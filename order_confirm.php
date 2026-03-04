@@ -35,6 +35,8 @@ if (empty($cart_items)) {
 
 // 計算金額
 $order_amount = calculateOrderAmount($cart_items, $shipping_method);
+$coupon_status = getAppliedCouponStatus($pdo, $cart_items);
+$order_summary = calculateOrderSummary($cart_items, $shipping_method, $coupon_status['coupon']);
 
 // 處理訂單建立（非信用卡付款）
 $order_created = false;
@@ -61,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_order'])) {
                                VALUES (:user_id, :total_amount, :status, :payment_method, :shipping_method, :shipping_address, :pickup_store)");
         $stmt->execute([
             ':user_id' => $user_id,
-            ':total_amount' => $order_amount['total'],
+            ':total_amount' => $order_summary['final_total'],
             ':status' => $order_status,
             ':payment_method' => $payment_method,
             ':shipping_method' => $shipping_method,
@@ -92,6 +94,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_order'])) {
         
         // 清除結帳資料
         unset($_SESSION['checkout_data']);
+        clearAppliedCoupon();
         
         $pdo->commit();
         $order_created = true;
@@ -163,7 +166,7 @@ $shipping_method_names = [
     <div class="checkout-container">
         <div class="container">
             <?php renderCheckoutSteps(3); ?>
-            <h1 class="checkout-page-title">訂單確認</h1>
+            <h1 class="checkout-page-title">訂單建立成功</h1>
             
             <?php if (isset($error_message)): ?>
                 <div class="error-message">
@@ -249,21 +252,25 @@ $shipping_method_names = [
                         <div class="order-summary">
                             <div class="summary-row">
                                 <span class="summary-label">商品小計：</span>
-                                <span class="summary-value">NT$ <?php echo number_format($order_amount['subtotal'], 0); ?></span>
+                                <span class="summary-value">NT$ <?php echo number_format($order_summary['subtotal'], 0); ?></span>
                             </div>
                             <div class="summary-row">
                                 <span class="summary-label">運費：</span>
                                 <span class="summary-value">
-                                    <?php if ($order_amount['shipping'] == 0): ?>
+                                    <?php if ($order_summary['shipping'] == 0): ?>
                                         NT$ 0（免運）
                                     <?php else: ?>
-                                        NT$ <?php echo number_format($order_amount['shipping'], 0); ?>
+                                        NT$ <?php echo number_format($order_summary['shipping'], 0); ?>
                                     <?php endif; ?>
                                 </span>
                             </div>
+                            <div class="summary-row">
+                                <span class="summary-label">優惠券折扣：</span>
+                                <span class="summary-value">- NT$ <?php echo number_format($order_summary['discount'], 0); ?></span>
+                            </div>
                             <div class="summary-row summary-total">
-                                <span class="summary-label">訂單總金額：</span>
-                                <span class="summary-value">NT$ <?php echo number_format($order_amount['total'], 0); ?></span>
+                                <span class="summary-label">最終總價：</span>
+                                <span class="summary-value">NT$ <?php echo number_format($order_summary['final_total'], 0); ?></span>
                             </div>
                         </div>
                     </div>

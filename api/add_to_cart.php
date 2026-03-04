@@ -22,24 +22,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $product_id = isset($_POST['product_id']) ? (int)$_POST['product_id'] : 0;
     $size = isset($_POST['size']) ? trim($_POST['size']) : '';
     $quantity = isset($_POST['quantity']) ? (int)$_POST['quantity'] : 0;
+    $is_addon = isset($_POST['is_addon']) && $_POST['is_addon'] === '1';
+    $unit_price = null;
 
     // 驗證輸入
     if ($product_id <= 0) {
         $error_message = '無效的商品 ID';
-    } elseif (!in_array($size, ['S', 'M', 'L', 'XL'])) {
+    } elseif (!$is_addon && !in_array($size, ['S', 'M', 'L', 'XL'], true)) {
         $error_message = '無效的尺寸';
     } elseif ($quantity <= 0) {
         $error_message = '數量必須大於 0';
     } else {
         try {
             // 檢查商品是否存在且為 active
-            $stmt = $pdo->prepare("SELECT id, name FROM products WHERE id = :product_id AND status = 'active'");
+            $stmt = $pdo->prepare("SELECT id, name, price, is_addon_product FROM products WHERE id = :product_id AND status = 'active'");
             $stmt->execute([':product_id' => $product_id]);
             $product = $stmt->fetch();
 
             if (!$product) {
                 $error_message = '找不到此商品或已下架';
             } else {
+                // 加價購可不帶尺寸，後端自動選擇第一個可用尺寸
+                if ($is_addon) {
+                    if ((int)$product['is_addon_product'] !== 1) {
+                        $error_message = '此商品不可加價購';
+                    } else {
+                        $stmt = $pdo->prepare("SELECT size, stock FROM product_sizes
+                                               WHERE product_id = :product_id AND stock > 0
+                                               ORDER BY FIELD(size, 'S', 'M', 'L', 'XL')
+                                               LIMIT 1");
+                        $stmt->execute([':product_id' => $product_id]);
+                        $first_available_size = $stmt->fetch();
+                        if (!$first_available_size) {
+                            $error_message = '此商品目前沒有可加購尺寸';
+                        } else {
+                            $size = $first_available_size['size'];
+                            $unit_price = round((float)$product['price'] * 0.9, 2);
+                        }
+                    }
+                }
+
+                if (!empty($error_message)) {
+                    throw new Exception($error_message);
+                }
+
                 // 檢查該商品 + 尺寸是否存在於尺寸庫存表中
                 $stmt = $pdo->prepare("SELECT stock FROM product_sizes WHERE product_id = :product_id AND size = :size");
                 $stmt->execute([':product_id' => $product_id, ':size' => $size]);
@@ -69,27 +95,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $error_message = '購物車中已有此商品，總數量超過庫存，已調整為最大可購買數量：' . $new_quantity;
                         }
 
-                        $stmt = $pdo->prepare("UPDATE cart SET quantity = :quantity WHERE id = :cart_id");
-                        $stmt->execute([':quantity' => $new_quantity, ':cart_id' => $existing_cart_item['id']]);
+                        if ($is_addon) {
+                            $stmt = $pdo->prepare("UPDATE cart SET quantity = :quantity, unit_price = :unit_price WHERE id = :cart_id");
+                            $stmt->execute([
+                                ':quantity' => $new_quantity,
+                                ':unit_price' => $unit_price,
+                                ':cart_id' => $existing_cart_item['id']
+                            ]);
+                        } else {
+                            $stmt = $pdo->prepare("UPDATE cart SET quantity = :quantity WHERE id = :cart_id");
+                            $stmt->execute([':quantity' => $new_quantity, ':cart_id' => $existing_cart_item['id']]);
+                        }
                     } else {
                         // 新增購物車項目
-                        $stmt = $pdo->prepare("INSERT INTO cart (user_id, product_id, size, quantity) VALUES (:user_id, :product_id, :size, :quantity)");
+                        $stmt = $pdo->prepare("INSERT INTO cart (user_id, product_id, size, quantity, unit_price)
+                                               VALUES (:user_id, :product_id, :size, :quantity, :unit_price)");
                         $stmt->execute([
                             ':user_id' => $user_id,
                             ':product_id' => $product_id,
                             ':size' => $size,
-                            ':quantity' => $quantity
+                            ':quantity' => $quantity,
+                            ':unit_price' => $unit_price
                         ]);
                     }
 
                     // 如果沒有錯誤訊息，表示成功
                     if (empty($error_message)) {
-                        $success_message = '已成功加入購物車';
+                        $success_message = $is_addon ? '已成功加入加價購商品（9 折）' : '已成功加入購物車';
                     }
                 }
             }
         } catch (PDOException $e) {
             $error_message = '加入購物車時發生錯誤：' . $e->getMessage();
+        } catch (Exception $e) {
+            $error_message = $e->getMessage();
         }
     }
     

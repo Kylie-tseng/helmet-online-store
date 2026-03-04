@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS `products` (
   `price` decimal(10,2) NOT NULL,
   `stock` int(11) NOT NULL DEFAULT 0,
   `status` enum('active','inactive') NOT NULL DEFAULT 'active',
+  `is_addon_product` tinyint(1) NOT NULL DEFAULT 0,
   `image_url` varchar(255) NULL DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NULL DEFAULT NULL,
@@ -81,6 +82,7 @@ CREATE TABLE IF NOT EXISTS `cart` (
   `product_id` int(11) NOT NULL,
   `size` enum('S','M','L','XL') NOT NULL,
   `quantity` int(11) NOT NULL DEFAULT 1,
+  `unit_price` decimal(10,2) DEFAULT NULL,
   `added_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
@@ -142,6 +144,40 @@ CREATE TABLE IF NOT EXISTS `view_history` (
   CONSTRAINT `fk_view_history_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `fk_view_history_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- =========================================
+-- coupons：優惠券
+-- =========================================
+CREATE TABLE IF NOT EXISTS `coupons` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `coupon_code` varchar(50) NOT NULL,
+  `discount_type` enum('percent','fixed') NOT NULL,
+  `discount_value` decimal(10,2) NOT NULL,
+  `minimum_amount` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `start_date` date NOT NULL,
+  `expire_date` date NOT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_coupon_code` (`coupon_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- 只保留四張指定優惠券
+DELETE FROM `coupons` WHERE `coupon_code` NOT IN ('NEW100', 'HELMET10', 'SAVE300', 'RIDER20');
+
+INSERT INTO `coupons` (`coupon_code`, `discount_type`, `discount_value`, `minimum_amount`, `start_date`, `expire_date`, `is_active`)
+VALUES
+('NEW100', 'fixed', 100, 500, '2025-01-01', '2099-12-31', 1),
+('HELMET10', 'percent', 10, 0, '2025-01-01', '2099-12-31', 1),
+('SAVE300', 'fixed', 300, 2000, '2025-01-01', '2099-12-31', 1),
+('RIDER20', 'percent', 20, 0, '2025-01-01', '2099-12-31', 1)
+ON DUPLICATE KEY UPDATE
+`discount_type` = VALUES(`discount_type`),
+`discount_value` = VALUES(`discount_value`),
+`minimum_amount` = VALUES(`minimum_amount`),
+`start_date` = VALUES(`start_date`),
+`expire_date` = VALUES(`expire_date`),
+`is_active` = VALUES(`is_active`);
 
 -- =========================================
 -- admin_logs：後台管理紀錄

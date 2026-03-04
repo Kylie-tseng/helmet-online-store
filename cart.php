@@ -24,7 +24,42 @@ if (isset($_SESSION['cart_message'])) {
 
 // 處理更新數量
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
-    if ($_POST['action'] === 'update_quantity') {
+    if ($_POST['action'] === 'apply_coupon') {
+        $coupon_code = isset($_POST['coupon_code']) ? trim($_POST['coupon_code']) : '';
+        $cart_items_for_coupon = getCartItems($pdo, $user_id);
+        $subtotal_for_coupon = 0.0;
+        foreach ($cart_items_for_coupon as $item) {
+            $subtotal_for_coupon += (float)$item['price'] * (int)$item['quantity'];
+        }
+
+        if ($coupon_code === '') {
+            $_SESSION['cart_message'] = '請輸入優惠券代碼';
+            $_SESSION['cart_message_type'] = 'error';
+        } else {
+            try {
+                $coupon = getCouponByCode($pdo, $coupon_code);
+                $validation = validateCoupon($coupon, $subtotal_for_coupon);
+
+                if ($validation['valid']) {
+                    setAppliedCoupon($coupon);
+                    $discount_amount = calculateCouponDiscount($coupon, $subtotal_for_coupon);
+                    $_SESSION['cart_message'] = '優惠券套用成功，折扣 NT$ ' . number_format($discount_amount, 0);
+                    $_SESSION['cart_message_type'] = 'success';
+                } else {
+                    clearAppliedCoupon();
+                    $_SESSION['cart_message'] = $validation['message'];
+                    $_SESSION['cart_message_type'] = 'error';
+                }
+            } catch (PDOException $e) {
+                $_SESSION['cart_message'] = '套用優惠券時發生錯誤，請稍後再試';
+                $_SESSION['cart_message_type'] = 'error';
+            }
+        }
+    } elseif ($_POST['action'] === 'remove_coupon') {
+        clearAppliedCoupon();
+        $_SESSION['cart_message'] = '已移除優惠券';
+        $_SESSION['cart_message_type'] = 'success';
+    } elseif ($_POST['action'] === 'update_quantity') {
         $cart_id = isset($_POST['cart_id']) ? (int)$_POST['cart_id'] : 0;
         $quantity = isset($_POST['quantity']) ? (int)$_POST['quantity'] : 0;
 
@@ -52,7 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     } elseif ($quantity == 0) {
                         // 刪除項目
                         $stmt = $pdo->prepare("DELETE FROM cart WHERE id = :cart_id AND user_id = :user_id");
-                        $stmt->execute([':cart_id' => $cart_id]);
+                        $stmt->execute([':cart_id' => $cart_id, ':user_id' => $user_id]);
                     }
                 }
             } catch (PDOException $e) {
@@ -84,6 +119,62 @@ $cart_items = getCartItems($pdo, $user_id);
 
 // 計算金額（使用共用函數）
 $order_amount = calculateOrderAmount($cart_items, 'pickup'); // 預設超商取貨
+$coupon_status = getAppliedCouponStatus($pdo, $cart_items);
+$order_summary = calculateOrderSummary($cart_items, 'pickup', $coupon_status['coupon']);
+$free_shipping_threshold = getFreeShippingThreshold();
+$remaining_for_free_shipping = max(0, $free_shipping_threshold - $order_summary['subtotal']);
+if (!empty($coupon_status['message']) && empty($cart_message)) {
+    $cart_message = $coupon_status['message'];
+    $cart_message_type = 'warning';
+}
+$coupon_panel_message = '';
+$coupon_panel_message_type = '';
+if (!empty($cart_message) &&
+    (strpos($cart_message, '優惠券') !== false || strpos($cart_message, '最低消費') !== false)
+) {
+    $coupon_panel_message = $cart_message;
+    $coupon_panel_message_type = $cart_message_type;
+}
+
+// 加價購商品（僅購物車有商品時顯示）
+$addon_products = [];
+$addon_sizes_map = [];
+if (!empty($cart_items)) {
+    try {
+        $stmt = $pdo->query("SELECT id, name, price, image_url
+                             FROM products
+                             WHERE status = 'active' AND is_addon_product = 1
+                             ORDER BY created_at DESC
+                             LIMIT 8");
+        $addon_products = $stmt->fetchAll();
+
+        if (!empty($addon_products)) {
+            $addon_ids = array_map(function ($p) {
+                return (int)$p['id'];
+            }, $addon_products);
+
+            $in_placeholders = implode(',', array_fill(0, count($addon_ids), '?'));
+            $size_stmt = $pdo->prepare("SELECT product_id, size
+                                        FROM product_sizes
+                                        WHERE product_id IN ($in_placeholders)
+                                          AND stock > 0
+                                        ORDER BY FIELD(size, 'S', 'M', 'L', 'XL')");
+            $size_stmt->execute($addon_ids);
+            $size_rows = $size_stmt->fetchAll();
+
+            foreach ($size_rows as $row) {
+                $pid = (int)$row['product_id'];
+                if (!isset($addon_sizes_map[$pid])) {
+                    $addon_sizes_map[$pid] = [];
+                }
+                $addon_sizes_map[$pid][] = $row['size'];
+            }
+        }
+    } catch (PDOException $e) {
+        $addon_products = [];
+        $addon_sizes_map = [];
+    }
+}
 
 // 查詢所有分類（用於導覽列）
 try {
@@ -114,7 +205,7 @@ $is_logged_in = isset($_SESSION['user_id']);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>購物車 - HelmetVRse</title>
-    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/style.css?v=20260304-addon-fix">
 </head>
 <body>
     <!-- 頂部公告橫幅 -->
@@ -229,32 +320,134 @@ $is_logged_in = isset($_SESSION['user_id']);
                     </table>
                 </div>
 
-                <!-- 購物車總計 -->
-                <div class="cart-summary">
-                    <div class="cart-summary-content">
-                        <div class="summary-row">
-                            <span class="summary-label">商品小計：</span>
-                            <span class="summary-value">NT$ <?php echo number_format($order_amount['subtotal'], 0); ?></span>
+                <!-- 2. 加價購商品區塊 -->
+                <?php if (!empty($addon_products)): ?>
+                    <section class="addon-section">
+                        <div class="addon-header">
+                            <h2 class="addon-title">加價購商品</h2>
+                            <p class="addon-hint">🔥 加購享 9 折</p>
                         </div>
-                        <div class="summary-row">
-                            <span class="summary-label">運費：</span>
-                            <span class="summary-value">
-                                <?php if ($order_amount['shipping'] == 0): ?>
-                                    NT$ 0（免運）
-                                <?php else: ?>
-                                    NT$ <?php echo number_format($order_amount['shipping'], 0); ?>
-                                <?php endif; ?>
-                            </span>
+                        <button type="button" class="addon-nav-btn addon-nav-left" id="addonNavLeft" aria-label="向左滑動">‹</button>
+                        <button type="button" class="addon-nav-btn addon-nav-right" id="addonNavRight" aria-label="向右滑動">›</button>
+                        <div class="addon-scroll" id="addonScroll">
+                            <div class="addon-track">
+                                <?php foreach ($addon_products as $addon): ?>
+                                    <?php
+                                        $addon_original_price = (float)$addon['price'];
+                                        $addon_price = round($addon_original_price * 0.9, 2);
+                                        $addon_has_image = !empty($addon['image_url']) && trim($addon['image_url']) !== '';
+                                        $addon_sizes = $addon_sizes_map[(int)$addon['id']] ?? [];
+                                    ?>
+                                    <article class="addon-card" data-product-id="<?php echo (int)$addon['id']; ?>">
+                                        <a href="product_detail.php?id=<?php echo (int)$addon['id']; ?>" class="addon-image-link">
+                                            <div class="addon-image-wrap">
+                                                <?php if ($addon_has_image): ?>
+                                                    <img src="<?php echo htmlspecialchars($addon['image_url'], ENT_QUOTES); ?>"
+                                                         alt="<?php echo htmlspecialchars($addon['name']); ?>"
+                                                         class="addon-image">
+                                                <?php else: ?>
+                                                    <div class="addon-image-fallback">無圖片</div>
+                                                <?php endif; ?>
+                                            </div>
+                                        </a>
+                                        <div class="addon-info">
+                                            <a href="product_detail.php?id=<?php echo (int)$addon['id']; ?>" class="addon-name-link">
+                                                <h3 class="addon-name"><?php echo htmlspecialchars($addon['name']); ?></h3>
+                                            </a>
+
+                                            <div class="addon-price-row">
+                                                <span class="addon-original-price">原價 NT$ <?php echo number_format($addon_original_price, 0); ?></span>
+                                                <span class="addon-price">加購價 NT$ <?php echo number_format($addon_price, 0); ?></span>
+                                            </div>
+
+                                            <?php if (!empty($addon_sizes)): ?>
+                                                <div class="addon-sizes addon-size-group" data-product-id="<?php echo (int)$addon['id']; ?>">
+                                                    <?php foreach ($addon_sizes as $size): ?>
+                                                        <button type="button" class="addon-size-pill" data-size="<?php echo htmlspecialchars($size); ?>">
+                                                            <?php echo htmlspecialchars($size); ?>
+                                                        </button>
+                                                    <?php endforeach; ?>
+                                                </div>
+                                                <p class="addon-size-error" id="addonError_<?php echo (int)$addon['id']; ?>"></p>
+                                                <button type="button"
+                                                        class="addon-cta-btn addon-add-btn"
+                                                        data-product-id="<?php echo (int)$addon['id']; ?>">
+                                                    加入購物車
+                                                </button>
+                                            <?php else: ?>
+                                                <button type="button" class="addon-cta-btn" disabled>目前無可用尺寸</button>
+                                            <?php endif; ?>
+                                        </div>
+                                    </article>
+                                <?php endforeach; ?>
+                            </div>
                         </div>
-                        <div class="summary-row summary-total">
-                            <span class="summary-label">訂單總金額：</span>
-                            <span class="summary-value">NT$ <?php echo number_format($order_amount['total'], 0); ?></span>
+                    </section>
+                <?php endif; ?>
+
+                <div class="cart-summary-layout">
+                    <!-- 3. 左欄：優惠券輸入區 -->
+                    <div class="coupon-panel">
+                        <div class="cart-summary-content">
+                            <label class="summary-label coupon-label">Coupon Code：</label>
+                            <div class="coupon-form-row">
+                                <form method="POST" class="coupon-apply-form">
+                                    <input type="hidden" name="action" value="<?php echo !empty($coupon_status['coupon']) ? 'remove_coupon' : 'apply_coupon'; ?>">
+                                    <input type="text" name="coupon_code" class="form-input coupon-input" placeholder="輸入優惠券代碼"
+                                           value="<?php echo !empty($coupon_status['coupon']) ? htmlspecialchars($coupon_status['coupon']['coupon_code']) : ''; ?>">
+                                    <button type="submit" class="<?php echo !empty($coupon_status['coupon']) ? 'btn-secondary' : 'btn-primary'; ?>">
+                                        <?php echo !empty($coupon_status['coupon']) ? '移除優惠券' : '套用優惠券'; ?>
+                                    </button>
+                                </form>
+                            </div>
+                            <?php if (!empty($coupon_panel_message)): ?>
+                                <div class="cart-message <?php echo htmlspecialchars($coupon_panel_message_type); ?>">
+                                    <?php echo htmlspecialchars($coupon_panel_message); ?>
+                                </div>
+                            <?php endif; ?>
                         </div>
                     </div>
-                    <div class="cart-actions">
-                        <a href="products.php" class="btn-secondary">繼續購物</a>
-                        <a href="checkout.php" class="btn-primary">下一步：選擇送貨及付款方式</a>
+
+                    <!-- 4. 右欄：結算摘要 -->
+                    <div class="summary-card">
+                        <div class="cart-summary-content">
+                            <div class="summary-row">
+                                <span class="summary-label">商品小計：</span>
+                                <span class="summary-value">NT$ <?php echo number_format($order_summary['subtotal'], 0); ?></span>
+                            </div>
+                            <div class="summary-row">
+                                <span class="summary-label">運費：</span>
+                                <span class="summary-value">
+                                    <?php if ($order_summary['shipping'] == 0): ?>
+                                        免運費
+                                    <?php else: ?>
+                                        NT$ 60
+                                    <?php endif; ?>
+                                </span>
+                            </div>
+                            <?php if ($remaining_for_free_shipping > 0): ?>
+                                <div class="summary-row summary-hint">
+                                    <span class="summary-label">免運提醒：</span>
+                                    <span class="summary-value">再購買 <?php echo number_format($remaining_for_free_shipping, 0); ?> 元即可享免運</span>
+                                </div>
+                            <?php endif; ?>
+                            <div class="summary-row">
+                                <span class="summary-label">優惠券折扣：</span>
+                                <span class="summary-value">- NT$ <?php echo number_format($order_summary['discount'], 0); ?></span>
+                            </div>
+                            <div class="summary-divider"></div>
+                            <div class="summary-row summary-total">
+                                <span class="summary-label">最終總價：</span>
+                                <span class="summary-value">NT$ <?php echo number_format($order_summary['final_total'], 0); ?></span>
+                            </div>
+                        </div>
                     </div>
+                </div>
+
+                <!-- 底部按鈕列 -->
+                <div class="cart-actions cart-actions-bottom">
+                    <a href="products.php" class="btn-secondary">繼續購物</a>
+                    <a href="checkout.php" class="btn-primary">下一步：選擇送貨及付款方式</a>
                 </div>
             <?php endif; ?>
         </div>
@@ -333,6 +526,115 @@ $is_logged_in = isset($_SESSION['user_id']);
             document.body.appendChild(form);
             form.submit();
         }
+
+        // 加價購：直接加入購物車（使用 9 折）
+        (function() {
+            const addonScroll = document.getElementById('addonScroll');
+            const navLeft = document.getElementById('addonNavLeft');
+            const navRight = document.getElementById('addonNavRight');
+            const addonTrack = addonScroll ? addonScroll.querySelector('.addon-track') : null;
+
+            function getScrollStep() {
+                if (!addonTrack) return 376;
+                const firstCard = addonTrack.querySelector('.addon-card');
+                if (!firstCard) return 376;
+                const gap = parseFloat(window.getComputedStyle(addonTrack).columnGap || window.getComputedStyle(addonTrack).gap || '16');
+                return firstCard.getBoundingClientRect().width + gap;
+            }
+
+            function updateNavState() {
+                if (!addonScroll || !navLeft || !navRight) return;
+                const maxScrollLeft = addonScroll.scrollWidth - addonScroll.clientWidth;
+                navLeft.disabled = addonScroll.scrollLeft <= 2;
+                navRight.disabled = addonScroll.scrollLeft >= (maxScrollLeft - 2);
+            }
+
+            if (addonScroll && navLeft && navRight) {
+                navLeft.addEventListener('click', function() {
+                    addonScroll.scrollBy({ left: -getScrollStep(), behavior: 'smooth' });
+                });
+
+                navRight.addEventListener('click', function() {
+                    addonScroll.scrollBy({ left: getScrollStep(), behavior: 'smooth' });
+                });
+
+                addonScroll.addEventListener('scroll', updateNavState, { passive: true });
+                window.addEventListener('resize', updateNavState);
+
+                addonScroll.addEventListener('wheel', function(e) {
+                    if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+                        e.preventDefault();
+                        addonScroll.scrollLeft += e.deltaY;
+                    }
+                }, { passive: false });
+
+                updateNavState();
+            }
+
+            const sizeGroups = document.querySelectorAll('.addon-size-group');
+            sizeGroups.forEach(function(group) {
+                const pills = group.querySelectorAll('.addon-size-pill');
+                pills.forEach(function(pill) {
+                    pill.addEventListener('click', function() {
+                        pills.forEach(function(p) { p.classList.remove('active'); });
+                        pill.classList.add('active');
+                        group.setAttribute('data-selected-size', pill.getAttribute('data-size'));
+
+                        const pid = group.getAttribute('data-product-id');
+                        const err = document.getElementById('addonError_' + pid);
+                        if (err) err.textContent = '';
+                    });
+                });
+            });
+
+            const buttons = document.querySelectorAll('.addon-add-btn');
+            if (!buttons.length) return;
+
+            buttons.forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    const productId = btn.getAttribute('data-product-id');
+                    if (!productId) return;
+
+                    const formData = new FormData();
+                    const sizeGroup = document.querySelector('.addon-size-group[data-product-id="' + productId + '"]');
+                    const selectedSize = sizeGroup ? sizeGroup.getAttribute('data-selected-size') : '';
+                    const errorEl = document.getElementById('addonError_' + productId);
+                    if (!selectedSize) {
+                        if (errorEl) errorEl.textContent = '請先選擇尺寸';
+                        return;
+                    }
+
+                    formData.append('product_id', productId);
+                    formData.append('size', selectedSize);
+                    formData.append('quantity', '1');
+                    formData.append('is_addon', '1');
+
+                    btn.disabled = true;
+                    const originalText = btn.textContent;
+                    btn.textContent = '加入中...';
+
+                    fetch('api/add_to_cart.php', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            window.location.reload();
+                        } else if (errorEl) {
+                            errorEl.textContent = data.message || '加入失敗';
+                        }
+                    })
+                    .catch(() => {
+                        if (errorEl) errorEl.textContent = '加入購物車時發生錯誤';
+                    })
+                    .finally(() => {
+                        btn.disabled = false;
+                        btn.textContent = originalText;
+                    });
+                });
+            });
+        })();
 
         // 搜尋功能
         (function() {

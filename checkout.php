@@ -37,19 +37,22 @@ if (isset($_SESSION['pending_order_id']) && isset($_GET['return_from_payment']))
             
             if ($existing) {
                 // 更新數量
-                $stmt = $pdo->prepare("UPDATE cart SET quantity = :quantity, updated_at = NOW() WHERE id = :cart_id");
+                $stmt = $pdo->prepare("UPDATE cart SET quantity = :quantity, unit_price = :unit_price, updated_at = NOW() WHERE id = :cart_id");
                 $stmt->execute([
                     ':quantity' => $item['quantity'],
+                    ':unit_price' => $item['unit_price'],
                     ':cart_id' => $existing['id']
                 ]);
             } else {
                 // 新增到購物車
-                $stmt = $pdo->prepare("INSERT INTO cart (user_id, product_id, size, quantity) VALUES (:user_id, :product_id, :size, :quantity)");
+                $stmt = $pdo->prepare("INSERT INTO cart (user_id, product_id, size, quantity, unit_price)
+                                       VALUES (:user_id, :product_id, :size, :quantity, :unit_price)");
                 $stmt->execute([
                     ':user_id' => $user_id,
                     ':product_id' => $item['product_id'],
                     ':size' => $item['size'],
-                    ':quantity' => $item['quantity']
+                    ':quantity' => $item['quantity'],
+                    ':unit_price' => $item['unit_price']
                 ]);
             }
         }
@@ -81,6 +84,9 @@ if (empty($cart_items)) {
     exit;
 }
 
+$coupon_status = getAppliedCouponStatus($pdo, $cart_items);
+$coupon_notice = !empty($coupon_status['message']) ? $coupon_status['message'] : '';
+
 // 處理表單提交
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $shipping_method = isset($_POST['shipping_method']) ? trim($_POST['shipping_method']) : '';
@@ -90,6 +96,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     // 驗證
     $errors = [];
+    if ($coupon_notice !== '') {
+        $errors[] = $coupon_notice;
+    }
     
     if (!in_array($shipping_method, ['pickup', 'home'])) {
         $errors[] = '請選擇送貨方式';
@@ -113,13 +122,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'shipping_method' => $shipping_method,
             'payment_method' => $payment_method,
             'shipping_address' => $shipping_address,
-            'pickup_store' => $pickup_store
+            'pickup_store' => $pickup_store,
+            'coupon_code' => !empty($coupon_status['coupon']) ? $coupon_status['coupon']['coupon_code'] : null
         ];
         
         // 如果選擇信用卡，先建立訂單再導向信用卡繳費頁
         if ($payment_method === 'credit_card') {
             // 計算金額
-            $order_amount = calculateOrderAmount($cart_items, $shipping_method);
+            $order_summary = calculateOrderSummary($cart_items, $shipping_method, $coupon_status['coupon']);
             
             try {
                 $pdo->beginTransaction();
@@ -129,7 +139,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                      VALUES (:user_id, :total_amount, 'pending_payment', :payment_method, :shipping_method, :shipping_address, :pickup_store)");
                 $stmt->execute([
                     ':user_id' => $user_id,
-                    ':total_amount' => $order_amount['total'],
+                    ':total_amount' => $order_summary['final_total'],
                     ':payment_method' => $payment_method,
                     ':shipping_method' => $shipping_method,
                     ':shipping_address' => $shipping_method === 'home' ? $shipping_address : null,
@@ -182,6 +192,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $shipping_address = isset($_SESSION['checkout_data']['shipping_address']) ? $_SESSION['checkout_data']['shipping_address'] : '';
     $pickup_store = isset($_SESSION['checkout_data']['pickup_store']) ? $_SESSION['checkout_data']['pickup_store'] : '';
     $errors = [];
+    if ($coupon_notice !== '') {
+        $errors[] = $coupon_notice;
+    }
     
     // 如果沒有填寫過地址，自動帶入會員資料中的地址
     if (empty($shipping_address)) {
@@ -200,6 +213,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // 計算金額
 $order_amount = calculateOrderAmount($cart_items, $shipping_method);
+$order_summary = calculateOrderSummary($cart_items, $shipping_method, $coupon_status['coupon']);
 
 // 查詢所有分類（用於導覽列）
 try {
@@ -270,14 +284,14 @@ $is_logged_in = isset($_SESSION['user_id']);
                                        <?php echo $shipping_method === 'pickup' ? 'checked' : ''; ?>
                                        onchange="updateShippingMethod()">
                                 <span class="method-label">超商取貨</span>
-                                <span class="method-fee">運費 NT$ <?php echo $order_amount['shipping'] == 0 && $shipping_method === 'pickup' ? '0（免運）' : '60'; ?></span>
+                                <span class="method-fee"><?php echo $order_amount['shipping'] == 0 ? '免運費' : '運費 60 元'; ?></span>
                             </label>
                             <label class="shipping-method-option">
                                 <input type="radio" name="shipping_method" value="home"
                                        <?php echo $shipping_method === 'home' ? 'checked' : ''; ?>
                                        onchange="updateShippingMethod()">
                                 <span class="method-label">宅配到府</span>
-                                <span class="method-fee">運費 NT$ <?php echo $order_amount['shipping'] == 0 && $shipping_method === 'home' ? '0（免運）' : '60'; ?></span>
+                                <span class="method-fee"><?php echo $order_amount['shipping'] == 0 ? '免運費' : '運費 60 元'; ?></span>
                             </label>
                         </div>
                         
@@ -330,21 +344,25 @@ $is_logged_in = isset($_SESSION['user_id']);
                         <div class="order-summary">
                             <div class="summary-row">
                                 <span class="summary-label">商品小計：</span>
-                                <span class="summary-value">NT$ <?php echo number_format($order_amount['subtotal'], 0); ?></span>
+                                <span class="summary-value">NT$ <?php echo number_format($order_summary['subtotal'], 0); ?></span>
                             </div>
                             <div class="summary-row">
                                 <span class="summary-label">運費：</span>
                                 <span class="summary-value" id="shippingFee">
-                                    <?php if ($order_amount['shipping'] == 0): ?>
-                                        NT$ 0（免運）
+                                    <?php if ($order_summary['shipping'] == 0): ?>
+                                        免運費
                                     <?php else: ?>
-                                        NT$ <?php echo number_format($order_amount['shipping'], 0); ?>
+                                        運費 60 元
                                     <?php endif; ?>
                                 </span>
                             </div>
+                            <div class="summary-row">
+                                <span class="summary-label">優惠券折扣：</span>
+                                <span class="summary-value" id="couponDiscount">- NT$ <?php echo number_format($order_summary['discount'], 0); ?></span>
+                            </div>
                             <div class="summary-row summary-total">
-                                <span class="summary-label">訂單總金額：</span>
-                                <span class="summary-value" id="totalAmount">NT$ <?php echo number_format($order_amount['total'], 0); ?></span>
+                                <span class="summary-label">最終總價：</span>
+                                <span class="summary-value" id="totalAmount">NT$ <?php echo number_format($order_summary['final_total'], 0); ?></span>
                             </div>
                         </div>
                     </div>
@@ -411,20 +429,16 @@ $is_logged_in = isset($_SESSION['user_id']);
             document.getElementById('homeFields').style.display = shippingMethod === 'home' ? 'block' : 'none';
             
             // 重新計算運費（使用 AJAX 或直接計算）
-            const subtotal = <?php echo $order_amount['subtotal']; ?>;
-            let shipping = 60;
+            const subtotal = <?php echo (float)$order_summary['subtotal']; ?>;
+            const couponDiscount = <?php echo (float)$order_summary['discount']; ?>;
+            let shipping = subtotal >= 3000 ? 0 : 60;
             
-            if (shippingMethod === 'pickup' && subtotal >= 199) {
-                shipping = 0;
-            } else if (shippingMethod === 'home' && subtotal >= 490) {
-                shipping = 0;
-            }
-            
-            const total = subtotal + shipping;
+            const total = Math.max(0, subtotal + shipping - couponDiscount);
             
             // 更新顯示
-            document.getElementById('shippingFee').textContent = shipping === 0 ? 'NT$ 0（免運）' : 'NT$ ' + shipping.toLocaleString();
+            document.getElementById('shippingFee').textContent = shipping === 0 ? '免運費' : '運費 60 元';
             document.getElementById('totalAmount').textContent = 'NT$ ' + total.toLocaleString();
+            document.getElementById('couponDiscount').textContent = '- NT$ ' + couponDiscount.toLocaleString();
         }
     </script>
 </body>
