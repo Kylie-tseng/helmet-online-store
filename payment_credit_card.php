@@ -90,6 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_payment'])) {
             // 清除 session
             unset($_SESSION['pending_order_id']);
             unset($_SESSION['checkout_data']);
+            clearAppliedCoupon();
             
             $payment_success = true;
         } catch (PDOException $e) {
@@ -145,12 +146,18 @@ $is_logged_in = isset($_SESSION['user_id']);
     <!-- 信用卡繳費內容 -->
     <div class="checkout-container">
         <div class="container">
-            <?php renderCheckoutSteps(3); ?>
-            <h1 class="checkout-page-title">信用卡繳費</h1>
+            <?php
+            if ($payment_success) {
+                renderCheckoutSteps(5, ['信用卡繳費', '訂單完成']);
+            } else {
+                renderCheckoutSteps(4, '信用卡繳費');
+            }
+            ?>
+            <h1 class="checkout-page-title">訂單建立成功</h1>
             
             <?php if ($payment_success): ?>
                 <div class="order-success">
-                    <h2>付款成功！</h2>
+                    <h2>付款成功！訂單已建立!</h2>
                     <p>訂單編號：<?php echo htmlspecialchars($order_id); ?></p>
                     <p>感謝您的購買，我們將盡快為您處理訂單。</p>
                     <div class="order-success-actions">

@@ -68,6 +68,12 @@ if ($_SESSION['role'] !== 'admin') {
                     <p class="card-content">管理會員帳號</p>
                     <a href="users.php" class="btn">管理會員</a>
                 </div>
+
+                <div class="dashboard-card">
+                    <h2 class="card-title">優惠券管理</h2>
+                    <p class="card-content">新增與維護優惠券</p>
+                    <a href="coupons.php" class="btn">管理優惠券</a>
+                </div>
             </div>
         </div>
     </div>

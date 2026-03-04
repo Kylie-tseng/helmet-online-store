@@ -5,6 +5,9 @@ $payment_method_names = [
     'cod' => '貨到付款'
 ];
 
+$coupon_discount = isset($order_summary['discount']) ? (float)$order_summary['discount'] : 0;
+$final_total = isset($order_summary['final_total']) ? (float)$order_summary['final_total'] : (float)$order_amount['total'];
+
 // 因為是用 include 引入，這裡不需要重新連接資料庫 config.php
 // 只需要載入 PHPMailer 的檔案
 require_once 'PHPMailer/src/Exception.php';
@@ -79,8 +82,12 @@ if (!empty($customer_email)) {
                     </tbody>
                     <tfoot>
                         <tr>
-                            <td colspan='2' style='border:1px solid #ddd; padding:8px; text-align:right;'><strong>總計</strong></td>
-                            <td style='border:1px solid #ddd; padding:8px; text-align:right; color: #e74c3c;'><strong>NT$ " . number_format($order_amount['total']) . "</strong></td>
+                            <td colspan='2' style='border:1px solid #ddd; padding:8px; text-align:right;'>優惠券折扣</td>
+                            <td style='border:1px solid #ddd; padding:8px; text-align:right;'>- NT$ " . number_format($coupon_discount) . "</td>
+                        </tr>
+                        <tr>
+                            <td colspan='2' style='border:1px solid #ddd; padding:8px; text-align:right;'><strong>最終總價</strong></td>
+                            <td style='border:1px solid #ddd; padding:8px; text-align:right; color: #e74c3c;'><strong>NT$ " . number_format($final_total) . "</strong></td>
                         </tr>
                     </tfoot>
                 </table>
