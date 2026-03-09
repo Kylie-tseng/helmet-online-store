@@ -195,6 +195,21 @@ if ($active_tab === 'orders') {
     }
 }
 
+// 查詢會員優惠券（我的優惠券分頁）
+$user_coupons = [];
+if ($active_tab === 'coupons') {
+    try {
+        $stmt = $pdo->prepare("SELECT id, coupon_code, status, created_at
+                               FROM user_coupons
+                               WHERE user_id = :user_id
+                               ORDER BY created_at DESC");
+        $stmt->execute([':user_id' => $user_id]);
+        $user_coupons = $stmt->fetchAll();
+    } catch (PDOException $e) {
+        $error = '讀取優惠券資料時發生錯誤：' . $e->getMessage();
+    }
+}
+
 // 訂單狀態中文對照
 $status_map = [
     'pending' => '未出貨',
@@ -323,6 +338,9 @@ $cart_count = getCartItemCount($pdo, $user_id);
                 </a>
                 <a href="profile.php?tab=orders" class="profile-tab <?php echo $active_tab === 'orders' ? 'active' : ''; ?>">
                     訂單管理
+                </a>
+                <a href="profile.php?tab=coupons" class="profile-tab <?php echo $active_tab === 'coupons' ? 'active' : ''; ?>">
+                    我的優惠券
                 </a>
             </div>
 
@@ -525,6 +543,37 @@ $cart_count = getCartItemCount($pdo, $user_id);
                                         </div>
                                     </div>
                                 <?php endforeach; ?>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                <?php elseif ($active_tab === 'coupons'): ?>
+                    <!-- 我的優惠券分頁 -->
+                    <div class="profile-card">
+                        <h2 class="card-title">我的優惠券</h2>
+
+                        <?php if (empty($user_coupons)): ?>
+                            <div class="empty-message">目前尚未領取任何優惠券。</div>
+                        <?php else: ?>
+                            <div class="cart-table-wrapper">
+                                <table class="cart-table">
+                                    <thead>
+                                        <tr>
+                                            <th>優惠名稱</th>
+                                            <th>優惠內容</th>
+                                            <th>狀態</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($user_coupons as $coupon): ?>
+                                            <?php $meta = getCouponActivityMeta($coupon['coupon_code']); ?>
+                                            <tr class="cart-table-row">
+                                                <td><?php echo htmlspecialchars($meta['name']); ?></td>
+                                                <td><?php echo htmlspecialchars($meta['content']); ?></td>
+                                                <td><?php echo $coupon['status'] === 'unused' ? '可使用' : '已使用'; ?></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
                             </div>
                         <?php endif; ?>
                     </div>

@@ -30,7 +30,18 @@ function renderNavbar($pdo, $categories, $parts_category_id, $current_page = '')
                     </ul>
                 </li>
                 <li><a href="products.php<?php echo $parts_category_id ? '?category=' . htmlspecialchars($parts_category_id) : ''; ?>">周邊與零件</a></li>
-                <li><a href="guide.php">購物須知</a></li>
+                <li class="helmet-menu">
+                    <a href="guide.php" id="guideMenuToggle">購物須知 <span class="dropdown-arrow">▾</span></a>
+                    <ul class="helmet-submenu">
+                        <li><a href="helmet_size.php">安全帽尺寸</a></li>
+                        <li><a href="helmet_knowledge.php">安全帽知識</a></li>
+                        <li><a href="head_measure.php">頭圍量測教學</a></li>
+                        <li><a href="helmet_care.php">安全帽保養教學</a></li>
+                        <li><a href="faq.php">常見問題 FAQ</a></li>
+                        <li><a href="coupons.php">優惠券專區</a></li>
+                        <li><a href="return_policy.php">退貨政策</a></li>
+                    </ul>
+                </li>
             </ul>
             <div class="nav-right">
                 <!-- 搜尋 -->
@@ -107,6 +118,48 @@ function renderNavbar($pdo, $categories, $parts_category_id, $current_page = '')
             </div>
         </div>
     </nav>
+    <script>
+        (function() {
+            try {
+                const guideLink = document.getElementById('guideMenuToggle');
+                const guideMenu = guideLink ? guideLink.closest('.helmet-menu') : null;
+                if (!guideMenu || !guideLink) return;
+
+                let guideArmedForNavigation = false;
+
+                guideMenu.addEventListener('mouseenter', function() {
+                    guideMenu.classList.add('open');
+                });
+
+                guideMenu.addEventListener('mouseleave', function() {
+                    if (!guideArmedForNavigation) {
+                        guideMenu.classList.remove('open');
+                    }
+                });
+
+                guideLink.addEventListener('click', function(e) {
+                    // First click opens dropdown; second click navigates to guide.php
+                    if (!guideMenu.classList.contains('open') || !guideArmedForNavigation) {
+                        e.preventDefault();
+                        guideMenu.classList.add('open');
+                        guideArmedForNavigation = true;
+                        return;
+                    }
+
+                    guideArmedForNavigation = false;
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (!guideMenu.contains(e.target)) {
+                        guideMenu.classList.remove('open');
+                        guideArmedForNavigation = false;
+                    }
+                });
+            } catch (error) {
+                console.error('購物須知下拉選單功能錯誤:', error);
+            }
+        })();
+    </script>
     <?php
 }
 
