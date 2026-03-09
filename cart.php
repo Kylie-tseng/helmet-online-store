@@ -37,10 +37,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $_SESSION['cart_message_type'] = 'error';
         } else {
             try {
+                $ownership = validateUserCouponOwnership($pdo, $user_id, $coupon_code);
+                if (!$ownership['valid']) {
+                    clearAppliedCoupon();
+                    $_SESSION['cart_message'] = $ownership['message'];
+                    $_SESSION['cart_message_type'] = 'error';
+                    header('Location: cart.php');
+                    exit;
+                }
+
                 $coupon = getCouponByCode($pdo, $coupon_code);
                 $validation = validateCoupon($coupon, $subtotal_for_coupon);
 
                 if ($validation['valid']) {
+                    if (!markUserCouponUsed($pdo, $user_id, $coupon_code)) {
+                        clearAppliedCoupon();
+                        $_SESSION['cart_message'] = '優惠券使用失敗，請稍後再試';
+                        $_SESSION['cart_message_type'] = 'error';
+                        header('Location: cart.php');
+                        exit;
+                    }
+
                     setAppliedCoupon($coupon);
                     $discount_amount = calculateCouponDiscount($coupon, $subtotal_for_coupon);
                     $_SESSION['cart_message'] = '優惠券套用成功，折扣 NT$ ' . number_format($discount_amount, 0);

@@ -293,3 +293,147 @@ function calculateOrderSummary($cart_items, $shipping_method = 'pickup', $coupon
     ];
 }
 
+/**
+ * 優惠活動對照（僅保留四檔）
+ */
+function getCouponActivityMap() {
+    return [
+        'NEW100' => [
+            'name' => '新會員優惠',
+            'content' => '單筆滿 NT$500 折 NT$100'
+        ],
+        'HELMET10' => [
+            'name' => '安全帽週年慶',
+            'content' => '全站商品享 9 折優惠'
+        ],
+        'SAVE300' => [
+            'name' => '滿額折扣',
+            'content' => '單筆滿 NT$2000 折 NT$300'
+        ],
+        'RIDER20' => [
+            'name' => '騎士節活動',
+            'content' => '指定活動享 8 折優惠'
+        ]
+    ];
+}
+
+/**
+ * 依優惠券代碼取得活動資訊
+ */
+function getCouponActivityMeta($coupon_code) {
+    $coupon_code = normalizeCouponCode($coupon_code);
+    $map = getCouponActivityMap();
+    return $map[$coupon_code] ?? [
+        'name' => $coupon_code,
+        'content' => '優惠活動'
+    ];
+}
+
+/**
+ * 會員是否已領取特定優惠券
+ */
+function hasUserCoupon($pdo, $user_id, $coupon_code) {
+    if ((int)$user_id <= 0) {
+        return false;
+    }
+
+    $coupon_code = normalizeCouponCode($coupon_code);
+    if ($coupon_code === '') {
+        return false;
+    }
+
+    try {
+        $stmt = $pdo->prepare("SELECT id FROM user_coupons WHERE user_id = :user_id AND coupon_code = :coupon_code LIMIT 1");
+        $stmt->execute([
+            ':user_id' => (int)$user_id,
+            ':coupon_code' => $coupon_code
+        ]);
+        return (bool)$stmt->fetch();
+    } catch (PDOException $e) {
+        return false;
+    }
+}
+
+/**
+ * 領取會員優惠券
+ */
+function claimUserCoupon($pdo, $user_id, $coupon_code) {
+    $coupon_code = normalizeCouponCode($coupon_code);
+    if ((int)$user_id <= 0 || $coupon_code === '') {
+        return ['success' => false, 'message' => '資料不完整'];
+    }
+    if (!in_array($coupon_code, getAllowedCouponCodes(), true)) {
+        return ['success' => false, 'message' => '此優惠券不可領取'];
+    }
+
+    try {
+        if (hasUserCoupon($pdo, $user_id, $coupon_code)) {
+            return ['success' => false, 'message' => '您已領取過此優惠券'];
+        }
+
+        $stmt = $pdo->prepare("INSERT INTO user_coupons (user_id, coupon_code, status) VALUES (:user_id, :coupon_code, 'unused')");
+        $stmt->execute([
+            ':user_id' => (int)$user_id,
+            ':coupon_code' => $coupon_code
+        ]);
+        return ['success' => true, 'message' => '優惠券領取成功'];
+    } catch (PDOException $e) {
+        return ['success' => false, 'message' => '領取失敗，請稍後再試'];
+    }
+}
+
+/**
+ * 檢查會員是否可使用指定優惠券（必須為 unused）
+ */
+function validateUserCouponOwnership($pdo, $user_id, $coupon_code) {
+    $coupon_code = normalizeCouponCode($coupon_code);
+    if ((int)$user_id <= 0 || $coupon_code === '') {
+        return ['valid' => false, 'message' => '請先登入會員'];
+    }
+
+    try {
+        $stmt = $pdo->prepare("SELECT id, status FROM user_coupons WHERE user_id = :user_id AND coupon_code = :coupon_code LIMIT 1");
+        $stmt->execute([
+            ':user_id' => (int)$user_id,
+            ':coupon_code' => $coupon_code
+        ]);
+        $user_coupon = $stmt->fetch();
+
+        if (!$user_coupon) {
+            return ['valid' => false, 'message' => '此優惠券尚未領取'];
+        }
+        if ($user_coupon['status'] !== 'unused') {
+            return ['valid' => false, 'message' => '此優惠券已使用'];
+        }
+
+        return ['valid' => true, 'message' => '可使用'];
+    } catch (PDOException $e) {
+        return ['valid' => false, 'message' => '驗證會員優惠券時發生錯誤'];
+    }
+}
+
+/**
+ * 將會員優惠券標記為已使用
+ */
+function markUserCouponUsed($pdo, $user_id, $coupon_code) {
+    $coupon_code = normalizeCouponCode($coupon_code);
+    if ((int)$user_id <= 0 || $coupon_code === '') {
+        return false;
+    }
+
+    try {
+        $stmt = $pdo->prepare("UPDATE user_coupons
+                               SET status = 'used'
+                               WHERE user_id = :user_id
+                                 AND coupon_code = :coupon_code
+                                 AND status = 'unused'");
+        $stmt->execute([
+            ':user_id' => (int)$user_id,
+            ':coupon_code' => $coupon_code
+        ]);
+        return $stmt->rowCount() > 0;
+    } catch (PDOException $e) {
+        return false;
+    }
+}
+

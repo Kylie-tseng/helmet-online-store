@@ -3,6 +3,37 @@ require_once 'config.php';
 require_once 'includes/cart_functions.php';
 require_once 'includes/navbar.php';
 
+$coupon_message = '';
+$coupon_message_type = '';
+
+if (isset($_SESSION['coupon_message'])) {
+    $coupon_message = $_SESSION['coupon_message'];
+    $coupon_message_type = $_SESSION['coupon_message_type'] ?? 'success';
+    unset($_SESSION['coupon_message'], $_SESSION['coupon_message_type']);
+}
+
+if (isset($_GET['claim_coupon'])) {
+    $coupon_code = normalizeCouponCode($_GET['claim_coupon']);
+    if ($coupon_code === 'NEW100') {
+        if (!isset($_SESSION['user_id'])) {
+            $_SESSION['coupon_message'] = '請先登入再領取優惠券';
+            $_SESSION['coupon_message_type'] = 'error';
+            header('Location: login.php?redirect=' . urlencode('index.php?claim_coupon=NEW100'));
+            exit;
+        }
+
+        $claim_result = claimUserCoupon($pdo, (int)$_SESSION['user_id'], $coupon_code);
+        $_SESSION['coupon_message'] = $claim_result['message'];
+        $_SESSION['coupon_message_type'] = $claim_result['success'] ? 'success' : 'error';
+    } else {
+        $_SESSION['coupon_message'] = '此活動無可領取的優惠券';
+        $_SESSION['coupon_message_type'] = 'warning';
+    }
+
+    header('Location: index.php');
+    exit;
+}
+
 // 查詢分類資料
 try {
     $stmt = $pdo->query("SELECT id, name, description FROM categories ORDER BY id LIMIT 4");
@@ -39,6 +70,73 @@ try {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HelmetVRse - 首頁</title>
     <link rel="stylesheet" href="assets/css/style.css">
+    <style>
+        /* 只在首頁生效：活動快捷卡強制版 */
+        .home-promotions {
+            display: flex !important;
+            flex-wrap: nowrap !important;
+            justify-content: space-between !important;
+            align-items: stretch !important;
+            gap: 16px !important;
+            margin: 30px 0 !important;
+        }
+
+        .home-promotions .promo-card {
+            flex: 0 0 calc((100% - 64px) / 5) !important;
+            max-width: calc((100% - 64px) / 5) !important;
+            min-width: 0 !important;
+            background: #fff !important;
+            padding: 16px 12px !important;
+            border-radius: 12px !important;
+            text-align: center !important;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05) !important;
+            transition: transform 0.2s ease !important;
+            text-decoration: none !important;
+            color: inherit !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: center !important;
+        }
+
+        .home-promotions .promo-card:hover {
+            transform: translateY(-3px) !important;
+        }
+
+        .home-promotions .promo-shortcut-icon {
+            display: block;
+            font-size: 20px;
+            margin-bottom: 8px;
+            line-height: 1;
+        }
+
+        .home-promotions .promo-shortcut-title {
+            font-size: 15px;
+            color: #243047;
+            font-weight: 700;
+            margin-bottom: 6px;
+            line-height: 1.35;
+        }
+
+        .home-promotions .promo-shortcut-desc {
+            font-size: 13px;
+            color: #6B7280;
+            line-height: 1.4;
+        }
+
+        @media (max-width: 991.98px) {
+            .home-promotions {
+                justify-content: flex-start !important;
+                overflow-x: auto !important;
+                -webkit-overflow-scrolling: touch;
+                padding-bottom: 8px;
+            }
+
+            .home-promotions .promo-card {
+                flex: 0 0 190px !important;
+                max-width: none !important;
+            }
+        }
+    </style>
 </head>
 <body>
     <!-- 頂部公告橫幅（自動輪播） -->
@@ -63,6 +161,38 @@ try {
     <!-- 分類區 -->
     <section class="categories-section">
         <div class="container">
+            <div class="home-promotions">
+                <a href="<?php echo isset($_SESSION['user_id']) ? 'index.php?claim_coupon=NEW100' : 'login.php?redirect=' . urlencode('index.php?claim_coupon=NEW100'); ?>" class="promo-card">
+                    <span class="promo-shortcut-icon">🎉</span>
+                    <h3 class="promo-shortcut-title">新會員優惠</h3>
+                    <p class="promo-shortcut-desc">滿 500 元折抵 100 元</p>
+                </a>
+                <a href="coupons.php" class="promo-card">
+                    <span class="promo-shortcut-icon">🪖</span>
+                    <h3 class="promo-shortcut-title">安全帽週年慶</h3>
+                    <p class="promo-shortcut-desc">全館商品 9 折</p>
+                </a>
+                <a href="coupons.php" class="promo-card">
+                    <span class="promo-shortcut-icon">💰</span>
+                    <h3 class="promo-shortcut-title">滿額折扣活動</h3>
+                    <p class="promo-shortcut-desc">滿 2000 元折抵 300 元</p>
+                </a>
+                <a href="coupons.php" class="promo-card">
+                    <span class="promo-shortcut-icon">🏍</span>
+                    <h3 class="promo-shortcut-title">騎士節活動</h3>
+                    <p class="promo-shortcut-desc">全館商品 8 折</p>
+                </a>
+                <a href="coupons.php" class="promo-card">
+                    <span class="promo-shortcut-icon">🚚</span>
+                    <h3 class="promo-shortcut-title">滿三千免運</h3>
+                    <p class="promo-shortcut-desc">全站滿 NT$3000 免運</p>
+                </a>
+            </div>
+            <?php if ($coupon_message !== ''): ?>
+                <div class="cart-message <?php echo htmlspecialchars($coupon_message_type); ?>">
+                    <?php echo htmlspecialchars($coupon_message); ?>
+                </div>
+            <?php endif; ?>
             <div class="section-header">
                 <h2 class="section-title">商品分類</h2>
                 <p class="section-subtitle">探索我們的精選分類</p>
