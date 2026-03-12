@@ -4,7 +4,7 @@ require_once 'includes/cart_functions.php';
 require_once 'includes/navbar.php';
 
 try {
-    $stmt = $pdo->query("SELECT id, name, description FROM categories ORDER BY id");
+    $stmt = $pdo->query("SELECT id, name FROM categories ORDER BY id");
     $categories = $stmt->fetchAll();
 } catch (PDOException $e) {
     $categories = [];
@@ -27,7 +27,7 @@ try {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>安全帽保養教學 - HelmetVRse</title>
+    <title>關於我們 - HelmetVRse</title>
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
@@ -36,8 +36,16 @@ try {
     <section class="products-section">
         <div class="container">
             <div class="section-header">
-                <h1 class="section-title">安全帽保養教學</h1>
-                <p class="section-subtitle">此頁為基本頁面，可後續補充內襯清洗與帽殼保養流程</p>
+                <h1 class="section-title">關於我們</h1>
+                <p class="section-subtitle">以騎乘安全與選購體驗為核心，提供更清楚的安全帽資訊與服務</p>
+            </div>
+            <div class="product-card" style="max-width: 900px; margin: 0 auto;">
+                <div class="product-info" style="text-align: left;">
+                    <h2 class="product-name">品牌理念</h2>
+                    <p>HelmetVRse 專注於提供完整的安全帽產品與知識內容，協助每位騎士找到合適的裝備。</p>
+                    <h2 class="product-name">服務內容</h2>
+                    <p>我們提供商品選購、尺寸教學、保養指南與常見問題整理，讓購物流程更清楚、使用更安心。</p>
+                </div>
             </div>
         </div>
     </section>

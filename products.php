@@ -15,10 +15,10 @@ try {
     $categories = [];
 }
 
-// 查詢「周邊與零件」的分類 ID
+// 查詢「周邊與配件」的分類 ID
 $parts_category_id = null;
 try {
-    $stmt = $pdo->prepare("SELECT id FROM categories WHERE name = '周邊與零件' LIMIT 1");
+    $stmt = $pdo->prepare("SELECT id FROM categories WHERE name = '周邊與配件' LIMIT 1");
     $stmt->execute();
     $parts_category = $stmt->fetch();
     if ($parts_category) {
@@ -47,7 +47,7 @@ if ($category_id) {
 
 // 查詢商品（根據分類和搜尋條件）
 try {
-    $sql = "SELECT p.id, p.name, p.description, p.price, p.stock, p.status, p.image_url, 
+    $sql = "SELECT p.id, p.name, p.description, p.price, p.status, p.image_url, 
                    c.name AS category_name, c.id AS category_id
             FROM products p
             INNER JOIN categories c ON p.category_id = c.id
@@ -89,6 +89,10 @@ if (!empty($search_keyword)) {
 
 // 檢查是否已登入
 $is_logged_in = isset($_SESSION['user_id']);
+$favorite_ids = [];
+if ($is_logged_in) {
+    $favorite_ids = getUserFavoriteProductIds($pdo, (int)$_SESSION['user_id']);
+}
 ?>
 <!DOCTYPE html>
 <html lang="zh-TW">
@@ -99,14 +103,7 @@ $is_logged_in = isset($_SESSION['user_id']);
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
-    <!-- 頂部公告橫幅 -->
-    <div class="announcement-bar">
-        <div class="announcement-content" id="announcementText">
-            商品庫存變動快速，請多利用客服功能
-        </div>
-    </div>
-
-    <!-- 導覽列 -->
+<!-- 導覽列 -->
     <?php renderNavbar($pdo, $categories, $parts_category_id); ?>
 
     <!-- 商品總覽頁面內容 -->
@@ -136,10 +133,29 @@ $is_logged_in = isset($_SESSION['user_id']);
             <main class="products-main">
                 <!-- 標題 -->
                 <div class="products-header">
-                    <h1 class="products-page-title"><?php echo htmlspecialchars($page_title); ?></h1>
+                    <div class="products-header-row">
+                        <h1 class="products-page-title"><?php echo htmlspecialchars($page_title); ?></h1>
+                        <form action="products.php" method="GET" class="products-search-form" role="search">
+                            <?php if ($category_id): ?>
+                                <input type="hidden" name="category" value="<?php echo htmlspecialchars($category_id); ?>">
+                            <?php endif; ?>
+                            <input
+                                type="text"
+                                name="search"
+                                class="products-search-input"
+                                placeholder="找商品"
+                                value="<?php echo htmlspecialchars($search_keyword); ?>"
+                            >
+                            <button type="submit" class="products-search-btn">搜尋</button>
+                        </form>
+                    </div>
                 </div>
 
                 <!-- 商品卡片網格 -->
+                <?php if (!empty($_SESSION['favorite_message'])): ?>
+                    <div class="success-message"><?php echo htmlspecialchars($_SESSION['favorite_message']); ?></div>
+                    <?php unset($_SESSION['favorite_message']); ?>
+                <?php endif; ?>
                 <?php if (isset($error_message)): ?>
                     <div class="error-message"><?php echo htmlspecialchars($error_message); ?></div>
                 <?php elseif (empty($products)): ?>
@@ -153,6 +169,7 @@ $is_logged_in = isset($_SESSION['user_id']);
                 <?php else: ?>
                     <div class="products-grid-page">
                         <?php foreach ($products as $product): ?>
+                            <?php $is_favorited = in_array((int)$product['id'], $favorite_ids, true); ?>
                             <div class="product-card-page">
                                 <div class="product-image-page">
                                     <?php 
@@ -164,7 +181,7 @@ $is_logged_in = isset($_SESSION['user_id']);
                                              alt="<?php echo htmlspecialchars($product['name']); ?>">
                                     <?php else: ?>
                                         <div class="product-image-placeholder">
-                                            <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#8B96A9" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                            <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#9A9A9A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                                                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                                                 <circle cx="8.5" cy="8.5" r="1.5"></circle>
                                                 <polyline points="21 15 16 10 5 21"></polyline>
@@ -175,10 +192,29 @@ $is_logged_in = isset($_SESSION['user_id']);
                                 </div>
                                 <div class="product-info-page">
                                     <h3 class="product-name-page"><?php echo htmlspecialchars($product['name']); ?></h3>
-                                    <p class="product-price-page">NT$ <?php echo number_format($product['price'], 0); ?></p>
-                                    <a href="product_detail.php?id=<?php echo htmlspecialchars($product['id']); ?>" class="btn-primary product-btn-page">
-                                        查看詳情
-                                    </a>
+                                    <div class="product-price-row">
+                                        <p class="product-price-page">NT$ <?php echo number_format($product['price'], 0); ?></p>
+                                        <form action="api/toggle_favorite.php" method="POST" class="product-favorite-inline-form">
+                                            <input type="hidden" name="product_id" value="<?php echo (int)$product['id']; ?>">
+                                            <input type="hidden" name="redirect" value="<?php echo htmlspecialchars($_SERVER['REQUEST_URI'] ?? 'products.php'); ?>">
+                                            <button
+                                                type="submit"
+                                                class="favorite-btn favorite-icon-btn <?php echo $is_favorited ? 'active' : ''; ?>"
+                                                aria-label="<?php echo $is_favorited ? '取消收藏' : '加入收藏'; ?>"
+                                                title="<?php echo $is_favorited ? '取消收藏' : '加入收藏'; ?>"
+                                            >
+                                                <svg class="heart-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                                    <path class="heart-outline" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"></path>
+                                                    <path class="heart-fill" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"></path>
+                                                </svg>
+                                            </button>
+                                        </form>
+                                    </div>
+                                    <div class="product-card-actions">
+                                        <a href="product_detail.php?id=<?php echo htmlspecialchars($product['id']); ?>" class="btn-primary product-btn-page">
+                                            查看詳情
+                                        </a>
+                                    </div>
                                 </div>
                             </div>
                         <?php endforeach; ?>
@@ -203,7 +239,7 @@ $is_logged_in = isset($_SESSION['user_id']);
                 <div class="footer-column">
                     <h3 class="footer-title">顧客服務</h3>
                     <ul class="footer-links">
-                        <li><a href="guide.php">購物須知</a></li>
+                        <li><a href="guide.php">購物指南</a></li>
                         <li><a href="faq.php">常見問題</a></li>
                         <li><a href="return.php">退換貨政策</a></li>
                         <li><a href="shipping.php">運送說明</a></li>
@@ -230,31 +266,7 @@ $is_logged_in = isset($_SESSION['user_id']);
     </footer>
 
     <script>
-        // 公告條自動輪播功能
-        (function() {
-            try {
-                const announcementText = document.getElementById('announcementText');
-                if (!announcementText) return;
-
-                const messages = [
-                    '商品庫存變動快速，請多利用客服功能',
-                    '超取滿199、宅配滿490 享免運優惠'
-                ];
-
-                let currentIndex = 0;
-
-                function rotateAnnouncement() {
-                    currentIndex = (currentIndex + 1) % messages.length;
-                    announcementText.textContent = messages[currentIndex];
-                }
-
-                setInterval(rotateAnnouncement, 4000);
-            } catch (error) {
-                console.error('公告輪播功能錯誤:', error);
-            }
-        })();
-
-        // 安全帽側邊欄互動功能
+// 安全帽側邊欄互動功能
         (function() {
             try {
                 const helmetMenu = document.querySelector('.helmet-menu');

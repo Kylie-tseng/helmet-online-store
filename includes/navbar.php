@@ -8,113 +8,132 @@ function renderNavbar($pdo, $categories, $parts_category_id, $current_page = '')
     $is_logged_in = isset($_SESSION['user_id']);
     $user_id = $is_logged_in ? $_SESSION['user_id'] : 0;
     $cart_count = getCartItemCount($pdo, $user_id);
+    $favorite_count = getFavoriteCount($pdo, $user_id);
+    $is_home = ($current_page === 'home');
+    $nav_class = $is_home ? 'navbar home-navbar unified-navbar' : 'navbar unified-navbar';
+    $nav_id = $is_home ? ' id="homeNavbar"' : '';
+    $favorites_link = $is_logged_in ? 'favorites.php' : 'login.php?redirect=' . urlencode('favorites.php') . '&notice=favorite';
+    $cart_link = $is_logged_in ? 'cart.php' : 'login.php?redirect=' . urlencode('cart.php') . '&notice=cart';
+    $profile_link = $is_logged_in ? 'profile.php' : 'login.php';
     ?>
-    <nav class="navbar">
+    <nav class="<?php echo $nav_class; ?>"<?php echo $nav_id; ?>>
         <div class="nav-container">
-            <div class="nav-logo">
+            <div class="nav-logo home-navbar-left">
                 <a href="index.php">HelmetVRse</a>
             </div>
-            <ul class="nav-menu">
-                <li><a href="products.php">商品總覽</a></li>
-                <li class="helmet-menu">
+            <ul class="nav-menu home-navbar-center">
+                <li class="helmet-menu nav-item has-mega-menu">
                     <a href="products.php" id="helmetMenuToggle">安全帽 <span class="dropdown-arrow">▾</span></a>
                     <ul class="helmet-submenu">
-                        <?php 
-                        $helmet_categories = array_filter($categories, function($cat) {
-                            return $cat['name'] !== '周邊與零件';
-                        });
-                        foreach ($helmet_categories as $cat): 
-                        ?>
-                            <li><a href="products.php?category=<?php echo htmlspecialchars($cat['id']); ?>"><?php echo htmlspecialchars($cat['name']); ?></a></li>
-                        <?php endforeach; ?>
+                        <li><a href="products.php">全部安全帽</a></li>
+                        <li><a href="products.php?search=<?php echo urlencode('全罩式安全帽'); ?>">全罩式安全帽</a></li>
+                        <li><a href="products.php?search=<?php echo urlencode('半罩式安全帽'); ?>">半罩式安全帽</a></li>
+                        <li><a href="products.php?search=<?php echo urlencode('3/4罩安全帽'); ?>">3/4罩安全帽</a></li>
+                        <li><a href="products.php<?php echo $parts_category_id ? '?category=' . htmlspecialchars($parts_category_id) : ''; ?>">周邊與配件</a></li>
                     </ul>
+                    <div class="mega-menu">
+                        <div class="mega-links">
+                            <div class="mega-column">
+                                <h4>商品分類</h4>
+                                <a href="products.php">全部安全帽</a>
+                                <a href="products.php?search=<?php echo urlencode('全罩式安全帽'); ?>">全罩式安全帽</a>
+                                <a href="products.php?search=<?php echo urlencode('半罩式安全帽'); ?>">半罩式安全帽</a>
+                                <a href="products.php?search=<?php echo urlencode('3/4罩安全帽'); ?>">3/4罩安全帽</a>
+                                <a href="products.php<?php echo $parts_category_id ? '?category=' . htmlspecialchars($parts_category_id) : ''; ?>">周邊與配件</a>
+                            </div>
+                            <div class="mega-column">
+                                <h4>更多資訊</h4>
+                                <a href="helmet_size.php">安全帽尺寸</a>
+                                <a href="head_measure.php">頭圍量測教學</a>
+                                <a href="helmet_care.php">安全帽保養教學</a>
+                                <a href="faq.php">常見問題 FAQ</a>
+                            </div>
+                        </div>
+                    </div>
                 </li>
-                <li><a href="products.php<?php echo $parts_category_id ? '?category=' . htmlspecialchars($parts_category_id) : ''; ?>">周邊與零件</a></li>
-                <li class="helmet-menu">
-                    <a href="guide.php" id="guideMenuToggle">購物須知 <span class="dropdown-arrow">▾</span></a>
+                <li class="nav-item">
+                    <a href="products.php<?php echo $parts_category_id ? '?category=' . htmlspecialchars($parts_category_id) : ''; ?>">周邊與配件</a>
+                </li>
+                <li class="helmet-menu nav-item has-mega-menu">
+                    <a href="guide.php" id="guideMenuToggle">購物指南 <span class="dropdown-arrow">▾</span></a>
                     <ul class="helmet-submenu">
-                        <li><a href="helmet_size.php">安全帽尺寸</a></li>
+                        <li><a href="guide.php">購物指南總覽</a></li>
+                        <li><a href="about.php">關於我們</a></li>
+                        <li><a href="coupons.php">優惠券專區</a></li>
+                        <li><a href="return_policy.php">退貨政策</a></li>
                         <li><a href="helmet_knowledge.php">安全帽知識</a></li>
+                        <li><a href="helmet_size.php">安全帽尺寸</a></li>
                         <li><a href="head_measure.php">頭圍量測教學</a></li>
                         <li><a href="helmet_care.php">安全帽保養教學</a></li>
                         <li><a href="faq.php">常見問題 FAQ</a></li>
-                        <li><a href="coupons.php">優惠券專區</a></li>
-                        <li><a href="return_policy.php">退貨政策</a></li>
                     </ul>
+                    <div class="mega-menu">
+                        <div class="mega-links">
+                            <div class="mega-column">
+                                <h4>購物指南</h4>
+                                <a href="guide.php">購物指南總覽</a>
+                                <a href="about.php">關於我們</a>
+                                <a href="coupons.php">優惠券專區</a>
+                                <a href="return_policy.php">退貨政策</a>
+                            </div>
+                            <div class="mega-column">
+                                <h4>更多資訊</h4>
+                                <a href="helmet_knowledge.php">安全帽知識</a>
+                                <a href="helmet_size.php">安全帽尺寸</a>
+                                <a href="head_measure.php">頭圍量測教學</a>
+                                <a href="helmet_care.php">安全帽保養教學</a>
+                                <a href="faq.php">常見問題 FAQ</a>
+                            </div>
+                        </div>
+                    </div>
                 </li>
             </ul>
-            <div class="nav-right">
-                <!-- 搜尋 -->
-                <div class="search-box">
-                    <a href="#search" class="nav-action-link" id="searchToggle">
-                        <span class="nav-action-icon">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <circle cx="11" cy="11" r="8"></circle>
-                                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                            </svg>
-                        </span>
-                        <span class="nav-action-text">找商品</span>
-                    </a>
-                    <input type="text" class="search-input" id="searchInput" placeholder="找商品">
-                </div>
+            <div class="nav-right home-navbar-right">
+                <?php if ($is_logged_in): ?>
+                    <span class="user-greeting">Hi, <?php echo htmlspecialchars($_SESSION['user_name']); ?>!</span>
+                <?php endif; ?>
 
-                <!-- 購物車 -->
-                <a href="cart.php" class="nav-action-link" id="cartLink">
+                <a href="<?php echo htmlspecialchars($favorites_link); ?>" class="nav-action-link nav-icon-link" aria-label="收藏商品">
                     <span class="nav-action-icon">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M6 2h12"></path>
-                            <path d="M3 6h18l-2 14H5L3 6z"></path>
+                        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"></path>
                         </svg>
                     </span>
-                    <span class="nav-action-text" id="cartCount">購物車(<?php echo $cart_count; ?>)</span>
+                    <span id="favoriteBadge" class="nav-action-badge<?php echo $favorite_count > 0 ? '' : ' is-empty'; ?>"><?php echo (int)$favorite_count; ?></span>
                 </a>
 
-                <!-- 登入/註冊 -->
-                <div class="auth-links">
-                    <?php if ($is_logged_in): ?>
-                        <span class="user-greeting">Hi, <?php echo htmlspecialchars($_SESSION['user_name']); ?></span>
-                        <a href="profile.php" class="nav-action-link">
-                            <span class="nav-action-icon">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                                    <circle cx="12" cy="7" r="4"></circle>
-                                </svg>
-                            </span>
-                            <span class="nav-action-text">個人檔案</span>
-                        </a>
-                        <a href="logout.php" class="nav-action-link">
-                            <span class="nav-action-icon">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                                    <polyline points="16 17 21 12 16 7"></polyline>
-                                    <line x1="21" y1="12" x2="9" y2="12"></line>
-                                </svg>
-                            </span>
-                            <span class="nav-action-text">登出</span>
-                        </a>
-                    <?php else: ?>
-                        <a href="login.php" class="nav-action-link">
-                            <span class="nav-action-icon">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                                    <circle cx="12" cy="7" r="4"></circle>
-                                </svg>
-                            </span>
-                            <span class="nav-action-text">登入</span>
-                        </a>
-                        <a href="register.php" class="nav-action-link">
-                            <span class="nav-action-icon">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                                    <circle cx="8.5" cy="7" r="4"></circle>
-                                    <line x1="20" y1="8" x2="20" y2="14"></line>
-                                    <line x1="23" y1="11" x2="17" y2="11"></line>
-                                </svg>
-                            </span>
-                            <span class="nav-action-text">註冊</span>
-                        </a>
-                    <?php endif; ?>
-                </div>
+                <a href="<?php echo htmlspecialchars($cart_link); ?>" class="nav-action-link nav-icon-link" id="cartLink" aria-label="購物車">
+                    <span class="nav-action-icon">
+                        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="9" cy="21" r="1"></circle>
+                            <circle cx="20" cy="21" r="1"></circle>
+                            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h7.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                        </svg>
+                    </span>
+                    <span id="cartBadge" class="nav-action-badge<?php echo $cart_count > 0 ? '' : ' is-empty'; ?>"><?php echo (int)$cart_count; ?></span>
+                </a>
+
+                <a href="<?php echo htmlspecialchars($profile_link); ?>" class="nav-action-link nav-icon-link" aria-label="個人檔案">
+                    <span class="nav-action-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
+                    </span>
+                </a>
+
+                <?php if ($is_logged_in): ?>
+                    <a href="logout.php" class="nav-action-link nav-icon-link" aria-label="登出">
+                        <span class="nav-action-icon">
+                            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                                <polyline points="16 17 21 12 16 7"></polyline>
+                                <line x1="21" y1="12" x2="9" y2="12"></line>
+                            </svg>
+                        </span>
+                    </a>
+                <?php endif; ?>
+
             </div>
         </div>
     </nav>
@@ -156,8 +175,87 @@ function renderNavbar($pdo, $categories, $parts_category_id, $current_page = '')
                     }
                 });
             } catch (error) {
-                console.error('購物須知下拉選單功能錯誤:', error);
+                console.error('購物指南下拉選單功能錯誤:', error);
             }
+        })();
+
+        (function() {
+            const navbar = document.getElementById('homeNavbar');
+            if (!navbar) return;
+
+            const updateNavbarState = function() {
+                if (window.scrollY > 0) {
+                    navbar.classList.add('is-scrolled');
+                } else {
+                    navbar.classList.remove('is-scrolled');
+                }
+            };
+
+            updateNavbarState();
+            window.addEventListener('scroll', updateNavbarState, { passive: true });
+        })();
+
+        (function() {
+            const SCROLL_KEY = 'favoriteToggleScrollY';
+            const PATH_KEY = 'favoriteTogglePath';
+
+            document.addEventListener('submit', function(e) {
+                const form = e.target.closest('form[action*="api/toggle_favorite.php"]');
+                if (!form) return;
+
+                try {
+                    sessionStorage.setItem(SCROLL_KEY, String(window.scrollY || window.pageYOffset || 0));
+                    sessionStorage.setItem(PATH_KEY, window.location.pathname + window.location.search);
+                } catch (error) {
+                    // ignore storage failure
+                }
+            });
+
+            const restoreScroll = function() {
+                try {
+                    const savedY = sessionStorage.getItem(SCROLL_KEY);
+                    const savedPath = sessionStorage.getItem(PATH_KEY);
+                    const currentPath = window.location.pathname + window.location.search;
+
+                    if (!savedY || savedPath !== currentPath) return;
+
+                    const y = parseInt(savedY, 10);
+                    if (!Number.isNaN(y)) {
+                        window.scrollTo(0, y);
+                    }
+
+                    sessionStorage.removeItem(SCROLL_KEY);
+                    sessionStorage.removeItem(PATH_KEY);
+                } catch (error) {
+                    // ignore storage failure
+                }
+            };
+
+            window.addEventListener('DOMContentLoaded', restoreScroll, { once: true });
+            window.addEventListener('pageshow', restoreScroll, { once: true });
+        })();
+
+        (function() {
+            const setBadge = function(el, count) {
+                if (!el) return;
+                const value = Number.isFinite(Number(count)) ? Math.max(0, parseInt(count, 10)) : 0;
+                el.textContent = String(value);
+                el.classList.toggle('is-empty', value <= 0);
+            };
+
+            window.updateNavbarBadges = function(payload) {
+                if (!payload || typeof payload !== 'object') return;
+                if (Object.prototype.hasOwnProperty.call(payload, 'cart_count')) {
+                    setBadge(document.getElementById('cartBadge'), payload.cart_count);
+                }
+                if (Object.prototype.hasOwnProperty.call(payload, 'favorite_count')) {
+                    setBadge(document.getElementById('favoriteBadge'), payload.favorite_count);
+                }
+            };
+
+            window.addEventListener('cart:updated', function(e) {
+                window.updateNavbarBadges(e.detail || {});
+            });
         })();
     </script>
     <?php

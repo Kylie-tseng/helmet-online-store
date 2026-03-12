@@ -22,15 +22,8 @@ if ($_SESSION['role'] !== 'staff' && $_SESSION['role'] !== 'admin') {
     <link rel="stylesheet" href="../assets/css/style.css">
 </head>
 <body>
-    <!-- 頂部公告橫幅 -->
-    <div class="announcement-bar">
-        <div class="announcement-content">
-            員工後台管理系統
-        </div>
-    </div>
-
-    <!-- 導覽列 -->
-    <nav class="navbar">
+<!-- 導覽列 -->
+    <nav class="navbar unified-navbar">
         <div class="nav-container">
             <div class="nav-logo">
                 <a href="../index.php">HelmetVRse</a>

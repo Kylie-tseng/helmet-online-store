@@ -3,37 +3,6 @@ require_once 'config.php';
 require_once 'includes/cart_functions.php';
 require_once 'includes/navbar.php';
 
-$coupon_message = '';
-$coupon_message_type = '';
-
-if (isset($_SESSION['coupon_message'])) {
-    $coupon_message = $_SESSION['coupon_message'];
-    $coupon_message_type = $_SESSION['coupon_message_type'] ?? 'success';
-    unset($_SESSION['coupon_message'], $_SESSION['coupon_message_type']);
-}
-
-if (isset($_GET['claim_coupon'])) {
-    $coupon_code = normalizeCouponCode($_GET['claim_coupon']);
-    if ($coupon_code === 'NEW100') {
-        if (!isset($_SESSION['user_id'])) {
-            $_SESSION['coupon_message'] = '請先登入再領取優惠券';
-            $_SESSION['coupon_message_type'] = 'error';
-            header('Location: login.php?redirect=' . urlencode('index.php?claim_coupon=NEW100'));
-            exit;
-        }
-
-        $claim_result = claimUserCoupon($pdo, (int)$_SESSION['user_id'], $coupon_code);
-        $_SESSION['coupon_message'] = $claim_result['message'];
-        $_SESSION['coupon_message_type'] = $claim_result['success'] ? 'success' : 'error';
-    } else {
-        $_SESSION['coupon_message'] = '此活動無可領取的優惠券';
-        $_SESSION['coupon_message_type'] = 'warning';
-    }
-
-    header('Location: index.php');
-    exit;
-}
-
 // 查詢分類資料
 try {
     $stmt = $pdo->query("SELECT id, name, description FROM categories ORDER BY id LIMIT 4");
@@ -42,10 +11,10 @@ try {
     $categories = [];
 }
 
-// 查詢「周邊與零件」的分類 ID
+// 查詢「周邊與配件」的分類 ID
 $parts_category_id = null;
 try {
-    $stmt = $pdo->prepare("SELECT id FROM categories WHERE name = '周邊與零件' LIMIT 1");
+    $stmt = $pdo->prepare("SELECT id FROM categories WHERE name = '周邊與配件' LIMIT 1");
     $stmt->execute();
     $parts_category = $stmt->fetch();
     if ($parts_category) {
@@ -61,6 +30,12 @@ try {
     $hotProducts = $stmt->fetchAll();
 } catch (PDOException $e) {
     $hotProducts = [];
+}
+
+$is_logged_in = isset($_SESSION['user_id']);
+$favorite_ids = [];
+if ($is_logged_in) {
+    $favorite_ids = getUserFavoriteProductIds($pdo, (int)$_SESSION['user_id']);
 }
 ?>
 <!DOCTYPE html>
@@ -111,7 +86,7 @@ try {
 
         .home-promotions .promo-shortcut-title {
             font-size: 15px;
-            color: #243047;
+            color: #333333;
             font-weight: 700;
             margin-bottom: 6px;
             line-height: 1.35;
@@ -119,7 +94,7 @@ try {
 
         .home-promotions .promo-shortcut-desc {
             font-size: 13px;
-            color: #6B7280;
+            color: #666666;
             line-height: 1.4;
         }
 
@@ -138,23 +113,29 @@ try {
         }
     </style>
 </head>
-<body>
-    <!-- 頂部公告橫幅（自動輪播） -->
-    <div class="announcement-bar">
-        <div class="announcement-content" id="announcementText">
-            商品庫存變動快速，請多利用客服功能
-        </div>
-    </div>
+<body class="home-page">
+    <header class="home-header">
+        <?php renderNavbar($pdo, $categories, $parts_category_id, 'home'); ?>
+    </header>
 
-    <!-- 導覽列 -->
-    <?php renderNavbar($pdo, $categories, $parts_category_id); ?>
+    <section class="hero">
+        <div class="hero-slider">
+            <div class="slides">
+                <img src="assets/images/index1.jpg" class="slide active" alt="Helmet Banner 1">
+                <img src="assets/images/index2.jpg" class="slide" alt="Helmet Banner 2">
+                <img src="assets/images/index3.jpg" class="slide" alt="Helmet Banner 3">
+                <img src="assets/images/index4.jpg" class="slide" alt="Helmet Banner 4">
+                <img src="assets/images/index5.jpg" class="slide" alt="Helmet Banner 5">
+            </div>
 
-    <!-- Hero Banner -->
-    <section class="hero-banner">
-        <div class="hero-content">
-            <h1 class="hero-title">HelmetVRse</h1>
-            <p class="hero-subtitle">結合 VR 展場體驗，讓你看得更清楚、買得更安心</p>
-            <a href="products.php" class="hero-btn">VR展場</a>
+            <div class="hero-overlay">
+                <h1 class="hero-main-title">ENTER THE VR HELMET MALL</h1>
+                <p class="hero-main-subtitle">沉浸式虛擬商場，重新定義智慧安全帽選購體驗</p>
+                <a href="products.php" class="hero-cta-btn">前往 VR 商場</a>
+            </div>
+
+            <div class="slider-arrow left">&#10094;</div>
+            <div class="slider-arrow right">&#10095;</div>
         </div>
     </section>
 
@@ -162,37 +143,32 @@ try {
     <section class="categories-section">
         <div class="container">
             <div class="home-promotions">
-                <a href="<?php echo isset($_SESSION['user_id']) ? 'index.php?claim_coupon=NEW100' : 'login.php?redirect=' . urlencode('index.php?claim_coupon=NEW100'); ?>" class="promo-card">
+                <a href="coupon_new_member.php" class="promo-card">
                     <span class="promo-shortcut-icon">🎉</span>
                     <h3 class="promo-shortcut-title">新會員優惠</h3>
                     <p class="promo-shortcut-desc">滿 500 元折抵 100 元</p>
                 </a>
-                <a href="coupons.php" class="promo-card">
+                <a href="coupon_anniversary.php" class="promo-card">
                     <span class="promo-shortcut-icon">🪖</span>
                     <h3 class="promo-shortcut-title">安全帽週年慶</h3>
                     <p class="promo-shortcut-desc">全館商品 9 折</p>
                 </a>
-                <a href="coupons.php" class="promo-card">
+                <a href="coupon_discount.php" class="promo-card">
                     <span class="promo-shortcut-icon">💰</span>
                     <h3 class="promo-shortcut-title">滿額折扣活動</h3>
                     <p class="promo-shortcut-desc">滿 2000 元折抵 300 元</p>
                 </a>
-                <a href="coupons.php" class="promo-card">
+                <a href="coupon_rider_day.php" class="promo-card">
                     <span class="promo-shortcut-icon">🏍</span>
                     <h3 class="promo-shortcut-title">騎士節活動</h3>
                     <p class="promo-shortcut-desc">全館商品 8 折</p>
                 </a>
-                <a href="coupons.php" class="promo-card">
+                <a href="coupon_free_shipping.php" class="promo-card">
                     <span class="promo-shortcut-icon">🚚</span>
                     <h3 class="promo-shortcut-title">滿三千免運</h3>
                     <p class="promo-shortcut-desc">全站滿 NT$3000 免運</p>
                 </a>
             </div>
-            <?php if ($coupon_message !== ''): ?>
-                <div class="cart-message <?php echo htmlspecialchars($coupon_message_type); ?>">
-                    <?php echo htmlspecialchars($coupon_message); ?>
-                </div>
-            <?php endif; ?>
             <div class="section-header">
                 <h2 class="section-title">商品分類</h2>
                 <p class="section-subtitle">探索我們的精選分類</p>
@@ -223,11 +199,16 @@ try {
                 <h2 class="section-title">熱門商品</h2>
                 <p class="section-subtitle">精選推薦商品</p>
             </div>
+            <?php if (!empty($_SESSION['favorite_message'])): ?>
+                <div class="success-message"><?php echo htmlspecialchars($_SESSION['favorite_message']); ?></div>
+                <?php unset($_SESSION['favorite_message']); ?>
+            <?php endif; ?>
             <div class="products-grid">
                 <?php if (empty($hotProducts)): ?>
                     <div class="empty-message">目前尚未有熱門商品</div>
                 <?php else: ?>
                     <?php foreach ($hotProducts as $product): ?>
+                        <?php $is_favorited = in_array((int)$product['id'], $favorite_ids, true); ?>
                         <div class="product-card">
                             <div class="product-image">
                                 <?php 
@@ -238,7 +219,7 @@ try {
                                     <img src="<?php echo htmlspecialchars($product['image_url'], ENT_QUOTES); ?>" alt="<?php echo htmlspecialchars($product['name']); ?>">
                                 <?php else: ?>
                                     <div class="product-image-placeholder">
-                                        <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#8B96A9" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                        <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#9A9A9A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                                             <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                                             <circle cx="8.5" cy="8.5" r="1.5"></circle>
                                             <polyline points="21 15 16 10 5 21"></polyline>
@@ -249,8 +230,27 @@ try {
                             </div>
                             <div class="product-info">
                                 <h3 class="product-name"><?php echo htmlspecialchars($product['name']); ?></h3>
-                                <p class="product-price">NT$ <?php echo number_format($product['price']); ?></p>
-                                <a href="product_detail.php?id=<?php echo htmlspecialchars($product['id']); ?>" class="product-btn">查看詳情</a>
+                                <div class="product-price-row">
+                                    <p class="product-price">NT$ <?php echo number_format($product['price']); ?></p>
+                                    <form action="api/toggle_favorite.php" method="POST" class="product-favorite-inline-form">
+                                        <input type="hidden" name="product_id" value="<?php echo (int)$product['id']; ?>">
+                                        <input type="hidden" name="redirect" value="index.php">
+                                        <button
+                                            type="submit"
+                                            class="favorite-btn favorite-icon-btn <?php echo $is_favorited ? 'active' : ''; ?>"
+                                            aria-label="<?php echo $is_favorited ? '取消收藏' : '加入收藏'; ?>"
+                                            title="<?php echo $is_favorited ? '取消收藏' : '加入收藏'; ?>"
+                                        >
+                                            <svg class="heart-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                                <path class="heart-outline" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"></path>
+                                                <path class="heart-fill" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"></path>
+                                            </svg>
+                                        </button>
+                                    </form>
+                                </div>
+                                <div class="product-card-actions">
+                                    <a href="product_detail.php?id=<?php echo htmlspecialchars($product['id']); ?>" class="product-btn">查看詳情</a>
+                                </div>
                             </div>
                         </div>
                     <?php endforeach; ?>
@@ -274,7 +274,7 @@ try {
                 <div class="footer-column">
                     <h3 class="footer-title">顧客服務</h3>
                     <ul class="footer-links">
-                        <li><a href="guide.php">購物須知</a></li>
+                        <li><a href="guide.php">購物指南</a></li>
                         <li><a href="faq.php">常見問題</a></li>
                         <li><a href="return.php">退換貨政策</a></li>
                         <li><a href="shipping.php">運送說明</a></li>
@@ -301,32 +301,7 @@ try {
     </footer>
 
     <script>
-        // 公告條自動輪播功能
-        (function() {
-            try {
-                const announcementText = document.getElementById('announcementText');
-                if (!announcementText) return;
-
-                const messages = [
-                    '商品庫存變動快速，請多利用客服功能',
-                    '超取滿199、宅配滿490 享免運優惠'
-                ];
-
-                let currentIndex = 0;
-
-                function rotateAnnouncement() {
-                    currentIndex = (currentIndex + 1) % messages.length;
-                    announcementText.textContent = messages[currentIndex];
-                }
-
-                // 每 4 秒切換一次
-                setInterval(rotateAnnouncement, 4000);
-            } catch (error) {
-                console.error('公告輪播功能錯誤:', error);
-            }
-        })();
-
-        // 安全帽側邊欄互動功能
+// 安全帽側邊欄互動功能
         (function() {
             try {
                 const helmetMenu = document.querySelector('.helmet-menu');
@@ -428,6 +403,42 @@ try {
                 });
             } catch (error) {
                 console.error('搜尋框功能錯誤:', error);
+            }
+        })();
+
+        // 首頁 Hero 圖片輪播
+        (function() {
+            try {
+                const slides = document.querySelectorAll('.hero-slider .slide');
+                const nextArrow = document.querySelector('.hero-slider .slider-arrow.right');
+                const prevArrow = document.querySelector('.hero-slider .slider-arrow.left');
+                if (!slides.length || !nextArrow || !prevArrow) return;
+
+                let current = 0;
+
+                function showSlide(index) {
+                    slides.forEach(function(slide) {
+                        slide.classList.remove('active');
+                    });
+                    slides[index].classList.add('active');
+                }
+
+                function nextSlide() {
+                    current = (current + 1) % slides.length;
+                    showSlide(current);
+                }
+
+                function prevSlide() {
+                    current = (current - 1 + slides.length) % slides.length;
+                    showSlide(current);
+                }
+
+                nextArrow.addEventListener('click', nextSlide);
+                prevArrow.addEventListener('click', prevSlide);
+
+                setInterval(nextSlide, 5000);
+            } catch (error) {
+                console.error('Hero 輪播功能錯誤:', error);
             }
         })();
     </script>

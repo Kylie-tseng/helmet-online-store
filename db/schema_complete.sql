@@ -1,14 +1,17 @@
 -- =========================================
--- HelmetVRse 完整資料庫結構
+-- HelmetVRse 完整資料庫結構（單一主檔）
 -- 資料庫名稱：helmet
--- 最後更新：2025-01-XX
+-- 版本：2026-03-12
 -- =========================================
 
--- 使用資料庫
-USE helmet;
+SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
+START TRANSACTION;
+SET time_zone = "+00:00";
+
+USE `helmet`;
 
 -- =========================================
--- users：會員 / 管理者
+-- users
 -- =========================================
 CREATE TABLE IF NOT EXISTS `users` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -27,7 +30,7 @@ CREATE TABLE IF NOT EXISTS `users` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- =========================================
--- categories：商品分類
+-- categories
 -- =========================================
 CREATE TABLE IF NOT EXISTS `categories` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -38,7 +41,7 @@ CREATE TABLE IF NOT EXISTS `categories` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- =========================================
--- products：商品
+-- products
 -- =========================================
 CREATE TABLE IF NOT EXISTS `products` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -46,10 +49,9 @@ CREATE TABLE IF NOT EXISTS `products` (
   `name` varchar(150) NOT NULL,
   `description` text DEFAULT NULL,
   `price` decimal(10,2) NOT NULL,
-  `stock` int(11) NOT NULL DEFAULT 0,
   `status` enum('active','inactive') NOT NULL DEFAULT 'active',
   `is_addon_product` tinyint(1) NOT NULL DEFAULT 0,
-  `image_url` varchar(255) NULL DEFAULT NULL,
+  `image_url` varchar(255) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
@@ -58,7 +60,7 @@ CREATE TABLE IF NOT EXISTS `products` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- =========================================
--- product_sizes：商品尺寸庫存
+-- product_sizes
 -- =========================================
 CREATE TABLE IF NOT EXISTS `product_sizes` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -68,38 +70,71 @@ CREATE TABLE IF NOT EXISTS `product_sizes` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `unique_product_size` (`product_id`, `size`),
+  UNIQUE KEY `unique_product_size` (`product_id`,`size`),
   KEY `fk_product_sizes_product` (`product_id`),
   CONSTRAINT `fk_product_sizes_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- =========================================
--- cart：購物車
+-- coupons
+-- =========================================
+CREATE TABLE IF NOT EXISTS `coupons` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `coupon_code` varchar(50) NOT NULL,
+  `discount_type` enum('percent','fixed') NOT NULL,
+  `discount_value` decimal(10,2) NOT NULL,
+  `minimum_amount` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `start_date` date NOT NULL,
+  `expire_date` date NOT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_coupon_code` (`coupon_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- 系統預設優惠券
+INSERT INTO `coupons` (`coupon_code`, `discount_type`, `discount_value`, `minimum_amount`, `start_date`, `expire_date`, `is_active`)
+VALUES
+('NEW100', 'fixed', 100.00, 500.00, '2025-01-01', '2099-12-31', 1),
+('HELMET10', 'percent', 10.00, 0.00, '2025-01-01', '2099-12-31', 1),
+('SAVE300', 'fixed', 300.00, 2000.00, '2025-01-01', '2099-12-31', 1),
+('RIDER20', 'percent', 20.00, 0.00, '2025-01-01', '2099-12-31', 1)
+ON DUPLICATE KEY UPDATE
+`discount_type` = VALUES(`discount_type`),
+`discount_value` = VALUES(`discount_value`),
+`minimum_amount` = VALUES(`minimum_amount`),
+`start_date` = VALUES(`start_date`),
+`expire_date` = VALUES(`expire_date`),
+`is_active` = VALUES(`is_active`);
+
+-- =========================================
+-- cart
 -- =========================================
 CREATE TABLE IF NOT EXISTS `cart` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `user_id` int(11) NOT NULL,
   `product_id` int(11) NOT NULL,
-  `size` enum('S','M','L','XL') NOT NULL,
+  `size` enum('S','M','L','XL') NOT NULL DEFAULT 'M',
   `quantity` int(11) NOT NULL DEFAULT 1,
-  `unit_price` decimal(10,2) DEFAULT NULL,
+  `unit_price` decimal(10,2) NOT NULL,
   `added_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `unique_cart_item` (`user_id`, `product_id`, `size`),
-  KEY `fk_cart_user` (`user_id`),
+  UNIQUE KEY `unique_cart_item` (`user_id`,`product_id`,`size`),
   KEY `fk_cart_product` (`product_id`),
   CONSTRAINT `fk_cart_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `fk_cart_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- =========================================
--- orders：訂單主檔
+-- orders
 -- =========================================
 CREATE TABLE IF NOT EXISTS `orders` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `user_id` int(11) NOT NULL,
+  `coupon_id` int(11) DEFAULT NULL,
   `total_amount` decimal(10,2) NOT NULL,
+  `discount_amount` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `final_amount` decimal(10,2) NOT NULL DEFAULT 0.00,
   `status` enum('pending','pending_payment','paid','shipped','completed','cancelled') NOT NULL DEFAULT 'pending',
   `payment_method` varchar(50) DEFAULT NULL,
   `shipping_method` enum('pickup','home') DEFAULT NULL,
@@ -109,11 +144,13 @@ CREATE TABLE IF NOT EXISTS `orders` (
   `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `fk_orders_user` (`user_id`),
+  KEY `fk_orders_coupon` (`coupon_id`),
+  CONSTRAINT `fk_orders_coupon` FOREIGN KEY (`coupon_id`) REFERENCES `coupons` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT `fk_orders_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- =========================================
--- order_items：訂單明細
+-- order_items
 -- =========================================
 CREATE TABLE IF NOT EXISTS `order_items` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -131,71 +168,38 @@ CREATE TABLE IF NOT EXISTS `order_items` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- =========================================
--- view_history：瀏覽紀錄
--- =========================================
-CREATE TABLE IF NOT EXISTS `view_history` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `user_id` int(11) NOT NULL,
-  `product_id` int(11) NOT NULL,
-  `viewed_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`id`),
-  KEY `fk_view_history_user` (`user_id`),
-  KEY `fk_view_history_product` (`product_id`),
-  CONSTRAINT `fk_view_history_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT `fk_view_history_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- =========================================
--- coupons：優惠券
--- =========================================
-CREATE TABLE IF NOT EXISTS `coupons` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `coupon_code` varchar(50) NOT NULL,
-  `discount_type` enum('percent','fixed') NOT NULL,
-  `discount_value` decimal(10,2) NOT NULL,
-  `minimum_amount` decimal(10,2) NOT NULL DEFAULT 0.00,
-  `start_date` date NOT NULL,
-  `expire_date` date NOT NULL,
-  `is_active` tinyint(1) NOT NULL DEFAULT 1,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_coupon_code` (`coupon_code`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- 只保留四張指定優惠券
-DELETE FROM `coupons` WHERE `coupon_code` NOT IN ('NEW100', 'HELMET10', 'SAVE300', 'RIDER20');
-
-INSERT INTO `coupons` (`coupon_code`, `discount_type`, `discount_value`, `minimum_amount`, `start_date`, `expire_date`, `is_active`)
-VALUES
-('NEW100', 'fixed', 100, 500, '2025-01-01', '2099-12-31', 1),
-('HELMET10', 'percent', 10, 0, '2025-01-01', '2099-12-31', 1),
-('SAVE300', 'fixed', 300, 2000, '2025-01-01', '2099-12-31', 1),
-('RIDER20', 'percent', 20, 0, '2025-01-01', '2099-12-31', 1)
-ON DUPLICATE KEY UPDATE
-`discount_type` = VALUES(`discount_type`),
-`discount_value` = VALUES(`discount_value`),
-`minimum_amount` = VALUES(`minimum_amount`),
-`start_date` = VALUES(`start_date`),
-`expire_date` = VALUES(`expire_date`),
-`is_active` = VALUES(`is_active`);
-
--- =========================================
--- user_coupons：會員已領取優惠券
+-- user_coupons
 -- =========================================
 CREATE TABLE IF NOT EXISTS `user_coupons` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `user_id` int(11) NOT NULL,
-  `coupon_code` varchar(50) NOT NULL,
-  `status` enum('unused','used') NOT NULL DEFAULT 'unused',
+  `coupon_id` int(11) NOT NULL,
+  `status` enum('unused','used') DEFAULT 'unused',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_user_coupon` (`user_id`, `coupon_code`),
-  KEY `idx_user_coupons_user_id` (`user_id`),
+  UNIQUE KEY `unique_user_coupon` (`user_id`,`coupon_id`),
+  KEY `fk_user_coupons_coupon` (`coupon_id`),
+  CONSTRAINT `fk_user_coupons_coupon` FOREIGN KEY (`coupon_id`) REFERENCES `coupons` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `fk_user_coupons_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- =========================================
--- admin_logs：後台管理紀錄
+-- favorites
+-- =========================================
+CREATE TABLE IF NOT EXISTS `favorites` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `product_id` int(11) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_user_favorite` (`user_id`,`product_id`),
+  KEY `fk_favorites_product` (`product_id`),
+  CONSTRAINT `fk_favorites_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_favorites_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- =========================================
+-- admin_logs
 -- =========================================
 CREATE TABLE IF NOT EXISTS `admin_logs` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -210,3 +214,4 @@ CREATE TABLE IF NOT EXISTS `admin_logs` (
   CONSTRAINT `fk_admin_logs_user` FOREIGN KEY (`admin_id`) REFERENCES `users` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+COMMIT;

@@ -6,7 +6,7 @@ require_once 'includes/checkout_steps.php';
 
 // 檢查是否已登入
 if (!isset($_SESSION['user_id'])) {
-    header('Location: login.php?redirect=' . urlencode('cart.php'));
+    header('Location: login.php?redirect=' . urlencode('cart.php') . '&notice=cart');
     exit;
 }
 
@@ -201,10 +201,10 @@ try {
     $categories = [];
 }
 
-// 查詢「周邊與零件」的分類 ID
+// 查詢「周邊與配件」的分類 ID
 $parts_category_id = null;
 try {
-    $stmt = $pdo->prepare("SELECT id FROM categories WHERE name = '周邊與零件' LIMIT 1");
+    $stmt = $pdo->prepare("SELECT id FROM categories WHERE name = '周邊與配件' LIMIT 1");
     $stmt->execute();
     $parts_category = $stmt->fetch();
     if ($parts_category) {
@@ -225,14 +225,7 @@ $is_logged_in = isset($_SESSION['user_id']);
     <link rel="stylesheet" href="assets/css/style.css?v=20260304-addon-fix">
 </head>
 <body>
-    <!-- 頂部公告橫幅 -->
-    <div class="announcement-bar">
-        <div class="announcement-content" id="announcementText">
-            商品庫存變動快速，請多利用客服功能
-        </div>
-    </div>
-
-    <!-- 導覽列 -->
+<!-- 導覽列 -->
     <?php renderNavbar($pdo, $categories, $parts_category_id); ?>
 
     <!-- 購物車內容 -->
@@ -252,7 +245,7 @@ $is_logged_in = isset($_SESSION['user_id']);
                 <!-- 空購物車 -->
                 <div class="cart-empty">
                     <div class="cart-empty-icon">
-                        <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#8B96A9" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#9A9A9A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M6 2h12"></path>
                             <path d="M3 6h18l-2 14H5L3 6z"></path>
                         </svg>
@@ -288,7 +281,7 @@ $is_logged_in = isset($_SESSION['user_id']);
                                                          alt="<?php echo htmlspecialchars($item['product_name']); ?>">
                                                 <?php else: ?>
                                                     <div class="product-image-placeholder">
-                                                        <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#8B96A9" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                                        <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#9A9A9A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                                                             <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                                                             <circle cx="8.5" cy="8.5" r="1.5"></circle>
                                                             <polyline points="21 15 16 10 5 21"></polyline>
@@ -485,7 +478,7 @@ $is_logged_in = isset($_SESSION['user_id']);
                 <div class="footer-column">
                     <h3 class="footer-title">顧客服務</h3>
                     <ul class="footer-links">
-                        <li><a href="guide.php">購物須知</a></li>
+                        <li><a href="guide.php">購物指南</a></li>
                         <li><a href="faq.php">常見問題</a></li>
                         <li><a href="return.php">退換貨政策</a></li>
                         <li><a href="shipping.php">運送說明</a></li>

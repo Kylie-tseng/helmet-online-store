@@ -31,6 +31,10 @@ if ($product_id > 0) {
 
 // 檢查是否已登入
 $is_logged_in = isset($_SESSION['user_id']);
+$is_favorited = false;
+if ($is_logged_in && $product_id > 0) {
+    $is_favorited = isProductFavorited($pdo, (int)$_SESSION['user_id'], $product_id);
+}
 
 // 查詢所有分類（用於導覽列）
 try {
@@ -40,10 +44,10 @@ try {
     $categories = [];
 }
 
-// 查詢「周邊與零件」的分類 ID
+// 查詢「周邊與配件」的分類 ID
 $parts_category_id = null;
 try {
-    $stmt = $pdo->prepare("SELECT id FROM categories WHERE name = '周邊與零件' LIMIT 1");
+    $stmt = $pdo->prepare("SELECT id FROM categories WHERE name = '周邊與配件' LIMIT 1");
     $stmt->execute();
     $parts_category = $stmt->fetch();
     if ($parts_category) {
@@ -74,14 +78,7 @@ if ($product) {
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
-    <!-- 頂部公告橫幅 -->
-    <div class="announcement-bar">
-        <div class="announcement-content" id="announcementText">
-            商品庫存變動快速，請多利用客服功能
-        </div>
-    </div>
-
-    <!-- 導覽列 -->
+<!-- 導覽列 -->
     <?php renderNavbar($pdo, $categories, $parts_category_id); ?>
 
     <!-- 商品詳情內容 -->
@@ -105,7 +102,7 @@ if ($product) {
                                  alt="<?php echo htmlspecialchars($product['name']); ?>">
                         <?php else: ?>
                             <div class="product-detail-image-placeholder">
-                                <svg width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="#8B96A9" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                <svg width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="#9A9A9A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                                     <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                                     <circle cx="8.5" cy="8.5" r="1.5"></circle>
                                     <polyline points="21 15 16 10 5 21"></polyline>
@@ -123,6 +120,21 @@ if ($product) {
                             <div class="product-detail-price">
                                 NT$ <?php echo number_format($product['price'], 0); ?>
                             </div>
+                            <form action="api/toggle_favorite.php" method="POST" class="product-favorite-form">
+                                <input type="hidden" name="product_id" value="<?php echo (int)$product['id']; ?>">
+                                <input type="hidden" name="redirect" value="<?php echo htmlspecialchars('product_detail.php?id=' . (int)$product['id']); ?>">
+                                <button
+                                    type="submit"
+                                    class="favorite-btn favorite-icon-btn <?php echo $is_favorited ? 'active' : ''; ?>"
+                                    aria-label="<?php echo $is_favorited ? '取消收藏' : '加入收藏'; ?>"
+                                    title="<?php echo $is_favorited ? '取消收藏' : '加入收藏'; ?>"
+                                >
+                                    <svg class="heart-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path class="heart-outline" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"></path>
+                                        <path class="heart-fill" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"></path>
+                                    </svg>
+                                </button>
+                            </form>
                         </div>
 
                         <?php if (!empty($product['description'])): ?>
@@ -213,10 +225,11 @@ if ($product) {
                                             .then(response => response.json())
                                             .then(data => {
                                                 if (data.success) {
-                                                    // 更新購物車數字
-                                                    const cartCountEl = document.getElementById('cartCount');
-                                                    if (cartCountEl) {
-                                                        cartCountEl.textContent = '購物車(' + data.cart_count + ')';
+                                                    // 即時同步 navbar 購物車 badge
+                                                    if (typeof window.updateNavbarBadges === 'function') {
+                                                        window.updateNavbarBadges({ cart_count: data.cart_count });
+                                                    } else {
+                                                        window.dispatchEvent(new CustomEvent('cart:updated', { detail: { cart_count: data.cart_count } }));
                                                     }
                                                     
                                                     // 顯示成功訊息
@@ -291,7 +304,7 @@ if ($product) {
                 <div class="footer-column">
                     <h3 class="footer-title">顧客服務</h3>
                     <ul class="footer-links">
-                        <li><a href="guide.php">購物須知</a></li>
+                        <li><a href="guide.php">購物指南</a></li>
                         <li><a href="faq.php">常見問題</a></li>
                         <li><a href="return.php">退換貨政策</a></li>
                         <li><a href="shipping.php">運送說明</a></li>
@@ -318,31 +331,7 @@ if ($product) {
     </footer>
 
     <script>
-        // 公告條自動輪播功能
-        (function() {
-            try {
-                const announcementText = document.getElementById('announcementText');
-                if (!announcementText) return;
-
-                const messages = [
-                    '商品庫存變動快速，請多利用客服功能',
-                    '超取滿199、宅配滿490 享免運優惠'
-                ];
-
-                let currentIndex = 0;
-
-                function rotateAnnouncement() {
-                    currentIndex = (currentIndex + 1) % messages.length;
-                    announcementText.textContent = messages[currentIndex];
-                }
-
-                setInterval(rotateAnnouncement, 4000);
-            } catch (error) {
-                console.error('公告輪播功能錯誤:', error);
-            }
-        })();
-
-        // 安全帽側邊欄互動功能
+// 安全帽側邊欄互動功能
         (function() {
             try {
                 const helmetMenu = document.querySelector('.helmet-menu');

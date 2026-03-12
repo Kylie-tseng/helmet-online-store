@@ -1,10 +1,11 @@
 <?php
 require_once 'config.php';
 require_once 'includes/cart_functions.php';
+require_once 'includes/navbar.php';
 
 // 檢查是否已登入
 if (!isset($_SESSION['user_id'])) {
-    header('Location: login.php');
+    header('Location: login.php?redirect=' . urlencode('profile.php') . '&notice=profile');
     exit;
 }
 
@@ -161,7 +162,7 @@ try {
     $user = $stmt->fetch();
     
     if (!$user) {
-        header('Location: login.php');
+        header('Location: login.php?redirect=' . urlencode('profile.php') . '&notice=profile');
         exit;
     }
 } catch (PDOException $e) {
@@ -199,10 +200,11 @@ if ($active_tab === 'orders') {
 $user_coupons = [];
 if ($active_tab === 'coupons') {
     try {
-        $stmt = $pdo->prepare("SELECT id, coupon_code, status, created_at
-                               FROM user_coupons
-                               WHERE user_id = :user_id
-                               ORDER BY created_at DESC");
+        $stmt = $pdo->prepare("SELECT uc.id, c.coupon_code, uc.status, uc.created_at
+                               FROM user_coupons uc
+                               INNER JOIN coupons c ON uc.coupon_id = c.id
+                               WHERE uc.user_id = :user_id
+                               ORDER BY uc.created_at DESC");
         $stmt->execute([':user_id' => $user_id]);
         $user_coupons = $stmt->fetchAll();
     } catch (PDOException $e) {
@@ -234,6 +236,25 @@ $shipping_method_names = [
 
 // 取得購物車數量
 $cart_count = getCartItemCount($pdo, $user_id);
+// 導覽列資料
+try {
+    $stmt = $pdo->query("SELECT id, name, description FROM categories ORDER BY id");
+    $categories = $stmt->fetchAll();
+} catch (PDOException $e) {
+    $categories = [];
+}
+
+$parts_category_id = null;
+try {
+    $stmt = $pdo->prepare("SELECT id FROM categories WHERE name = '周邊與配件' LIMIT 1");
+    $stmt->execute();
+    $parts_category = $stmt->fetch();
+    if ($parts_category) {
+        $parts_category_id = $parts_category['id'];
+    }
+} catch (PDOException $e) {
+    // ignore
+}
 ?>
 <!DOCTYPE html>
 <html lang="zh-TW">
@@ -244,80 +265,8 @@ $cart_count = getCartItemCount($pdo, $user_id);
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
-    <!-- 頂部公告橫幅 -->
-    <div class="announcement-bar">
-        <div class="announcement-content">
-            個人檔案管理
-        </div>
-    </div>
-
-    <!-- 導覽列 -->
-    <nav class="navbar">
-        <div class="nav-container">
-            <div class="nav-logo">
-                <a href="index.php">HelmetVRse</a>
-            </div>
-            <button class="nav-toggle" id="navToggle" aria-label="選單">
-                <span></span>
-                <span></span>
-                <span></span>
-            </button>
-            <ul class="nav-menu" id="navMenu">
-            </ul>
-            <div class="nav-right">
-                <!-- 搜尋 -->
-                <div class="search-box">
-                    <a href="#search" class="nav-action-link" id="searchToggle">
-                        <span class="nav-action-icon">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <circle cx="11" cy="11" r="8"></circle>
-                                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                            </svg>
-                        </span>
-                        <span class="nav-action-text">找商品</span>
-                    </a>
-                    <input type="text" class="search-input" id="searchInput" placeholder="找商品">
-                </div>
-
-                <!-- 購物車 -->
-                <a href="cart.php" class="nav-action-link" id="cartLink">
-                    <span class="nav-action-icon">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M6 2h12"></path>
-                            <path d="M3 6h18l-2 14H5L3 6z"></path>
-                        </svg>
-                    </span>
-                    <span class="nav-action-text" id="cartCount">購物車(<?php echo $cart_count; ?>)</span>
-                </a>
-
-                <!-- 使用者資訊 -->
-                <span class="user-greeting">Hi, <?php echo htmlspecialchars($_SESSION['user_name']); ?></span>
-                
-                <!-- 個人檔案（純文字標示，不是連結） -->
-                <span class="nav-action-link" style="cursor: default; opacity: 0.8;">
-                    <span class="nav-action-icon">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                            <circle cx="12" cy="7" r="4"></circle>
-                        </svg>
-                    </span>
-                    <span class="nav-action-text">個人檔案</span>
-                </span>
-                
-                <!-- 登出 -->
-                <a href="logout.php" class="nav-action-link">
-                    <span class="nav-action-icon">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                            <polyline points="16 17 21 12 16 7"></polyline>
-                            <line x1="21" y1="12" x2="9" y2="12"></line>
-                        </svg>
-                    </span>
-                    <span class="nav-action-text">登出</span>
-                </a>
-            </div>
-        </div>
-    </nav>
+<!-- 導覽列 -->
+    <?php renderNavbar($pdo, $categories, $parts_category_id); ?>
 
     <!-- 個人檔案內容 -->
     <div class="dashboard-container">
@@ -597,7 +546,7 @@ $cart_count = getCartItemCount($pdo, $user_id);
                 <div class="footer-column">
                     <h3 class="footer-title">顧客服務</h3>
                     <ul class="footer-links">
-                        <li><a href="guide.php">購物須知</a></li>
+                        <li><a href="guide.php">購物指南</a></li>
                         <li><a href="faq.php">常見問題</a></li>
                         <li><a href="return.php">退換貨政策</a></li>
                         <li><a href="shipping.php">運送說明</a></li>
