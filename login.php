@@ -1,5 +1,6 @@
 <?php
 require_once 'config.php';
+require_once 'includes/auth_layout.php';
 
 // 如果已經登入，根據角色導向
 if (isset($_SESSION['user_id'])) {
@@ -26,6 +27,25 @@ if (isset($_GET['success'])) {
 
 // 取得 redirect 參數
 $redirect = isset($_GET['redirect']) ? $_GET['redirect'] : 'index.php';
+$notice = isset($_GET['notice']) ? trim($_GET['notice']) : '';
+$notice_message = '';
+if ($notice === 'favorite') {
+    $notice_message = '請先登入或註冊，才可以使用收藏功能';
+} elseif ($notice === 'cart') {
+    $notice_message = '請先登入或註冊，才可以使用購物車功能';
+} elseif ($notice === 'profile') {
+    $notice_message = '請先登入或註冊，才可以使用個人檔案功能';
+} elseif ($notice === 'auth') {
+    $notice_message = '請先登入或註冊，才可以使用收藏 / 購物車功能';
+}
+
+if ($notice_message === '') {
+    if (strpos($redirect, 'favorites.php') !== false) {
+        $notice_message = '請先登入或註冊，才可以使用收藏功能';
+    } elseif (strpos($redirect, 'cart.php') !== false) {
+        $notice_message = '請先登入或註冊，才可以使用購物車功能';
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="zh-TW">
@@ -35,25 +55,8 @@ $redirect = isset($_GET['redirect']) ? $_GET['redirect'] : 'index.php';
     <title>登入 - HelmetVRse</title>
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
-<body>
-    <!-- 頂部公告橫幅 -->
-    <div class="announcement-bar">
-        <div class="announcement-content">
-            歡迎登入 HelmetVRse
-        </div>
-    </div>
-
-    <!-- 導覽列 -->
-    <nav class="navbar">
-        <div class="nav-container">
-            <div class="nav-logo">
-                <a href="index.php">HelmetVRse</a>
-            </div>
-            <div class="nav-right">
-                <a href="index.php" style="color: #FFFFFF; text-decoration: none; font-size: 14px;">← 返回首頁</a>
-            </div>
-        </div>
-    </nav>
+<body class="auth-page auth-login-page">
+    <?php renderAuthHeader('歡迎登入 HelmetVRse'); ?>
 
     <!-- 登入表單 -->
     <div class="login-container">
@@ -78,6 +81,12 @@ $redirect = isset($_GET['redirect']) ? $_GET['redirect'] : 'index.php';
             <?php if ($success): ?>
                 <div class="success-message">
                     <?php echo htmlspecialchars($success); ?>
+                </div>
+            <?php endif; ?>
+
+            <?php if ($notice_message): ?>
+                <div class="error-message">
+                    <?php echo htmlspecialchars($notice_message); ?>
                 </div>
             <?php endif; ?>
 

@@ -1,5 +1,6 @@
 <?php
 require_once 'config.php';
+require_once 'includes/auth_layout.php';
 
 // 如果已經登入，根據角色導向
 if (isset($_SESSION['user_id'])) {
@@ -39,7 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ?");
             $stmt->execute([$username]);
             if ($stmt->fetch()) {
-                $error = '此帳號已被使用，請換一個';
+                $error = '此帳號名已被使用';
             } else {
                 // 檢查 email 是否已存在
                 $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
@@ -62,6 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 }
+
 ?>
 <!DOCTYPE html>
 <html lang="zh-TW">
@@ -71,25 +73,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <title>註冊 - HelmetVRse</title>
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
-<body>
-    <!-- 頂部公告橫幅 -->
-    <div class="announcement-bar">
-        <div class="announcement-content">
-            歡迎註冊 HelmetVRse
-        </div>
-    </div>
-
-    <!-- 導覽列 -->
-    <nav class="navbar">
-        <div class="nav-container">
-            <div class="nav-logo">
-                <a href="index.php">HelmetVRse</a>
-            </div>
-            <div class="nav-right">
-                <a href="index.php" style="color: #FFFFFF; text-decoration: none; font-size: 14px;">← 返回首頁</a>
-            </div>
-        </div>
-    </nav>
+<body class="auth-page auth-register-page">
+    <?php renderAuthHeader('歡迎註冊 HelmetVRse'); ?>
 
     <!-- 註冊表單 -->
     <div class="register-container">
@@ -218,5 +203,88 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
         </div>
     </div>
+<script>
+    (function() {
+        const usernameInput = document.getElementById('username');
+        if (!usernameInput) return;
+
+        const form = usernameInput.closest('form');
+        if (!form) return;
+
+        const statusId = 'usernameStatusMessage';
+        let statusBox = document.getElementById(statusId);
+        if (!statusBox) {
+            statusBox = document.createElement('div');
+            statusBox.id = statusId;
+            statusBox.className = 'auth-username-status';
+            usernameInput.insertAdjacentElement('afterend', statusBox);
+        }
+
+        let latestRequestToken = 0;
+
+        function clearStatus() {
+            statusBox.textContent = '';
+            statusBox.classList.remove('error', 'success');
+        }
+
+        function setError(message) {
+            statusBox.textContent = message;
+            statusBox.classList.remove('success');
+            statusBox.classList.add('error');
+        }
+
+        function setSuccess(message) {
+            statusBox.textContent = message;
+            statusBox.classList.remove('error');
+            statusBox.classList.add('success');
+        }
+
+        async function checkUsername() {
+            const username = usernameInput.value.trim();
+            latestRequestToken += 1;
+            const token = latestRequestToken;
+
+            if (!username) {
+                clearStatus();
+                return true;
+            }
+
+            try {
+                const response = await fetch('api/check_username.php?username=' + encodeURIComponent(username), {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' }
+                });
+                const data = await response.json();
+                if (token !== latestRequestToken) return false;
+
+                if (data && data.exists) {
+                    setError('此帳號名已被使用');
+                    return false;
+                }
+
+                setSuccess('此帳號名稱可使用');
+                return true;
+            } catch (e) {
+                if (token === latestRequestToken) {
+                    setError('帳號檢查失敗，請稍後再試');
+                }
+                return false;
+            }
+        }
+
+        usernameInput.addEventListener('blur', checkUsername);
+        usernameInput.addEventListener('input', function() {
+            clearStatus();
+        });
+
+        form.addEventListener('submit', async function(e) {
+            const ok = await checkUsername();
+            if (!ok) {
+                e.preventDefault();
+                usernameInput.focus();
+            }
+        });
+    })();
+</script>
 </body>
 </html>

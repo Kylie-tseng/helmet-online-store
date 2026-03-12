@@ -12,7 +12,7 @@ try {
 
 $parts_category_id = null;
 try {
-    $stmt = $pdo->prepare("SELECT id FROM categories WHERE name = '周邊與零件' LIMIT 1");
+    $stmt = $pdo->prepare("SELECT id FROM categories WHERE name = '周邊與配件' LIMIT 1");
     $stmt->execute();
     $parts_category = $stmt->fetch();
     if ($parts_category) {
@@ -31,10 +31,7 @@ try {
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
-    <div class="announcement-bar">
-        <div class="announcement-content">常見問題 FAQ</div>
-    </div>
-    <?php renderNavbar($pdo, $categories, $parts_category_id); ?>
+<?php renderNavbar($pdo, $categories, $parts_category_id); ?>
 
     <section class="products-section">
         <div class="container">

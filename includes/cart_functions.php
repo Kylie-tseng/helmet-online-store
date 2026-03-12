@@ -342,11 +342,20 @@ function hasUserCoupon($pdo, $user_id, $coupon_code) {
         return false;
     }
 
+    $coupon = getCouponByCode($pdo, $coupon_code);
+    if (!$coupon) {
+        return false;
+    }
+
     try {
-        $stmt = $pdo->prepare("SELECT id FROM user_coupons WHERE user_id = :user_id AND coupon_code = :coupon_code LIMIT 1");
+        $stmt = $pdo->prepare("SELECT id
+                               FROM user_coupons
+                               WHERE user_id = :user_id
+                                 AND coupon_id = :coupon_id
+                               LIMIT 1");
         $stmt->execute([
             ':user_id' => (int)$user_id,
-            ':coupon_code' => $coupon_code
+            ':coupon_id' => (int)$coupon['id']
         ]);
         return (bool)$stmt->fetch();
     } catch (PDOException $e) {
@@ -362,7 +371,9 @@ function claimUserCoupon($pdo, $user_id, $coupon_code) {
     if ((int)$user_id <= 0 || $coupon_code === '') {
         return ['success' => false, 'message' => '資料不完整'];
     }
-    if (!in_array($coupon_code, getAllowedCouponCodes(), true)) {
+
+    $coupon = getCouponByCode($pdo, $coupon_code);
+    if (!$coupon || !in_array($coupon_code, getAllowedCouponCodes(), true)) {
         return ['success' => false, 'message' => '此優惠券不可領取'];
     }
 
@@ -371,10 +382,11 @@ function claimUserCoupon($pdo, $user_id, $coupon_code) {
             return ['success' => false, 'message' => '您已領取過此優惠券'];
         }
 
-        $stmt = $pdo->prepare("INSERT INTO user_coupons (user_id, coupon_code, status) VALUES (:user_id, :coupon_code, 'unused')");
+        $stmt = $pdo->prepare("INSERT INTO user_coupons (user_id, coupon_id, status)
+                               VALUES (:user_id, :coupon_id, 'unused')");
         $stmt->execute([
             ':user_id' => (int)$user_id,
-            ':coupon_code' => $coupon_code
+            ':coupon_id' => (int)$coupon['id']
         ]);
         return ['success' => true, 'message' => '優惠券領取成功'];
     } catch (PDOException $e) {
@@ -391,11 +403,20 @@ function validateUserCouponOwnership($pdo, $user_id, $coupon_code) {
         return ['valid' => false, 'message' => '請先登入會員'];
     }
 
+    $coupon = getCouponByCode($pdo, $coupon_code);
+    if (!$coupon) {
+        return ['valid' => false, 'message' => '此優惠券不存在'];
+    }
+
     try {
-        $stmt = $pdo->prepare("SELECT id, status FROM user_coupons WHERE user_id = :user_id AND coupon_code = :coupon_code LIMIT 1");
+        $stmt = $pdo->prepare("SELECT id, status
+                               FROM user_coupons
+                               WHERE user_id = :user_id
+                                 AND coupon_id = :coupon_id
+                               LIMIT 1");
         $stmt->execute([
             ':user_id' => (int)$user_id,
-            ':coupon_code' => $coupon_code
+            ':coupon_id' => (int)$coupon['id']
         ]);
         $user_coupon = $stmt->fetch();
 
@@ -421,19 +442,134 @@ function markUserCouponUsed($pdo, $user_id, $coupon_code) {
         return false;
     }
 
+    $coupon = getCouponByCode($pdo, $coupon_code);
+    if (!$coupon) {
+        return false;
+    }
+
     try {
         $stmt = $pdo->prepare("UPDATE user_coupons
                                SET status = 'used'
                                WHERE user_id = :user_id
-                                 AND coupon_code = :coupon_code
+                                 AND coupon_id = :coupon_id
                                  AND status = 'unused'");
         $stmt->execute([
             ':user_id' => (int)$user_id,
-            ':coupon_code' => $coupon_code
+            ':coupon_id' => (int)$coupon['id']
         ]);
         return $stmt->rowCount() > 0;
     } catch (PDOException $e) {
         return false;
+    }
+}
+
+/**
+ * 取得會員收藏商品 ID 清單
+ */
+function getUserFavoriteProductIds($pdo, $user_id) {
+    if ((int)$user_id <= 0) {
+        return [];
+    }
+
+    try {
+        $stmt = $pdo->prepare("SELECT product_id FROM favorites WHERE user_id = :user_id");
+        $stmt->execute([':user_id' => (int)$user_id]);
+        $rows = $stmt->fetchAll();
+        return array_map('intval', array_column($rows, 'product_id'));
+    } catch (PDOException $e) {
+        return [];
+    }
+}
+
+/**
+ * 判斷會員是否已收藏商品
+ */
+function isProductFavorited($pdo, $user_id, $product_id) {
+    if ((int)$user_id <= 0 || (int)$product_id <= 0) {
+        return false;
+    }
+
+    try {
+        $stmt = $pdo->prepare("SELECT id FROM favorites WHERE user_id = :user_id AND product_id = :product_id LIMIT 1");
+        $stmt->execute([
+            ':user_id' => (int)$user_id,
+            ':product_id' => (int)$product_id
+        ]);
+        return (bool)$stmt->fetch();
+    } catch (PDOException $e) {
+        return false;
+    }
+}
+
+/**
+ * 收藏商品
+ */
+function addFavorite($pdo, $user_id, $product_id) {
+    if ((int)$user_id <= 0 || (int)$product_id <= 0) {
+        return false;
+    }
+
+    try {
+        $stmt = $pdo->prepare("INSERT INTO favorites (user_id, product_id) VALUES (:user_id, :product_id)");
+        $stmt->execute([
+            ':user_id' => (int)$user_id,
+            ':product_id' => (int)$product_id
+        ]);
+        return true;
+    } catch (PDOException $e) {
+        return false;
+    }
+}
+
+/**
+ * 取消收藏商品
+ */
+function removeFavorite($pdo, $user_id, $product_id) {
+    if ((int)$user_id <= 0 || (int)$product_id <= 0) {
+        return false;
+    }
+
+    try {
+        $stmt = $pdo->prepare("DELETE FROM favorites WHERE user_id = :user_id AND product_id = :product_id");
+        $stmt->execute([
+            ':user_id' => (int)$user_id,
+            ':product_id' => (int)$product_id
+        ]);
+        return $stmt->rowCount() > 0;
+    } catch (PDOException $e) {
+        return false;
+    }
+}
+
+/**
+ * 切換收藏狀態，回傳最新狀態
+ */
+function toggleFavorite($pdo, $user_id, $product_id) {
+    $currently_favorited = isProductFavorited($pdo, $user_id, $product_id);
+    if ($currently_favorited) {
+        removeFavorite($pdo, $user_id, $product_id);
+        return false;
+    }
+
+    addFavorite($pdo, $user_id, $product_id);
+    return true;
+}
+
+/**
+ * 取得收藏總數
+ */
+function getFavoriteCount($pdo, $user_id) {
+    if ((int)$user_id <= 0) {
+        return 0;
+    }
+
+    try {
+        $stmt = $pdo->prepare("SELECT COUNT(*) AS total FROM favorites WHERE user_id = :user_id");
+        $stmt->execute([':user_id' => (int)$user_id]);
+        $row = $stmt->fetch();
+        return isset($row['total']) ? (int)$row['total'] : 0;
+    } catch (PDOException $e) {
+        return 0;
     }
 }
 

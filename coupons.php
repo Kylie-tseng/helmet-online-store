@@ -53,7 +53,7 @@ try {
 
 $parts_category_id = null;
 try {
-    $stmt = $pdo->prepare("SELECT id FROM categories WHERE name = '周邊與零件' LIMIT 1");
+    $stmt = $pdo->prepare("SELECT id FROM categories WHERE name = '周邊與配件' LIMIT 1");
     $stmt->execute();
     $parts_category = $stmt->fetch();
     if ($parts_category) {
@@ -72,11 +72,7 @@ try {
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
-    <div class="announcement-bar">
-        <div class="announcement-content">限時優惠活動中，歡迎立即選購</div>
-    </div>
-
-    <?php renderNavbar($pdo, $categories, $parts_category_id); ?>
+<?php renderNavbar($pdo, $categories, $parts_category_id); ?>
 
     <section class="products-section">
         <div class="container">
@@ -113,7 +109,7 @@ try {
                 <div class="footer-column">
                     <h3 class="footer-title">顧客服務</h3>
                     <ul class="footer-links">
-                        <li><a href="guide.php">購物須知</a></li>
+                        <li><a href="guide.php">購物指南</a></li>
                         <li><a href="faq.php">常見問題</a></li>
                         <li><a href="return.php">退換貨政策</a></li>
                         <li><a href="shipping.php">運送說明</a></li>

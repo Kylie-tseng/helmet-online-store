@@ -7,8 +7,8 @@ header('Content-Type: application/json; charset=utf-8');
 if (!isset($_SESSION['user_id'])) {
     echo json_encode([
         'success' => false,
-        'message' => '請先登入',
-        'redirect' => 'login.php'
+        'message' => '請先登入或註冊，才可以使用購物車功能',
+        'redirect' => 'login.php?notice=cart'
     ]);
     exit;
 }
@@ -23,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $size = isset($_POST['size']) ? trim($_POST['size']) : '';
     $quantity = isset($_POST['quantity']) ? (int)$_POST['quantity'] : 0;
     $is_addon = isset($_POST['is_addon']) && $_POST['is_addon'] === '1';
-    $unit_price = null;
+    $unit_price = 0.0;
 
     // 驗證輸入
     if ($product_id <= 0) {
@@ -42,6 +42,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!$product) {
                 $error_message = '找不到此商品或已下架';
             } else {
+                // 一般商品使用原價；加價購再覆寫為 9 折價
+                $unit_price = (float)$product['price'];
+
                 // 加價購可不帶尺寸，後端自動選擇第一個可用尺寸
                 if ($is_addon) {
                     if ((int)$product['is_addon_product'] !== 1) {
@@ -95,17 +98,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $error_message = '購物車中已有此商品，總數量超過庫存，已調整為最大可購買數量：' . $new_quantity;
                         }
 
-                        if ($is_addon) {
-                            $stmt = $pdo->prepare("UPDATE cart SET quantity = :quantity, unit_price = :unit_price WHERE id = :cart_id");
-                            $stmt->execute([
-                                ':quantity' => $new_quantity,
-                                ':unit_price' => $unit_price,
-                                ':cart_id' => $existing_cart_item['id']
-                            ]);
-                        } else {
-                            $stmt = $pdo->prepare("UPDATE cart SET quantity = :quantity WHERE id = :cart_id");
-                            $stmt->execute([':quantity' => $new_quantity, ':cart_id' => $existing_cart_item['id']]);
-                        }
+                        $stmt = $pdo->prepare("UPDATE cart SET quantity = :quantity, unit_price = :unit_price WHERE id = :cart_id");
+                        $stmt->execute([
+                            ':quantity' => $new_quantity,
+                            ':unit_price' => $unit_price,
+                            ':cart_id' => $existing_cart_item['id']
+                        ]);
                     } else {
                         // 新增購物車項目
                         $stmt = $pdo->prepare("INSERT INTO cart (user_id, product_id, size, quantity, unit_price)

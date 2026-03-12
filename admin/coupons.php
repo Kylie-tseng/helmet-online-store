@@ -161,11 +161,7 @@ try {
     <link rel="stylesheet" href="../assets/css/style.css">
 </head>
 <body>
-    <div class="announcement-bar">
-        <div class="announcement-content">管理後台系統</div>
-    </div>
-
-    <nav class="navbar">
+<nav class="navbar unified-navbar">
         <div class="nav-container">
             <div class="nav-logo">
                 <a href="../index.php">HelmetVRse</a>
