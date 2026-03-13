@@ -1478,103 +1478,321 @@ body {
     color: #333333;
 }
 
-/* 首頁活動快捷卡 */
-.home-promotions{
-    display:flex;
-    justify-content:space-between;
-    align-items:stretch;
-    gap:16px;
-    margin:30px 0;
-    flex-wrap:nowrap;
+/* 首頁新版促銷活動區塊（1 大 + 4 小） */
+.home-page .promo-section {
+    margin: 10px 0 16px;
 }
 
-.promo-card{
-    flex: 0 0 calc((100% - 64px) / 5);
-    max-width: calc((100% - 64px) / 5);
-    min-width: 180px;
-    background:#fff;
-    padding:16px 12px;
-    border-radius:12px;
-    text-align:center;
-    box-shadow:0 2px 10px rgba(0,0,0,0.05);
-    transition:0.2s;
-    text-decoration:none;
-    color:inherit;
-    display:flex;
-    flex-direction:column;
-    justify-content:center;
+.home-page .promo-container {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 4px;
 }
 
-.promo-card:hover{
-transform:translateY(-3px);
+.home-page .promo-header {
+    text-align: center;
+    margin-bottom: 10px;
 }
 
-@media (min-width: 992px) {
-  .home-promotions {
-    display: flex !important;
-    flex-wrap: nowrap !important;
-    justify-content: space-between !important;
-    align-items: stretch !important;
-    gap: 16px !important;
-  }
+.home-page .promo-eyebrow {
+    margin: 0 0 8px;
+    font-size: 12px;
+    letter-spacing: 0.18em;
+    font-weight: 700;
+    color: #6C727A;
+}
 
-  .home-promotions .promo-card {
-    flex: 0 0 calc((100% - 64px) / 5) !important;
-    max-width: calc((100% - 64px) / 5) !important;
-    min-width: 0 !important;
-    display: flex !important;
-    flex-direction: column !important;
-    justify-content: center !important;
-    text-align: center !important;
-  }
+.home-page .promo-title {
+    margin: 0;
+    font-size: clamp(25px, 3vw, 34px);
+    line-height: 1.08;
+    font-weight: 760;
+    color: #2F3338;
+}
+
+.home-page .promo-subtitle {
+    margin: 6px auto 0;
+    max-width: 620px;
+    font-size: 14px;
+    line-height: 1.45;
+    color: #5E656E;
+}
+
+.home-page .promo-layout {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1.62fr) minmax(0, 1fr);
+    gap: 14px;
+    align-items: stretch;
+}
+
+.home-page .promo-main-card,
+.home-page .promo-mini-card {
+    position: relative;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.74);
+    overflow: hidden;
+    transition: transform .26s ease, box-shadow .26s ease, border-color .26s ease;
+}
+
+.home-page .promo-main-card {
+    position: relative;
+    height: 438px;
+    min-height: 438px;
+    padding: 18px 20px;
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.9) 0%, rgba(243, 246, 249, 0.86) 40%, rgba(230, 236, 242, 0.78) 100%);
+    box-shadow: 0 16px 36px rgba(8, 8, 8, 0.12);
+    display: block;
+}
+
+.home-page .promo-main-content {
+    position: relative;
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+    max-width: 66%;
+}
+
+.home-page .promo-main-label {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    height: 26px;
+    padding: 0 10px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.18);
+    border: 1px solid rgba(255, 255, 255, 0.32);
+    color: rgba(255, 255, 255, 0.92);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    margin-bottom: 14px;
+}
+
+.home-page .promo-card-label {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    height: 26px;
+    padding: 0 10px;
+    border-radius: 999px;
+    background: rgba(47, 51, 56, 0.08);
+    color: #545B65;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    margin-bottom: 14px;
+}
+
+.home-page .promo-main-title {
+    margin: 0;
+    font-size: clamp(26px, 3vw, 34px);
+    line-height: 1.03;
+    font-weight: 770;
+    color: #FFFFFF;
+}
+
+.home-page .promo-main-highlight {
+    margin: 10px 0 0;
+    font-size: 17px;
+    font-weight: 760;
+    color: #FFFFFF;
+}
+
+.home-page .promo-main-text {
+    margin: 8px 0 0;
+    font-size: 13px;
+    line-height: 1.45;
+    color: rgba(242, 245, 248, 0.92);
+}
+
+.home-page .promo-main-bg {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+}
+
+.home-page .promo-main-bg-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center 58%;
+    display: block;
+}
+
+.home-page .promo-main-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    background: linear-gradient(120deg, rgba(12, 16, 22, 0.72) 0%, rgba(12, 16, 22, 0.54) 34%, rgba(12, 16, 22, 0.28) 58%, rgba(12, 16, 22, 0.12) 100%);
+}
+
+.home-page .promo-btn {
+    margin-top: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: fit-content;
+    min-width: 118px;
+    height: 38px;
+    padding: 0 18px;
+    border-radius: 999px;
+    background: #2F3338;
+    border: 1px solid #2F3338;
+    color: #FFFFFF !important;
+    text-decoration: none !important;
+    font-size: 13px;
+    font-weight: 700;
+    transition: transform .22s ease, background-color .22s ease, border-color .22s ease;
+}
+
+.home-page .promo-btn:visited {
+    color: #FFFFFF !important;
+}
+
+.home-page .promo-btn:hover {
+    transform: translateY(-1px);
+    background: #4A5058;
+    border-color: #4A5058;
+}
+
+.home-page .promo-main-card .promo-btn {
+    background: rgba(255, 255, 255, 0.96);
+    border: 1px solid rgba(255, 255, 255, 0.96);
+    color: #1F2328 !important;
+}
+
+.home-page .promo-main-card .promo-btn:visited {
+    color: #1F2328 !important;
+}
+
+.home-page .promo-main-card .promo-btn:hover {
+    background: #FFFFFF;
+    border-color: #FFFFFF;
+    color: #111111 !important;
+}
+
+.home-page .promo-side-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.home-page .promo-mini-card {
+    min-height: 132px;
+    padding: 12px 12px;
+    background: rgba(255, 255, 255, 0.84);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 11px 24px rgba(10, 10, 10, 0.09);
+    display: flex;
+    flex-direction: column;
+}
+
+.home-page .promo-card-title {
+    margin: 0 0 8px;
+    font-size: 15px;
+    line-height: 1.3;
+    font-weight: 740;
+    color: #2F3338;
+}
+
+.home-page .promo-card-desc {
+    margin: 0 0 10px;
+    font-size: 11px;
+    line-height: 1.6;
+    color: #606772;
+}
+
+.home-page .promo-card-offer {
+    margin: 0 0 14px;
+    padding-top: 0;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.5;
+    color: #33383F;
+}
+
+.home-page .promo-mini-card .promo-card-label,
+.home-page .promo-mini-card .promo-label {
+    margin-bottom: 10px;
+}
+
+.home-page .promo-mini-card .promo-btn {
+    margin-top: 6px;
+    min-width: 92px;
+    height: 30px;
+    font-size: 11px;
+}
+
+.home-page .promo-main-card:hover,
+.home-page .promo-mini-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 18px 36px rgba(8, 8, 8, 0.15);
+    border-color: rgba(255, 255, 255, 0.95);
+}
+
+@media (max-width: 1199.98px) {
+    .home-page .promo-layout {
+        grid-template-columns: minmax(0, 1fr) !important;
+        gap: 18px;
+    }
+
+    .home-page .promo-main-card {
+        min-height: 356px;
+        height: 356px;
+    }
+
+    .home-page .promo-main-content {
+        max-width: 100%;
+    }
+
+    .home-page .promo-main-bg-image {
+        object-position: center 56%;
+    }
 }
 
 @media (max-width: 991.98px) {
-  .home-promotions {
-    display: flex;
-    gap: 12px;
-    overflow-x: auto;
-    padding-bottom: 8px;
-    -webkit-overflow-scrolling: touch;
-    justify-content: flex-start;
-    flex-wrap: nowrap;
-  }
-
-  .home-promotions::-webkit-scrollbar {
-    height: 6px;
-  }
-
-  .home-promotions::-webkit-scrollbar-thumb {
-    background-color: #C8CEDA;
-    border-radius: 999px;
-  }
-
-  .promo-card {
-    min-width: 190px;
-    flex: 0 0 auto;
-    max-width: none;
-  }
+    .home-page .promo-side-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
 }
 
-.promo-shortcut-icon {
-    display: block;
-    font-size: 20px;
-    margin-bottom: 8px;
-    line-height: 1;
-}
+@media (max-width: 767.98px) {
+    .home-page .promo-section {
+        margin: 12px 0 22px;
+    }
 
-.promo-shortcut-title {
-    font-size: 15px;
-    color: #333333;
-    font-weight: 700;
-    margin-bottom: 6px;
-    line-height: 1.35;
-}
+    .home-page .promo-container {
+        padding: 0;
+    }
 
-.promo-shortcut-desc {
-    font-size: 13px;
-    color: #666666;
-    line-height: 1.4;
+    .home-page .promo-main-card {
+        min-height: 330px;
+        height: 330px;
+        padding: 18px 16px;
+    }
+
+    .home-page .promo-main-title {
+        font-size: 27px;
+    }
+
+    .home-page .promo-main-content {
+        max-width: 100%;
+    }
+
+    .home-page .promo-main-bg-image {
+        object-position: center 55%;
+    }
+
+    .home-page .promo-side-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .home-page .promo-mini-card {
+        min-height: 148px;
+    }
 }
 
 /* =========================================
@@ -4718,4 +4936,558 @@ body:not(.home-page):not(.auth-page) {
 .auth-page .login-container,
 .auth-page .register-container {
     min-height: calc(100vh - var(--auth-header-height)) !important;
+}
+
+/* =========================================
+   Promo Layout Fallback (強制命中)
+   ========================================= */
+.promo-section {
+    padding: 6px 0 12px !important;
+}
+
+.promo-container {
+    max-width: 1280px !important;
+    margin: 0 auto !important;
+    padding: 0 12px !important;
+}
+
+.promo-header {
+    text-align: center !important;
+    margin-bottom: 10px !important;
+}
+
+.promo-layout {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1.6fr) minmax(320px, 1fr) !important;
+    gap: 14px !important;
+    align-items: stretch !important;
+}
+
+.promo-side-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+}
+
+.promo-main-card {
+    height: 438px !important;
+    min-height: 438px !important;
+    border-radius: 20px !important;
+    padding: 18px 20px !important;
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.9) 0%, rgba(243, 246, 249, 0.86) 42%, rgba(230, 236, 242, 0.78) 100%) !important;
+    box-shadow: 0 16px 36px rgba(8, 8, 8, 0.12) !important;
+    border: 1px solid rgba(255, 255, 255, 0.74) !important;
+    position: relative !important;
+    overflow: hidden !important;
+    display: block !important;
+}
+
+.promo-main-content {
+    position: relative !important;
+    z-index: 3 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    max-width: 66% !important;
+}
+
+.promo-main-label {
+    background: rgba(255, 255, 255, 0.18) !important;
+    border: 1px solid rgba(255, 255, 255, 0.32) !important;
+    color: rgba(255, 255, 255, 0.92) !important;
+}
+
+.promo-main-title,
+.promo-main-highlight {
+    color: #FFFFFF !important;
+}
+
+.promo-main-text {
+    color: rgba(242, 245, 248, 0.92) !important;
+}
+
+.promo-main-bg {
+    position: absolute !important;
+    inset: 0 !important;
+    z-index: 1 !important;
+}
+
+.promo-main-bg-image {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    object-position: center 58% !important;
+    display: block !important;
+}
+
+.promo-main-overlay {
+    position: absolute !important;
+    inset: 0 !important;
+    z-index: 2 !important;
+    background: linear-gradient(120deg, rgba(12, 16, 22, 0.72) 0%, rgba(12, 16, 22, 0.54) 34%, rgba(12, 16, 22, 0.28) 58%, rgba(12, 16, 22, 0.12) 100%) !important;
+}
+
+.promo-mini-card {
+    min-height: 132px !important;
+    border-radius: 18px !important;
+    padding: 12px 12px !important;
+    background: rgba(255, 255, 255, 0.84) !important;
+    box-shadow: 0 11px 24px rgba(10, 10, 10, 0.09) !important;
+    border: 1px solid rgba(255, 255, 255, 0.74) !important;
+}
+
+.promo-main-card,
+.promo-mini-card {
+    transition: transform .26s ease, box-shadow .26s ease, border-color .26s ease !important;
+}
+
+.promo-main-card:hover,
+.promo-mini-card:hover {
+    transform: translateY(-4px) !important;
+    box-shadow: 0 18px 36px rgba(8, 8, 8, 0.15) !important;
+}
+
+.promo-btn,
+.promo-btn:visited,
+.promo-mini-card a,
+.promo-mini-card a:visited {
+    text-decoration: none !important;
+}
+
+.promo-btn {
+    color: #FFFFFF !important;
+    background: #2F3338 !important;
+    border: 1px solid #2F3338 !important;
+    margin-top: 10px !important;
+}
+
+.promo-main-card .promo-btn {
+    background: rgba(255, 255, 255, 0.96) !important;
+    border: 1px solid rgba(255, 255, 255, 0.96) !important;
+    color: #1F2328 !important;
+}
+
+.promo-main-card .promo-btn:visited {
+    color: #1F2328 !important;
+}
+
+.promo-main-card .promo-btn:hover {
+    background: #FFFFFF !important;
+    border-color: #FFFFFF !important;
+    color: #111111 !important;
+}
+
+.promo-card-title {
+    margin: 0 0 8px !important;
+    font-size: 15px !important;
+}
+
+.promo-card-desc {
+    margin: 0 0 10px !important;
+    font-size: 11px !important;
+    line-height: 1.6 !important;
+}
+
+.promo-card-offer {
+    margin: 0 0 14px !important;
+    padding-top: 0 !important;
+    font-size: 13px !important;
+    line-height: 1.5 !important;
+}
+
+.promo-mini-card .promo-card-label,
+.promo-mini-card .promo-label {
+    margin-bottom: 10px !important;
+}
+
+.promo-mini-card .promo-btn {
+    margin-top: 6px !important;
+    height: 30px !important;
+    font-size: 11px !important;
+}
+
+@media (max-width: 1024px) {
+    .promo-layout {
+        grid-template-columns: minmax(0, 1fr) !important;
+    }
+
+    .promo-side-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+
+    .promo-main-content {
+        max-width: 100% !important;
+    }
+
+    .promo-main-card {
+        min-height: 356px !important;
+        height: 356px !important;
+    }
+
+    .promo-main-content {
+        max-width: 100% !important;
+    }
+
+    .promo-main-bg-image {
+        object-position: center 56% !important;
+    }
+}
+
+@media (max-width: 640px) {
+    .promo-side-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .promo-main-card {
+        min-height: 330px !important;
+        height: 330px !important;
+        padding: 18px 16px !important;
+    }
+
+    .promo-main-content {
+        max-width: 100% !important;
+    }
+
+    .promo-main-bg-image {
+        object-position: center 55% !important;
+    }
+
+    .promo-mini-card {
+        min-height: 148px !important;
+    }
+}
+
+/* =========================================
+   活動詳情頁（Offer Detail Landing）
+   ========================================= */
+.offer-detail-page {
+    background: linear-gradient(180deg, #FFFFFF 0%, #ECECEC 40%, #D7D7D7 100%) !important;
+}
+
+.offer-hero {
+    position: relative;
+    min-height: 292px;
+    display: flex;
+    align-items: flex-end;
+    overflow: hidden;
+}
+
+.offer-hero-bg {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    transform: scale(1.02);
+}
+
+.offer-hero-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(120deg, rgba(10, 12, 16, 0.78) 0%, rgba(10, 12, 16, 0.52) 42%, rgba(10, 12, 16, 0.22) 100%);
+}
+
+.offer-hero-content {
+    position: relative;
+    z-index: 3;
+    width: 100%;
+    padding: 70px 0 30px;
+    color: #FFFFFF;
+}
+
+.offer-hero-title {
+    margin: 0;
+    font-size: clamp(32px, 4.4vw, 46px);
+    line-height: 1.08;
+    font-weight: 800;
+    letter-spacing: 0.01em;
+}
+
+.offer-hero-highlight {
+    margin: 10px 0 0;
+    font-size: clamp(18px, 2.2vw, 24px);
+    font-weight: 700;
+    color: #F4F6F8;
+}
+
+.offer-hero-text {
+    margin: 8px 0 0;
+    max-width: 660px;
+    font-size: 15px;
+    line-height: 1.58;
+    color: rgba(245, 248, 251, 0.92);
+}
+
+.offer-hero-actions {
+    margin-top: 18px;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.offer-hero-actions .promo-btn,
+.offer-hero-actions .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 124px;
+    height: 40px;
+    padding: 0 18px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.95);
+    background: rgba(255, 255, 255, 0.95);
+    color: #111827 !important;
+    text-decoration: none !important;
+    font-size: 13px;
+    font-weight: 700;
+    transition: transform .2s ease, background-color .2s ease;
+}
+
+.offer-hero-actions .promo-btn:hover,
+.offer-hero-actions .btn:hover {
+    transform: translateY(-1px);
+    background: #FFFFFF;
+}
+
+.offer-detail-main {
+    padding: 26px 0 52px;
+}
+
+.offer-section-title {
+    margin: 0 0 16px;
+    font-size: clamp(26px, 3.2vw, 32px);
+    font-weight: 750;
+    color: #2F3338;
+}
+
+.offer-summary {
+    margin-bottom: 34px;
+}
+
+.offer-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0;
+    background: rgba(255, 255, 255, 0.28);
+    border-top: 1px solid rgba(70, 76, 84, 0.14);
+    border-bottom: 1px solid rgba(70, 76, 84, 0.14);
+}
+
+.offer-summary-card {
+    background: transparent;
+    border-radius: 0;
+    border: 0;
+    box-shadow: none;
+    padding: 18px 22px 16px;
+    position: relative;
+}
+
+.offer-summary-card + .offer-summary-card::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 18px;
+    bottom: 18px;
+    width: 1px;
+    background: rgba(70, 76, 84, 0.18);
+}
+
+.offer-summary-label {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    font-weight: 700;
+    color: #6C727A;
+    margin-bottom: 8px;
+}
+
+.offer-summary-value {
+    margin: 0;
+    font-size: 30px;
+    line-height: 1.15;
+    font-weight: 760;
+    color: #2F3338;
+}
+
+.offer-summary-text {
+    margin: 10px 0 0;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #5E6670;
+}
+
+.offer-steps {
+    margin-bottom: 34px;
+}
+
+.offer-steps-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 24px;
+    position: relative;
+}
+
+.offer-step-card {
+    background: transparent;
+    border-radius: 0;
+    border: 0;
+    box-shadow: none;
+    padding: 0 8px 0 0;
+    position: relative;
+}
+
+.offer-step-card::after {
+    content: "";
+    position: absolute;
+    right: -13px;
+    top: 14px;
+    width: 26px;
+    height: 1px;
+    background: rgba(73, 79, 87, 0.26);
+}
+
+.offer-step-card:last-child::after {
+    display: none;
+}
+
+.offer-step-number {
+    width: 30px;
+    height: 30px;
+    border-radius: 999px;
+    background: #2F3338;
+    color: #FFFFFF;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 30px;
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+.offer-step-title {
+    margin: 0;
+    font-size: 19px;
+    line-height: 1.35;
+    color: #2F3338;
+    font-weight: 700;
+}
+
+.offer-step-text {
+    margin: 8px 0 0;
+    font-size: 14px;
+    line-height: 1.7;
+    color: #5E6670;
+}
+
+.offer-notes-card {
+    background: transparent;
+    border-radius: 0;
+    border: 0;
+    box-shadow: none;
+    padding: 14px 0 2px;
+    border-top: 1px solid rgba(67, 73, 82, 0.2);
+    border-bottom: 1px solid rgba(67, 73, 82, 0.2);
+}
+
+.offer-notes-list {
+    margin: 0;
+    padding-left: 18px;
+    color: #4F5660;
+    font-size: 14px;
+    line-height: 1.75;
+}
+
+.offer-notes-list li + li {
+    margin-top: 6px;
+}
+
+.offer-claim-card {
+    margin-top: 22px;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.5) 0%, rgba(250, 251, 253, 0.3) 100%);
+    border-radius: 14px;
+    border: 1px solid rgba(65, 72, 81, 0.16);
+    box-shadow: none;
+    padding: 16px 18px;
+}
+
+.offer-claim-card p {
+    margin: 0 0 12px;
+    color: #4F5660;
+}
+
+.offer-claim-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.offer-claim-actions .btn {
+    min-width: 118px;
+}
+
+.offer-hero.offer-new-member .offer-hero-bg { background-image: url('images/index2.jpg'); }
+.offer-hero.offer-anniversary .offer-hero-bg { background-image: url('images/index_helmet.jpg'); }
+.offer-hero.offer-discount .offer-hero-bg { background-image: url('images/index3.jpg'); }
+.offer-hero.offer-rider .offer-hero-bg { background-image: url('images/index4.jpg'); }
+.offer-hero.offer-shipping .offer-hero-bg { background-image: url('images/index5.jpg'); }
+
+@media (max-width: 1024px) {
+    .offer-summary-grid,
+    .offer-steps-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .offer-summary-card:nth-child(2n+1)::before {
+        display: none;
+    }
+
+    .offer-step-card::after {
+        display: none;
+    }
+}
+
+@media (max-width: 767.98px) {
+    .offer-hero {
+        min-height: 250px;
+    }
+
+    .offer-hero-content {
+        padding: 62px 0 24px;
+    }
+
+    .offer-hero-title {
+        font-size: clamp(28px, 7.3vw, 34px);
+    }
+
+    .offer-hero-highlight {
+        font-size: 17px;
+    }
+
+    .offer-hero-text {
+        font-size: 13px;
+        line-height: 1.55;
+    }
+
+    .offer-summary-grid,
+    .offer-steps-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .offer-summary-grid {
+        gap: 0;
+    }
+
+    .offer-summary-card {
+        padding: 14px 0;
+    }
+
+    .offer-summary-card + .offer-summary-card::before {
+        top: 0;
+        left: 0;
+        right: 0;
+        width: auto;
+        height: 1px;
+    }
+
+    .offer-detail-main {
+        padding: 20px 0 36px;
+    }
 }

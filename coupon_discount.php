@@ -48,58 +48,111 @@ try {
     <title>滿額折扣活動 - HelmetVRse</title>
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
-<body>
+<body class="offer-detail-page">
 <?php renderNavbar($pdo, $categories, $parts_category_id); ?>
 
-    <section class="products-section">
-        <div class="container">
-            <div class="section-header">
-                <h1 class="section-title">滿額折扣活動</h1>
-                <p class="section-subtitle">滿 2000 元折抵 300 元（優惠券代碼：SAVE300）</p>
+    <section class="offer-hero offer-discount">
+        <div class="offer-hero-bg"></div>
+        <div class="offer-hero-overlay"></div>
+        <div class="container offer-hero-content">
+            <h1 class="offer-hero-title">滿額折扣活動</h1>
+            <p class="offer-hero-highlight">滿 NT$2000 折 NT$300</p>
+            <p class="offer-hero-text">購物滿額即可享受限時回饋，讓每次升級裝備都更值得。</p>
+            <div class="offer-hero-actions">
+                <a href="products.php" class="promo-btn">前往購物</a>
+                <a href="#claim" class="promo-btn">領取優惠</a>
             </div>
+        </div>
+    </section>
 
+    <main class="offer-detail-main">
+        <div class="container">
             <?php if ($coupon_message !== ''): ?>
                 <div class="cart-message <?php echo htmlspecialchars($coupon_message_type); ?>">
                     <?php echo htmlspecialchars($coupon_message); ?>
                 </div>
             <?php endif; ?>
 
-            <div class="products-grid">
-                <article class="product-card">
-                    <div class="product-info">
-                        <h2 class="product-name">優惠內容</h2>
-                        <p class="product-price">套用 SAVE300，單筆消費滿 NT$2000 可折抵 NT$300。</p>
-                        <p class="product-price">折抵金額固定，不可重複使用。</p>
-                        <p class="product-price">有效期限：2025-01-01 ~ 2099-12-31</p>
-                    </div>
-                </article>
-                <article class="product-card">
-                    <div class="product-info">
-                        <h2 class="product-name">使用條件</h2>
-                        <p class="product-price">需先領取 SAVE300 優惠券。</p>
-                        <p class="product-price">結帳金額需達最低門檻 NT$2000。</p>
-                        <p class="product-price">每個會員帳號限領一次。</p>
-                    </div>
-                </article>
-            </div>
+            <section class="offer-summary">
+                <h2 class="offer-section-title">活動重點</h2>
+                <div class="offer-summary-grid">
+                    <article class="offer-summary-card">
+                        <div class="offer-summary-label">折抵金額</div>
+                        <p class="offer-summary-value">NT$300</p>
+                        <p class="offer-summary-text">套用 SAVE300，單筆消費滿 NT$2000 即可折抵。</p>
+                    </article>
+                    <article class="offer-summary-card">
+                        <div class="offer-summary-label">消費門檻</div>
+                        <p class="offer-summary-value">NT$2000</p>
+                        <p class="offer-summary-text">需先達最低門檻，系統才會成功套用折扣。</p>
+                    </article>
+                    <article class="offer-summary-card">
+                        <div class="offer-summary-label">活動期間</div>
+                        <p class="offer-summary-value">2025-2099</p>
+                        <p class="offer-summary-text">2025-01-01 至 2099-12-31，每會員限領取一次。</p>
+                    </article>
+                </div>
+            </section>
 
-            <div class="profile-card" style="margin-top: 20px;">
-                <h2 class="card-title">領取操作</h2>
+            <section class="offer-steps">
+                <h2 class="offer-section-title">使用方式</h2>
+                <div class="offer-steps-grid">
+                    <article class="offer-step-card">
+                        <div class="offer-step-number">01</div>
+                        <h3 class="offer-step-title">領取 SAVE300</h3>
+                        <p class="offer-step-text">先在本頁完成優惠券領取，領取後才可在結帳時使用。</p>
+                    </article>
+                    <article class="offer-step-card">
+                        <div class="offer-step-number">02</div>
+                        <h3 class="offer-step-title">選購並達門檻</h3>
+                        <p class="offer-step-text">加入商品後確認小計達 NT$2000，避免結帳時無法折抵。</p>
+                    </article>
+                    <article class="offer-step-card">
+                        <div class="offer-step-number">03</div>
+                        <h3 class="offer-step-title">結帳套用折抵</h3>
+                        <p class="offer-step-text">在結帳頁輸入 SAVE300，即可完成 NT$300 折抵。</p>
+                    </article>
+                </div>
+            </section>
+
+            <section class="offer-notes">
+                <h2 class="offer-section-title">注意事項</h2>
+                <div class="offer-notes-card">
+                    <ul class="offer-notes-list">
+                        <li>此優惠券為固定折抵金額，不可重複套用於同一筆訂單。</li>
+                        <li>優惠不得與其他折扣同時使用，實際折扣依系統計算為準。</li>
+                        <li>若結帳金額低於門檻，系統將自動取消折抵。</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section class="offer-claim-card" id="claim">
+                <h2 class="offer-section-title">領取優惠</h2>
                 <?php if ($is_logged_in): ?>
                     <?php if ($is_claimed): ?>
                         <p class="cart-message success">您已領取 SAVE300 優惠券。</p>
+                        <div class="offer-claim-actions">
+                            <a href="products.php" class="btn">前往購物</a>
+                        </div>
                     <?php else: ?>
-                        <form method="POST">
-                            <input type="hidden" name="action" value="claim_coupon">
-                            <button type="submit" class="btn">立即領取 SAVE300</button>
-                        </form>
+                        <p>領取後可於結帳頁輸入 SAVE300 使用滿額折抵。</p>
+                        <div class="offer-claim-actions">
+                            <form method="POST">
+                                <input type="hidden" name="action" value="claim_coupon">
+                                <button type="submit" class="btn">立即領取 SAVE300</button>
+                            </form>
+                            <a href="products.php" class="btn">前往購物</a>
+                        </div>
                     <?php endif; ?>
                 <?php else: ?>
                     <p>請先登入會員後再領取此優惠券。</p>
-                    <a href="login.php?redirect=<?php echo urlencode('coupon_discount.php'); ?>" class="btn">前往登入</a>
+                    <div class="offer-claim-actions">
+                        <a href="login.php?redirect=<?php echo urlencode('coupon_discount.php'); ?>" class="btn">前往登入</a>
+                        <a href="register.php" class="btn">前往註冊</a>
+                    </div>
                 <?php endif; ?>
-            </div>
+            </section>
         </div>
-    </section>
+    </main>
 </body>
 </html>
