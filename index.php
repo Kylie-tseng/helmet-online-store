@@ -37,6 +37,67 @@ $favorite_ids = [];
 if ($is_logged_in) {
     $favorite_ids = getUserFavoriteProductIds($pdo, (int)$_SESSION['user_id']);
 }
+
+$promo_offers = [
+    [
+        'title' => '新會員優惠',
+        'text' => '新會員註冊後即可使用優惠券',
+        'coupon' => 'NEW100',
+        'highlight' => '滿 500 元折抵 100 元',
+        'link' => 'coupon_new_member.php'
+    ],
+    [
+        'title' => '安全帽週年慶',
+        'text' => '全館安全帽限時優惠',
+        'coupon' => 'HELMET10',
+        'highlight' => '全館商品 9 折',
+        'link' => 'coupon_anniversary.php'
+    ],
+    [
+        'title' => '滿額折扣活動',
+        'text' => '購物滿額即可使用優惠券',
+        'coupon' => 'SAVE300',
+        'highlight' => '滿 2000 元折抵 300 元',
+        'link' => 'coupon_discount.php'
+    ],
+    [
+        'title' => '騎士節活動',
+        'text' => '騎士節限定優惠',
+        'coupon' => 'RIDER20',
+        'highlight' => '全館商品 8 折',
+        'link' => 'coupon_rider_day.php'
+    ],
+    [
+        'title' => '滿三千免運',
+        'text' => '全站購物滿額即可享免運優惠',
+        'coupon' => '',
+        'highlight' => '全站滿 3000 元免運',
+        'link' => 'coupon_free_shipping.php'
+    ],
+];
+
+$promo_main_offer = null;
+$promo_side_offers = [];
+if (is_array($promo_offers) && !empty($promo_offers)) {
+    foreach ($promo_offers as $index => $offer) {
+        if (isset($offer['title']) && $offer['title'] === '安全帽週年慶') {
+            $promo_main_offer = $offer;
+            unset($promo_offers[$index]);
+            break;
+        }
+    }
+
+    if ($promo_main_offer === null) {
+        $promo_main_offer = reset($promo_offers);
+        if ($promo_main_offer !== false) {
+            array_shift($promo_offers);
+        } else {
+            $promo_main_offer = null;
+        }
+    }
+
+    $promo_side_offers = array_slice(array_values($promo_offers), 0, 4);
+}
 ?>
 <!DOCTYPE html>
 <html lang="zh-TW">
@@ -44,74 +105,7 @@ if ($is_logged_in) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HelmetVRse - 首頁</title>
-    <link rel="stylesheet" href="assets/css/style.css">
-    <style>
-        /* 只在首頁生效：活動快捷卡強制版 */
-        .home-promotions {
-            display: flex !important;
-            flex-wrap: nowrap !important;
-            justify-content: space-between !important;
-            align-items: stretch !important;
-            gap: 16px !important;
-            margin: 30px 0 !important;
-        }
-
-        .home-promotions .promo-card {
-            flex: 0 0 calc((100% - 64px) / 5) !important;
-            max-width: calc((100% - 64px) / 5) !important;
-            min-width: 0 !important;
-            background: #fff !important;
-            padding: 16px 12px !important;
-            border-radius: 12px !important;
-            text-align: center !important;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05) !important;
-            transition: transform 0.2s ease !important;
-            text-decoration: none !important;
-            color: inherit !important;
-            display: flex !important;
-            flex-direction: column !important;
-            justify-content: center !important;
-        }
-
-        .home-promotions .promo-card:hover {
-            transform: translateY(-3px) !important;
-        }
-
-        .home-promotions .promo-shortcut-icon {
-            display: block;
-            font-size: 20px;
-            margin-bottom: 8px;
-            line-height: 1;
-        }
-
-        .home-promotions .promo-shortcut-title {
-            font-size: 15px;
-            color: #333333;
-            font-weight: 700;
-            margin-bottom: 6px;
-            line-height: 1.35;
-        }
-
-        .home-promotions .promo-shortcut-desc {
-            font-size: 13px;
-            color: #666666;
-            line-height: 1.4;
-        }
-
-        @media (max-width: 991.98px) {
-            .home-promotions {
-                justify-content: flex-start !important;
-                overflow-x: auto !important;
-                -webkit-overflow-scrolling: touch;
-                padding-bottom: 8px;
-            }
-
-            .home-promotions .promo-card {
-                flex: 0 0 190px !important;
-                max-width: none !important;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo urlencode((string)@filemtime(__DIR__ . '/assets/css/style.css')); ?>">
 </head>
 <body class="home-page">
     <header class="home-header">
@@ -142,33 +136,45 @@ if ($is_logged_in) {
     <!-- 分類區 -->
     <section class="categories-section">
         <div class="container">
-            <div class="home-promotions">
-                <a href="coupon_new_member.php" class="promo-card">
-                    <span class="promo-shortcut-icon">🎉</span>
-                    <h3 class="promo-shortcut-title">新會員優惠</h3>
-                    <p class="promo-shortcut-desc">滿 500 元折抵 100 元</p>
-                </a>
-                <a href="coupon_anniversary.php" class="promo-card">
-                    <span class="promo-shortcut-icon">🪖</span>
-                    <h3 class="promo-shortcut-title">安全帽週年慶</h3>
-                    <p class="promo-shortcut-desc">全館商品 9 折</p>
-                </a>
-                <a href="coupon_discount.php" class="promo-card">
-                    <span class="promo-shortcut-icon">💰</span>
-                    <h3 class="promo-shortcut-title">滿額折扣活動</h3>
-                    <p class="promo-shortcut-desc">滿 2000 元折抵 300 元</p>
-                </a>
-                <a href="coupon_rider_day.php" class="promo-card">
-                    <span class="promo-shortcut-icon">🏍</span>
-                    <h3 class="promo-shortcut-title">騎士節活動</h3>
-                    <p class="promo-shortcut-desc">全館商品 8 折</p>
-                </a>
-                <a href="coupon_free_shipping.php" class="promo-card">
-                    <span class="promo-shortcut-icon">🚚</span>
-                    <h3 class="promo-shortcut-title">滿三千免運</h3>
-                    <p class="promo-shortcut-desc">全站滿 NT$3000 免運</p>
-                </a>
-            </div>
+            <section class="promo-section" aria-label="限時優惠活動">
+                <div class="promo-container">
+                    <div class="promo-header">
+                        <p class="promo-eyebrow">EXCLUSIVE OFFERS</p>
+                        <h2 class="promo-title">限時優惠活動</h2>
+                        <p class="promo-subtitle">為騎士精選的專屬回饋與限時折扣</p>
+                    </div>
+
+                    <div class="promo-layout">
+                        <?php if (is_array($promo_main_offer) && !empty($promo_main_offer)): ?>
+                            <article class="promo-main-card">
+                                <div class="promo-main-bg">
+                                    <img src="assets/images/index_helmet.jpg" alt="安全帽主視覺" class="promo-main-bg-image">
+                                </div>
+                                <div class="promo-main-overlay"></div>
+                                <div class="promo-main-content">
+                                    <span class="promo-main-label">FEATURED</span>
+                                    <h3 class="promo-main-title"><?php echo htmlspecialchars($promo_main_offer['title'] ?? '限時優惠'); ?></h3>
+                                    <p class="promo-main-highlight"><?php echo htmlspecialchars($promo_main_offer['highlight'] ?? '優惠進行中'); ?></p>
+                                    <p class="promo-main-text"><?php echo htmlspecialchars($promo_main_offer['text'] ?? '精選回饋活動'); ?></p>
+                                    <a href="<?php echo htmlspecialchars($promo_main_offer['link'] ?? 'coupons.php'); ?>" class="promo-btn">立即選購</a>
+                                </div>
+                            </article>
+                        <?php endif; ?>
+
+                        <div class="promo-side-grid">
+                            <?php foreach ($promo_side_offers as $offer): ?>
+                                <article class="promo-mini-card">
+                                    <span class="promo-card-label">LIMITED</span>
+                                    <h3 class="promo-card-title"><?php echo htmlspecialchars($offer['title'] ?? '活動資訊'); ?></h3>
+                                    <p class="promo-card-desc"><?php echo htmlspecialchars($offer['text'] ?? '限時活動'); ?></p>
+                                    <p class="promo-card-offer"><?php echo htmlspecialchars($offer['highlight'] ?? '限時優惠'); ?></p>
+                                    <a href="<?php echo htmlspecialchars($offer['link'] ?? 'coupons.php'); ?>" class="promo-btn">查看活動</a>
+                                </article>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                </div>
+            </section>
             <div class="section-header">
                 <h2 class="section-title">商品分類</h2>
                 <p class="section-subtitle">探索我們的精選分類</p>
