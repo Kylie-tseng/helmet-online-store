@@ -87,11 +87,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_payment'])) {
             $stmt = $pdo->prepare("UPDATE orders SET status = 'paid', updated_at = NOW() WHERE id = :order_id AND user_id = :user_id");
             $stmt->execute([':order_id' => $order_id, ':user_id' => $user_id]);
             
-<<<<<<< Updated upstream
-=======
             include 'send_order.php';
 
->>>>>>> Stashed changes
             // 清除 session
             unset($_SESSION['pending_order_id']);
             unset($_SESSION['checkout_data']);
