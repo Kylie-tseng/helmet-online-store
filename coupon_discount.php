@@ -20,6 +20,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 }
 
 $is_claimed = $is_logged_in ? hasUserCoupon($pdo, (int)$_SESSION['user_id'], $coupon_code) : false;
+$validity_text = '領取後 3 個月內有效';
+
+if ($is_logged_in && $is_claimed) {
+    $claimed_at = getUserCouponClaimedAt($pdo, (int)$_SESSION['user_id'], $coupon_code);
+    if (!empty($claimed_at)) {
+        try {
+            $start_at = (new DateTime((string)$claimed_at))->setTime(0, 0);
+            $end_at = (clone $start_at)->modify('+3 months')->setTime(23, 59);
+            $validity_text = $start_at->format('Y-m-d H:i') . ' - ' . $end_at->format('Y-m-d H:i');
+        } catch (Exception $e) {
+            $validity_text = '領取後 3 個月內有效';
+        }
+    }
+}
 
 try {
     $stmt = $pdo->query("SELECT id, name, description FROM categories ORDER BY id");
@@ -46,113 +60,89 @@ try {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>滿額折扣活動 - HelmetVRse</title>
-    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo urlencode((string)@filemtime(__DIR__ . '/assets/css/style.css')); ?>">
 </head>
-<body class="offer-detail-page">
+<body class="offer-detail-page offer-new-member-page coupon-detail-page">
 <?php renderNavbar($pdo, $categories, $parts_category_id); ?>
 
-    <section class="offer-hero offer-discount">
-        <div class="offer-hero-bg"></div>
-        <div class="offer-hero-overlay"></div>
-        <div class="container offer-hero-content">
-            <h1 class="offer-hero-title">滿額折扣活動</h1>
-            <p class="offer-hero-highlight">滿 NT$2000 折 NT$300</p>
-            <p class="offer-hero-text">購物滿額即可享受限時回饋，讓每次升級裝備都更值得。</p>
-            <div class="offer-hero-actions">
-                <a href="products.php" class="promo-btn">前往購物</a>
-                <a href="#claim" class="promo-btn">領取優惠</a>
-            </div>
-        </div>
-    </section>
+    <main class="nm-simple-page">
+        <div class="container nm-container">
+            <section class="nm-simple-coupon">
+                <p class="nm-simple-coupon-code">滿額折扣活動</p>
+                <p class="nm-simple-coupon-title">滿 NT$2000 折 NT$300</p>
+                <p class="nm-simple-coupon-subtitle">優惠碼 <?php echo htmlspecialchars($coupon_code); ?></p>
+            </section>
 
-    <main class="offer-detail-main">
-        <div class="container">
             <?php if ($coupon_message !== ''): ?>
                 <div class="cart-message <?php echo htmlspecialchars($coupon_message_type); ?>">
                     <?php echo htmlspecialchars($coupon_message); ?>
                 </div>
             <?php endif; ?>
 
-            <section class="offer-summary">
-                <h2 class="offer-section-title">活動重點</h2>
-                <div class="offer-summary-grid">
-                    <article class="offer-summary-card">
-                        <div class="offer-summary-label">折抵金額</div>
-                        <p class="offer-summary-value">NT$300</p>
-                        <p class="offer-summary-text">套用 SAVE300，單筆消費滿 NT$2000 即可折抵。</p>
-                    </article>
-                    <article class="offer-summary-card">
-                        <div class="offer-summary-label">消費門檻</div>
-                        <p class="offer-summary-value">NT$2000</p>
-                        <p class="offer-summary-text">需先達最低門檻，系統才會成功套用折扣。</p>
-                    </article>
-                    <article class="offer-summary-card">
-                        <div class="offer-summary-label">活動期間</div>
-                        <p class="offer-summary-value">2025-2099</p>
-                        <p class="offer-summary-text">2025-01-01 至 2099-12-31，每會員限領取一次。</p>
-                    </article>
+            <section class="nm-simple-list">
+                <div class="nm-simple-list-item">
+                    <h2>有效期限</h2>
+                    <p><?php echo htmlspecialchars($validity_text); ?></p>
+                </div>
+                <div class="nm-simple-list-item">
+                    <h2>優惠內容</h2>
+                    <p>使用優惠碼 <?php echo htmlspecialchars($coupon_code); ?>，單筆消費滿 NT$2000 可折抵 NT$300。</p>
+                </div>
+                <div class="nm-simple-list-item">
+                    <h2>使用條件</h2>
+                    <p>每個會員帳號限領一次，未達門檻時系統不會套用優惠。</p>
+                </div>
+                <div class="nm-simple-list-item">
+                    <h2>付款方式</h2>
+                    <p>依結帳頁可用付款方式為準，折抵結果以系統計算顯示為準。</p>
+                </div>
+                <div class="nm-simple-list-item">
+                    <h2>適用範圍</h2>
+                    <p>適用於本網站商品訂單，實際適用條件依訂單內容判定。</p>
                 </div>
             </section>
 
-            <section class="offer-steps">
-                <h2 class="offer-section-title">使用方式</h2>
-                <div class="offer-steps-grid">
-                    <article class="offer-step-card">
-                        <div class="offer-step-number">01</div>
-                        <h3 class="offer-step-title">領取 SAVE300</h3>
-                        <p class="offer-step-text">先在本頁完成優惠券領取，領取後才可在結帳時使用。</p>
-                    </article>
-                    <article class="offer-step-card">
-                        <div class="offer-step-number">02</div>
-                        <h3 class="offer-step-title">選購並達門檻</h3>
-                        <p class="offer-step-text">加入商品後確認小計達 NT$2000，避免結帳時無法折抵。</p>
-                    </article>
-                    <article class="offer-step-card">
-                        <div class="offer-step-number">03</div>
-                        <h3 class="offer-step-title">結帳套用折抵</h3>
-                        <p class="offer-step-text">在結帳頁輸入 SAVE300，即可完成 NT$300 折抵。</p>
-                    </article>
+            <section class="nm-simple-steps">
+                <h2>使用方式</h2>
+                <div class="nm-simple-steps-inline">
+                    <span>1 登入會員</span>
+                    <span>2 領取優惠</span>
+                    <span>3 結帳輸入優惠碼</span>
                 </div>
             </section>
 
-            <section class="offer-notes">
-                <h2 class="offer-section-title">注意事項</h2>
-                <div class="offer-notes-card">
-                    <ul class="offer-notes-list">
-                        <li>此優惠券為固定折抵金額，不可重複套用於同一筆訂單。</li>
-                        <li>優惠不得與其他折扣同時使用，實際折扣依系統計算為準。</li>
-                        <li>若結帳金額低於門檻，系統將自動取消折抵。</li>
-                    </ul>
-                </div>
-            </section>
-
-            <section class="offer-claim-card" id="claim">
-                <h2 class="offer-section-title">領取優惠</h2>
+            <section class="nm-simple-status" id="claim">
+                <h2>優惠券狀態</h2>
                 <?php if ($is_logged_in): ?>
+                    <p>帳號：<?php echo htmlspecialchars($_SESSION['user_name'] ?? '會員'); ?></p>
                     <?php if ($is_claimed): ?>
-                        <p class="cart-message success">您已領取 SAVE300 優惠券。</p>
-                        <div class="offer-claim-actions">
-                            <a href="products.php" class="btn">前往購物</a>
+                        <p class="cart-message success">已領取優惠券（<?php echo htmlspecialchars($coupon_code); ?>）</p>
+                        <div class="nm-simple-actions">
+                            <a href="products.php" class="nm-simple-btn nm-simple-btn-secondary">前往購物</a>
                         </div>
                     <?php else: ?>
-                        <p>領取後可於結帳頁輸入 SAVE300 使用滿額折抵。</p>
-                        <div class="offer-claim-actions">
+                        <p>尚未領取優惠券</p>
+                        <div class="nm-simple-actions">
                             <form method="POST">
                                 <input type="hidden" name="action" value="claim_coupon">
-                                <button type="submit" class="btn">立即領取 SAVE300</button>
+                                <button type="submit" class="nm-simple-btn nm-simple-btn-primary">立即領取優惠券</button>
                             </form>
-                            <a href="products.php" class="btn">前往購物</a>
+                            <a href="products.php" class="nm-simple-btn nm-simple-btn-secondary">前往購物</a>
                         </div>
                     <?php endif; ?>
                 <?php else: ?>
                     <p>請先登入會員後再領取此優惠券。</p>
-                    <div class="offer-claim-actions">
-                        <a href="login.php?redirect=<?php echo urlencode('coupon_discount.php'); ?>" class="btn">前往登入</a>
-                        <a href="register.php" class="btn">前往註冊</a>
+                    <div class="nm-simple-actions">
+                        <a href="login.php?redirect=<?php echo urlencode('coupon_discount.php'); ?>" class="nm-simple-btn nm-simple-btn-primary">前往登入</a>
+                        <a href="register.php" class="nm-simple-btn nm-simple-btn-secondary">前往註冊</a>
                     </div>
                 <?php endif; ?>
             </section>
         </div>
     </main>
+
+    <div class="nm-simple-fixed-cta">
+        <a href="#claim" class="claim-btn">立即領取優惠</a>
+    </div>
 </body>
 </html>

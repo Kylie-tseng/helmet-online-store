@@ -30,97 +30,73 @@ try {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>滿三千免運 - HelmetVRse</title>
-    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo urlencode((string)@filemtime(__DIR__ . '/assets/css/style.css')); ?>">
 </head>
-<body class="offer-detail-page">
+<body class="offer-detail-page offer-new-member-page coupon-detail-page">
 <?php renderNavbar($pdo, $categories, $parts_category_id); ?>
 
-    <section class="offer-hero offer-shipping">
-        <div class="offer-hero-bg"></div>
-        <div class="offer-hero-overlay"></div>
-        <div class="container offer-hero-content">
-            <h1 class="offer-hero-title">滿三千免運</h1>
-            <p class="offer-hero-highlight">全站滿 NT$3000 免運</p>
-            <p class="offer-hero-text">一次購足更划算，達指定門檻即可享有全站免運優惠。</p>
-            <div class="offer-hero-actions">
-                <a href="products.php" class="promo-btn">立即選購</a>
-                <a href="cart.php" class="promo-btn">前往購物車</a>
-            </div>
-        </div>
-    </section>
+    <main class="nm-simple-page">
+        <div class="container nm-container">
+            <section class="nm-simple-coupon">
+                <p class="nm-simple-coupon-code">滿三千免運</p>
+                <p class="nm-simple-coupon-title">全站滿 NT$3000 免運</p>
+                <p class="nm-simple-coupon-subtitle">免輸入優惠碼，自動套用</p>
+            </section>
 
-    <main class="offer-detail-main">
-        <div class="container">
-            <section class="offer-summary">
-                <h2 class="offer-section-title">活動重點</h2>
-                <div class="offer-summary-grid">
-                    <article class="offer-summary-card">
-                        <div class="offer-summary-label">免運門檻</div>
-                        <p class="offer-summary-value">NT$3000</p>
-                        <p class="offer-summary-text">單筆訂單商品小計滿 NT$3000，運費將自動折抵。</p>
-                    </article>
-                    <article class="offer-summary-card">
-                        <div class="offer-summary-label">適用方式</div>
-                        <p class="offer-summary-value">自動套用</p>
-                        <p class="offer-summary-text">免輸入優惠碼，系統依結帳金額自動判定是否免運。</p>
-                    </article>
-                    <article class="offer-summary-card">
-                        <div class="offer-summary-label">活動期間</div>
-                        <p class="offer-summary-value">長期活動</p>
-                        <p class="offer-summary-text">依網站公告與最終結帳條件計算為準。</p>
-                    </article>
+            <section class="nm-simple-list">
+                <div class="nm-simple-list-item">
+                    <h2>有效期限</h2>
+                    <p>長期活動（依網站公告與系統判定為準）。</p>
+                </div>
+                <div class="nm-simple-list-item">
+                    <h2>優惠內容</h2>
+                    <p>單筆訂單商品小計滿 NT$3000，系統自動折抵運費。</p>
+                </div>
+                <div class="nm-simple-list-item">
+                    <h2>使用條件</h2>
+                    <p>訂單金額需達免運門檻，實際以結帳頁面金額為準。</p>
+                </div>
+                <div class="nm-simple-list-item">
+                    <h2>付款方式</h2>
+                    <p>依結帳頁可用付款方式與物流條件為準。</p>
+                </div>
+                <div class="nm-simple-list-item">
+                    <h2>適用範圍</h2>
+                    <p>適用於本網站商品訂單，特定配送範圍可能不適用。</p>
                 </div>
             </section>
 
-            <section class="offer-steps">
-                <h2 class="offer-section-title">使用方式</h2>
-                <div class="offer-steps-grid">
-                    <article class="offer-step-card">
-                        <div class="offer-step-number">01</div>
-                        <h3 class="offer-step-title">加入商品</h3>
-                        <p class="offer-step-text">先將欲購買商品加入購物車，確認小計累積金額。</p>
-                    </article>
-                    <article class="offer-step-card">
-                        <div class="offer-step-number">02</div>
-                        <h3 class="offer-step-title">達成門檻</h3>
-                        <p class="offer-step-text">當訂單小計達 NT$3000 以上，即符合免運活動條件。</p>
-                    </article>
-                    <article class="offer-step-card">
-                        <div class="offer-step-number">03</div>
-                        <h3 class="offer-step-title">自動免運</h3>
-                        <p class="offer-step-text">前往結帳時系統自動折抵運費，無須額外操作。</p>
-                    </article>
+            <section class="nm-simple-steps">
+                <h2>使用方式</h2>
+                <div class="nm-simple-steps-inline">
+                    <span>1 選購商品</span>
+                    <span>2 達到 NT$3000</span>
+                    <span>3 結帳自動免運</span>
                 </div>
             </section>
 
-            <section class="offer-notes">
-                <h2 class="offer-section-title">注意事項</h2>
-                <div class="offer-notes-card">
-                    <ul class="offer-notes-list">
-                        <li>免運依結帳時實際商品小計判定，優惠前後規則以系統為準。</li>
-                        <li>配送區域與物流限制可能影響最終免運適用條件。</li>
-                        <li>平台保留活動調整權利，請以最新公告為準。</li>
-                    </ul>
-                </div>
-            </section>
-
-            <section class="offer-claim-card">
-                <h2 class="offer-section-title">會員提示</h2>
+            <section class="nm-simple-status" id="claim">
+                <h2>優惠狀態</h2>
                 <?php if ($is_logged_in): ?>
-                    <p>您目前已登入會員，可直接前往購物車與結帳頁查看免運計算。</p>
-                    <div class="offer-claim-actions">
-                        <a href="cart.php" class="btn">前往購物車</a>
-                        <a href="products.php" class="btn">繼續購物</a>
+                    <p>帳號：<?php echo htmlspecialchars($_SESSION['user_name'] ?? '會員'); ?></p>
+                    <p>符合門檻即可自動套用免運</p>
+                    <div class="nm-simple-actions">
+                        <a href="cart.php" class="nm-simple-btn nm-simple-btn-primary">前往購物車</a>
+                        <a href="products.php" class="nm-simple-btn nm-simple-btn-secondary">繼續購物</a>
                     </div>
                 <?php else: ?>
-                    <p>您尚未登入，仍可先瀏覽活動內容；建議登入後享有完整會員功能。</p>
-                    <div class="offer-claim-actions">
-                        <a href="login.php?redirect=<?php echo urlencode('coupon_free_shipping.php'); ?>" class="btn">前往登入</a>
-                        <a href="register.php" class="btn">前往註冊</a>
+                    <p>登入後可於購物車與結帳頁查看免運計算。</p>
+                    <div class="nm-simple-actions">
+                        <a href="login.php?redirect=<?php echo urlencode('coupon_free_shipping.php'); ?>" class="nm-simple-btn nm-simple-btn-primary">前往登入</a>
+                        <a href="register.php" class="nm-simple-btn nm-simple-btn-secondary">前往註冊</a>
                     </div>
                 <?php endif; ?>
             </section>
         </div>
     </main>
+
+    <div class="nm-simple-fixed-cta">
+        <a href="products.php" class="claim-btn">立即查看活動</a>
+    </div>
 </body>
 </html>
