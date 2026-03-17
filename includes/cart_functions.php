@@ -364,6 +364,67 @@ function hasUserCoupon($pdo, $user_id, $coupon_code) {
 }
 
 /**
+ * 取得會員領取指定優惠券時間（若可用）
+ */
+function getUserCouponClaimedAt($pdo, $user_id, $coupon_code) {
+    if ((int)$user_id <= 0) {
+        return null;
+    }
+
+    $coupon_code = normalizeCouponCode($coupon_code);
+    if ($coupon_code === '') {
+        return null;
+    }
+
+    $coupon = getCouponByCode($pdo, $coupon_code);
+    if (!$coupon) {
+        return null;
+    }
+
+    try {
+        $stmt = $pdo->prepare("SELECT claimed_at, created_at
+                               FROM user_coupons
+                               WHERE user_id = :user_id
+                                 AND coupon_id = :coupon_id
+                               ORDER BY id DESC
+                               LIMIT 1");
+        $stmt->execute([
+            ':user_id' => (int)$user_id,
+            ':coupon_id' => (int)$coupon['id']
+        ]);
+        $row = $stmt->fetch();
+        if ($row) {
+            $claimed_at = $row['claimed_at'] ?? null;
+            $created_at = $row['created_at'] ?? null;
+            return $claimed_at ?: ($created_at ?: null);
+        }
+    } catch (PDOException $e) {
+        // fallback below
+    }
+
+    try {
+        $stmt = $pdo->prepare("SELECT created_at
+                               FROM user_coupons
+                               WHERE user_id = :user_id
+                                 AND coupon_id = :coupon_id
+                               ORDER BY id DESC
+                               LIMIT 1");
+        $stmt->execute([
+            ':user_id' => (int)$user_id,
+            ':coupon_id' => (int)$coupon['id']
+        ]);
+        $row = $stmt->fetch();
+        if ($row && !empty($row['created_at'])) {
+            return $row['created_at'];
+        }
+    } catch (PDOException $e) {
+        return null;
+    }
+
+    return null;
+}
+
+/**
  * 領取會員優惠券
  */
 function claimUserCoupon($pdo, $user_id, $coupon_code) {

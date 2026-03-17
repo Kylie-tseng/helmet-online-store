@@ -5491,3 +5491,837 @@ body:not(.home-page):not(.auth-page) {
         padding: 20px 0 36px;
     }
 }
+
+/* =========================================
+   新會員優惠頁 v3（科技騎士促銷頁）
+   ========================================= */
+.offer-new-member-page {
+    background: radial-gradient(circle at 82% -8%, rgba(34, 96, 185, 0.23) 0%, rgba(34, 96, 185, 0) 52%),
+                radial-gradient(circle at 10% 10%, rgba(29, 50, 84, 0.22) 0%, rgba(29, 50, 84, 0) 46%),
+                linear-gradient(180deg, #eff2f8 0%, #dde4ee 52%, #ccd5e2 100%) !important;
+}
+
+.offer-new-member-page .nm-campaign-main {
+    padding: 16px 0 96px;
+}
+
+.offer-new-member-page .nm-campaign-hero {
+    padding: 14px 0 12px;
+}
+
+.offer-new-member-page .nm-hero-shell {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1.06fr) minmax(0, 0.94fr);
+    gap: 20px;
+    padding: 34px 32px;
+    border-radius: 28px;
+    background: linear-gradient(118deg, #101621 0%, #16263c 45%, #1f3a59 78%, #294f74 100%);
+    border: 1px solid rgba(130, 169, 214, 0.32);
+    box-shadow: 0 24px 48px rgba(7, 12, 20, 0.32);
+    overflow: hidden;
+    isolation: isolate;
+}
+
+.offer-new-member-page .nm-hero-shell::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(140deg, rgba(98, 170, 255, 0.18) 0%, rgba(98, 170, 255, 0) 44%),
+                linear-gradient(320deg, rgba(255, 158, 67, 0.16) 0%, rgba(255, 158, 67, 0) 36%);
+    z-index: 0;
+}
+
+.offer-new-member-page .nm-hero-shell::after {
+    content: "";
+    position: absolute;
+    right: -140px;
+    bottom: -150px;
+    width: 340px;
+    height: 340px;
+    border-radius: 999px;
+    background: radial-gradient(circle, rgba(82, 166, 255, 0.45) 0%, rgba(82, 166, 255, 0) 68%);
+    z-index: 0;
+}
+
+.offer-new-member-page .nm-hero-content {
+    position: relative;
+    z-index: 2;
+}
+
+.offer-new-member-page .nm-hero-eyebrow {
+    margin: 0;
+    width: fit-content;
+    padding: 5px 12px;
+    border-radius: 999px;
+    font-size: 10px;
+    letter-spacing: 0.13em;
+    font-weight: 700;
+    color: #dfeeff;
+    border: 1px solid rgba(156, 204, 255, 0.52);
+    background: rgba(130, 189, 255, 0.12);
+}
+
+.offer-new-member-page .nm-hero-title {
+    margin: 12px 0 0;
+    font-size: clamp(40px, 5.4vw, 64px);
+    line-height: 0.98;
+    font-weight: 840;
+    letter-spacing: 0.01em;
+    color: #ffffff;
+    text-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+}
+
+.offer-new-member-page .nm-hero-highlight {
+    margin: 12px 0 0;
+    font-size: clamp(26px, 3.2vw, 38px);
+    line-height: 1.12;
+    font-weight: 800;
+    color: #ffd77f;
+}
+
+.offer-new-member-page .nm-hero-text {
+    margin: 12px 0 0;
+    max-width: 560px;
+    font-size: 15px;
+    line-height: 1.65;
+    color: rgba(227, 236, 248, 0.95);
+}
+
+.offer-new-member-page .nm-hero-code {
+    margin-top: 14px;
+    display: inline-flex;
+    align-items: center;
+    min-height: 34px;
+    padding: 0 14px;
+    border-radius: 999px;
+    border: 1px dashed rgba(255, 192, 96, 0.88);
+    background: rgba(255, 179, 67, 0.2);
+    color: #ffdd9f;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+}
+
+.offer-new-member-page .nm-hero-actions {
+    margin-top: 20px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.offer-new-member-page .nm-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 42px;
+    min-width: 132px;
+    padding: 0 18px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    text-decoration: none !important;
+    font-size: 13px;
+    font-weight: 760;
+    transition: transform .2s ease, box-shadow .2s ease, background-color .2s ease, border-color .2s ease;
+    cursor: pointer;
+}
+
+.offer-new-member-page .nm-btn:hover {
+    transform: translateY(-2px);
+}
+
+.offer-new-member-page .nm-btn-primary,
+.offer-new-member-page .nm-status-actions .nm-btn-primary,
+.offer-new-member-page .nm-status-actions button.nm-btn-primary {
+    background: linear-gradient(130deg, #ffd06b 0%, #ffae53 100%) !important;
+    border-color: rgba(255, 202, 126, 0.8) !important;
+    color: #1c2028 !important;
+    box-shadow: 0 10px 24px rgba(255, 164, 67, 0.35);
+}
+
+.offer-new-member-page .nm-btn-primary:hover {
+    background: linear-gradient(130deg, #ffdd90 0%, #ffbe70 100%) !important;
+}
+
+.offer-new-member-page .nm-btn-secondary,
+.offer-new-member-page .nm-status-actions .nm-btn-secondary {
+    background: rgba(113, 188, 255, 0.2) !important;
+    border-color: rgba(126, 188, 255, 0.58) !important;
+    color: #ebf5ff !important;
+}
+
+.offer-new-member-page .nm-btn-secondary:hover {
+    background: rgba(126, 197, 255, 0.3) !important;
+}
+
+.offer-new-member-page .nm-hero-visual {
+    position: relative;
+    z-index: 2;
+    min-height: 290px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.offer-new-member-page .nm-hero-glow {
+    position: absolute;
+    border-radius: 999px;
+    filter: blur(10px);
+}
+
+.offer-new-member-page .nm-hero-glow-blue {
+    width: 160px;
+    height: 160px;
+    left: 8%;
+    top: 10%;
+    background: rgba(88, 177, 255, 0.5);
+}
+
+.offer-new-member-page .nm-hero-glow-orange {
+    width: 120px;
+    height: 120px;
+    right: 10%;
+    bottom: 18%;
+    background: rgba(255, 170, 92, 0.46);
+}
+
+.offer-new-member-page .nm-hero-image-frame {
+    position: relative;
+    width: 86%;
+    max-width: 360px;
+    border-radius: 22px;
+    overflow: hidden;
+    border: 1px solid rgba(184, 214, 245, 0.4);
+    box-shadow: 0 18px 34px rgba(5, 8, 14, 0.35);
+    transform: rotate(-4deg);
+}
+
+.offer-new-member-page .nm-hero-image {
+    width: 100%;
+    height: 310px;
+    object-fit: cover;
+    object-position: center;
+    display: block;
+}
+
+.offer-new-member-page .nm-floating-coupon {
+    position: absolute;
+    right: 2%;
+    top: 10%;
+    width: 170px;
+    padding: 12px 12px 11px;
+    border-radius: 14px;
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.95) 0%, rgba(230, 238, 248, 0.96) 100%);
+    border: 1px solid rgba(183, 200, 220, 0.9);
+    color: #1d2530;
+    box-shadow: 0 10px 22px rgba(9, 12, 17, 0.28);
+    transform: rotate(6deg);
+}
+
+.offer-new-member-page .nm-coupon-tag {
+    display: inline-flex;
+    align-items: center;
+    height: 20px;
+    padding: 0 8px;
+    border-radius: 999px;
+    background: #1f4f7c;
+    color: #f8fbff;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+}
+
+.offer-new-member-page .nm-coupon-code {
+    display: block;
+    margin-top: 8px;
+    font-size: 28px;
+    line-height: 1;
+    color: #132033;
+}
+
+.offer-new-member-page .nm-coupon-text {
+    display: block;
+    margin-top: 6px;
+    font-size: 12px;
+    color: #4b5a6e;
+}
+
+.offer-new-member-page .nm-section-title {
+    margin: 0 0 14px;
+    font-size: clamp(25px, 3vw, 34px);
+    line-height: 1.15;
+    color: #23314a;
+    font-weight: 770;
+}
+
+.offer-new-member-page .nm-info-section,
+.offer-new-member-page .nm-steps-section,
+.offer-new-member-page .nm-detail-section,
+.offer-new-member-page .nm-status-section,
+.offer-new-member-page .nm-notes-section {
+    margin-top: 26px;
+}
+
+.offer-new-member-page .nm-coupon-summary {
+    display: grid;
+    grid-template-columns: minmax(240px, 340px) minmax(0, 1fr);
+    gap: 16px;
+}
+
+.offer-new-member-page .nm-coupon-summary-card {
+    border-radius: 18px;
+    border: 2px dashed rgba(94, 145, 208, 0.7);
+    background: linear-gradient(145deg, #ffffff 0%, #edf5ff 100%);
+    box-shadow: 0 12px 24px rgba(19, 36, 57, 0.12);
+    padding: 18px;
+}
+
+.offer-new-member-page .nm-coupon-summary-top {
+    margin: 0;
+    color: #5a7191;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    font-weight: 700;
+}
+
+.offer-new-member-page .nm-coupon-summary-code {
+    margin: 8px 0 0;
+    color: #1d3a62;
+    font-size: clamp(32px, 4vw, 42px);
+    line-height: 1;
+    font-weight: 820;
+}
+
+.offer-new-member-page .nm-coupon-summary-discount {
+    margin: 10px 0 0;
+    color: #1f2f47;
+    font-size: 24px;
+    font-weight: 770;
+}
+
+.offer-new-member-page .nm-coupon-summary-hint {
+    margin: 8px 0 0;
+    color: #617086;
+    font-size: 13px;
+}
+
+.offer-new-member-page .nm-coupon-summary-info {
+    border-radius: 18px;
+    border: 1px solid rgba(180, 200, 227, 0.75);
+    background: rgba(255, 255, 255, 0.8);
+    padding: 18px 18px 16px;
+}
+
+.offer-new-member-page .nm-coupon-summary-title {
+    margin: 0;
+    font-size: 22px;
+    color: #243753;
+}
+
+.offer-new-member-page .nm-coupon-summary-list {
+    margin: 12px 0 0;
+    padding-left: 18px;
+    color: #4b5f7d;
+    font-size: 15px;
+    line-height: 1.8;
+}
+
+.offer-new-member-page .nm-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.offer-new-member-page .nm-detail-item {
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.76);
+    border: 1px solid rgba(180, 198, 223, 0.72);
+    padding: 14px 14px 12px;
+}
+
+.offer-new-member-page .nm-detail-title {
+    margin: 0;
+    font-size: 16px;
+    color: #2a3f5f;
+    font-weight: 760;
+}
+
+.offer-new-member-page .nm-detail-text {
+    margin: 8px 0 0;
+    font-size: 13px;
+    line-height: 1.65;
+    color: #586a83;
+}
+
+.offer-new-member-page .nm-steps-flow {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+    padding: 18px 20px;
+    border-radius: 20px;
+    background: linear-gradient(132deg, rgba(255, 255, 255, 0.8) 0%, rgba(241, 247, 255, 0.8) 100%);
+    border: 1px solid rgba(184, 202, 225, 0.6);
+}
+
+.offer-new-member-page .nm-step-item {
+    position: relative;
+    padding: 0 18px 0 0;
+}
+
+.offer-new-member-page .nm-step-item::after {
+    content: "➜";
+    position: absolute;
+    right: -5px;
+    top: 14px;
+    color: rgba(70, 96, 130, 0.55);
+    font-size: 16px;
+}
+
+.offer-new-member-page .nm-step-item:last-child::after {
+    display: none;
+}
+
+.offer-new-member-page .nm-step-dot {
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    background: linear-gradient(140deg, #24487a 0%, #3c79b8 100%);
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 8px 16px rgba(37, 76, 122, 0.3);
+}
+
+.offer-new-member-page .nm-step-title {
+    margin: 10px 0 0;
+    font-size: 20px;
+    line-height: 1.22;
+    color: #243145;
+    font-weight: 760;
+}
+
+.offer-new-member-page .nm-step-text {
+    margin: 6px 0 0;
+    font-size: 14px;
+    line-height: 1.58;
+    color: #5b6880;
+}
+
+.offer-new-member-page .nm-status-card {
+    position: relative;
+    border-radius: 18px;
+    padding: 22px 20px;
+    border: 1px solid rgba(172, 196, 224, 0.78);
+    background: linear-gradient(130deg, #ffffff 0%, #eef4fe 100%) !important;
+    box-shadow: 0 14px 28px rgba(23, 36, 54, 0.12) !important;
+    overflow: hidden;
+}
+
+.offer-new-member-page .nm-status-card::after {
+    content: "";
+    position: absolute;
+    right: -80px;
+    top: -80px;
+    width: 220px;
+    height: 220px;
+    border-radius: 999px;
+    background: radial-gradient(circle, rgba(78, 147, 255, 0.18) 0%, rgba(78, 147, 255, 0) 70%);
+}
+
+.offer-new-member-page .nm-status-badge {
+    margin: 0 0 10px !important;
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    padding: 0 10px;
+    border-radius: 999px;
+    background: #e9f3ff;
+    border: 1px solid #bdd8f5;
+    color: #2b4f7c !important;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.09em;
+}
+
+.offer-new-member-page .nm-status-card p {
+    margin: 0 0 10px;
+    color: #4b5a70;
+    position: relative;
+    z-index: 2;
+}
+
+.offer-new-member-page .nm-status-prompt {
+    color: #243a5d !important;
+    font-weight: 700;
+}
+
+.offer-new-member-page .nm-status-actions {
+    margin-top: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    position: relative;
+    z-index: 2;
+}
+
+.offer-new-member-page .nm-status-actions form {
+    margin: 0;
+}
+
+.offer-new-member-page .nm-notes-section {
+    margin-top: 18px;
+}
+
+.offer-new-member-page .nm-section-title-muted {
+    margin-bottom: 8px;
+    font-size: 17px;
+    color: #6e7b8f;
+    font-weight: 700;
+}
+
+.offer-new-member-page .nm-notes-minimal {
+    border-top: 1px solid rgba(90, 110, 138, 0.2);
+    padding-top: 10px;
+}
+
+.offer-new-member-page .nm-notes-list {
+    margin: 0;
+    padding-left: 18px;
+    color: #627086;
+    font-size: 12px;
+    line-height: 1.75;
+}
+
+.offer-new-member-page .nm-fixed-cta {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    z-index: 6200;
+}
+
+.offer-new-member-page .nm-fixed-cta .nm-btn-primary {
+    min-width: 162px;
+    box-shadow: 0 12px 24px rgba(23, 34, 53, 0.28);
+}
+
+@media (max-width: 1150px) {
+    .offer-new-member-page .nm-coupon-summary {
+        grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 920px) {
+    .offer-new-member-page .nm-hero-shell {
+        grid-template-columns: 1fr;
+        padding: 26px 20px;
+    }
+
+    .offer-new-member-page .nm-hero-title {
+        font-size: clamp(36px, 8.6vw, 46px);
+    }
+
+    .offer-new-member-page .nm-hero-highlight {
+        font-size: clamp(22px, 6vw, 30px);
+    }
+
+    .offer-new-member-page .nm-hero-visual {
+        min-height: 250px;
+    }
+
+    .offer-new-member-page .nm-hero-image-frame {
+        transform: none;
+        width: 100%;
+        max-width: 420px;
+    }
+
+    .offer-new-member-page .nm-floating-coupon {
+        transform: rotate(0deg);
+        right: 5%;
+        top: 5%;
+    }
+
+    .offer-new-member-page .nm-steps-flow {
+        grid-template-columns: 1fr;
+    }
+
+    .offer-new-member-page .nm-step-item {
+        padding-right: 0;
+    }
+
+    .offer-new-member-page .nm-step-item::after {
+        display: none;
+    }
+
+    .offer-new-member-page .nm-coupon-summary,
+    .offer-new-member-page .nm-detail-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .offer-new-member-page .nm-fixed-cta {
+        right: 14px;
+        bottom: 14px;
+    }
+}
+
+@media (max-width: 640px) {
+    .offer-new-member-page .nm-campaign-main {
+        padding-bottom: 34px;
+    }
+
+    .offer-new-member-page .nm-hero-shell {
+        border-radius: 20px;
+    }
+
+    .offer-new-member-page .nm-hero-text {
+        font-size: 14px;
+    }
+
+    .offer-new-member-page .nm-hero-image {
+        height: 235px;
+    }
+
+    .offer-new-member-page .nm-floating-coupon {
+        width: 150px;
+        padding: 10px 10px 9px;
+    }
+
+    .offer-new-member-page .nm-coupon-code {
+        font-size: 24px;
+    }
+
+    .offer-new-member-page .nm-fixed-cta {
+        left: 12px;
+        right: 12px;
+        bottom: 10px;
+    }
+
+    .offer-new-member-page .nm-fixed-cta .nm-btn-primary {
+        width: 100%;
+    }
+}
+
+/* =========================================
+   新會員優惠頁 v4（簡潔優惠頁）
+   ========================================= */
+.offer-new-member-page {
+    background: linear-gradient(
+        to bottom,
+        #ffffff 0%,
+    #eeeeee 35%,
+    #d6d6d6 70%,
+    #8a8a8a 100%
+    ) !important;
+    min-height: 100vh;
+    padding-top: 100px !important;
+}
+
+.offer-new-member-page .nm-simple-page {
+    padding: 16px 0 96px;
+}
+
+.offer-new-member-page .nm-container {
+    max-width: 900px;
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 32px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+}
+
+.offer-new-member-page .nm-simple-coupon {
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+}
+
+.offer-new-member-page .nm-simple-coupon-code {
+    margin: 0;
+    font-size: 34px;
+    font-weight: 700;
+    color: #1a1a1a;
+    line-height: 1.12;
+}
+
+.offer-new-member-page .nm-simple-coupon-title {
+    margin: 10px 0 0;
+    font-size: 20px;
+    color: #444444;
+    font-weight: 700;
+}
+
+.offer-new-member-page .nm-simple-coupon-subtitle {
+    margin: 8px 0 0;
+    font-size: 14px;
+    color: #888888;
+    font-weight: 500;
+}
+
+.offer-new-member-page .nm-simple-list,
+.offer-new-member-page .nm-simple-steps,
+.offer-new-member-page .nm-simple-status {
+    margin-top: 16px;
+    background: #ffffff;
+    border: 1px solid #d8dde3;
+    border-radius: 10px;
+}
+
+.offer-new-member-page .nm-simple-list-item {
+    padding: 14px 16px;
+    border-bottom: 1px solid #e6e9ed;
+}
+
+.offer-new-member-page .nm-simple-list-item:last-child {
+    border-bottom: none;
+}
+
+.offer-new-member-page .nm-simple-list-item h2 {
+    margin: 0;
+    font-size: 14px;
+    color: #4a5f79;
+    font-weight: 700;
+}
+
+.offer-new-member-page .nm-simple-list-item p {
+    margin: 8px 0 0;
+    font-size: 14px;
+    color: #3f5067;
+    line-height: 1.6;
+}
+
+.offer-new-member-page .nm-simple-steps {
+    padding: 14px 16px;
+}
+
+.offer-new-member-page .nm-simple-steps h2,
+.offer-new-member-page .nm-simple-status h2 {
+    margin: 0;
+    font-size: 16px;
+    color: #1a1a1a;
+}
+
+.offer-new-member-page .nm-simple-steps ol {
+    margin: 10px 0 0;
+    padding-left: 18px;
+    color: #3f5067;
+    font-size: 14px;
+    line-height: 1.8;
+}
+
+.offer-new-member-page .nm-simple-steps-inline {
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    flex-wrap: wrap;
+    color: #3f5067;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.offer-new-member-page .nm-simple-status {
+    padding: 14px 16px;
+}
+
+.offer-new-member-page .nm-simple-status p {
+    margin: 8px 0 0;
+    font-size: 14px;
+    color: #3f5067;
+    line-height: 1.6;
+}
+
+.offer-new-member-page .nm-simple-actions {
+    margin-top: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.offer-new-member-page .nm-simple-actions form {
+    margin: 0;
+}
+
+.offer-new-member-page .nm-simple-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 124px;
+    height: 38px;
+    padding: 0 16px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    text-decoration: none !important;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.offer-new-member-page .nm-simple-btn-primary,
+.offer-new-member-page .nm-simple-actions button.nm-simple-btn-primary {
+    background: #3f5f82 !important;
+    border-color: #3f5f82 !important;
+    color: #ffffff !important;
+}
+
+.offer-new-member-page .nm-simple-btn-primary:hover {
+    background: #35516f !important;
+    border-color: #35516f !important;
+}
+
+.offer-new-member-page .nm-simple-btn-secondary {
+    background: #ffffff !important;
+    border-color: #9fb0c4 !important;
+    color: #3b5f86 !important;
+}
+
+.offer-new-member-page .nm-simple-btn-secondary:hover {
+    background: #f3f6fa !important;
+}
+
+.offer-new-member-page .nm-simple-fixed-cta {
+    position: fixed;
+    right: 24px;
+    bottom: 20px;
+    z-index: 6200;
+}
+
+.offer-new-member-page .claim-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: auto;
+    padding: 12px 28px;
+    background: #3f5f82;
+    color: #fff !important;
+    border: none;
+    border-radius: 999px;
+    font-weight: 500;
+    text-decoration: none !important;
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
+}
+
+.offer-new-member-page .claim-btn:hover {
+    background: #35516f;
+}
+
+@media (max-width: 640px) {
+    .offer-new-member-page {
+        padding-top: 92px !important;
+    }
+
+    .offer-new-member-page .nm-simple-steps-inline {
+        gap: 10px;
+    }
+
+    .offer-new-member-page .nm-simple-fixed-cta {
+        right: 12px;
+        bottom: 14px;
+    }
+
+    .offer-new-member-page .nm-simple-fixed-cta .nm-simple-btn-primary {
+        min-width: 210px;
+        padding: 12px 28px;
+    }
+}
