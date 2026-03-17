@@ -87,6 +87,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_payment'])) {
             $stmt = $pdo->prepare("UPDATE orders SET status = 'paid', updated_at = NOW() WHERE id = :order_id AND user_id = :user_id");
             $stmt->execute([':order_id' => $order_id, ':user_id' => $user_id]);
             
+<<<<<<< Updated upstream
+=======
+            include 'send_order.php';
+
+>>>>>>> Stashed changes
             // 清除 session
             unset($_SESSION['pending_order_id']);
             unset($_SESSION['checkout_data']);
@@ -267,7 +272,7 @@ $is_logged_in = isset($_SESSION['user_id']);
                     <h3 class="footer-title">聯絡我們</h3>
                     <ul class="footer-links">
                         <li>電話：02-2905-2000</li>
-                        <li>Email：service@helmetvr.com</li>
+                        <li>Email：helmetvrsefju@gmail.com</li>
                         <li>地址：新北市新莊區中正路510號</li>
                         <li class="social-links">
                             <a href="#" class="social-icon">Facebook</a>

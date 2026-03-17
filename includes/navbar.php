@@ -29,7 +29,7 @@ function renderNavbar($pdo, $categories, $parts_category_id, $current_page = '')
                         <li><a href="products.php?search=<?php echo urlencode('全罩式安全帽'); ?>">全罩式安全帽</a></li>
                         <li><a href="products.php?search=<?php echo urlencode('半罩式安全帽'); ?>">半罩式安全帽</a></li>
                         <li><a href="products.php?search=<?php echo urlencode('3/4罩安全帽'); ?>">3/4罩安全帽</a></li>
-                        <li><a href="products.php<?php echo $parts_category_id ? '?category=' . htmlspecialchars($parts_category_id) : ''; ?>">周邊與配件</a></li>
+                        <li><a href="products.php<?php echo $parts_category_id ? '?category=' . htmlspecialchars($parts_category_id) : ''; ?>">周邊與零件</a></li>
                     </ul>
                     <div class="mega-menu">
                         <div class="mega-links">
@@ -39,7 +39,7 @@ function renderNavbar($pdo, $categories, $parts_category_id, $current_page = '')
                                 <a href="products.php?search=<?php echo urlencode('全罩式安全帽'); ?>">全罩式安全帽</a>
                                 <a href="products.php?search=<?php echo urlencode('半罩式安全帽'); ?>">半罩式安全帽</a>
                                 <a href="products.php?search=<?php echo urlencode('3/4罩安全帽'); ?>">3/4罩安全帽</a>
-                                <a href="products.php<?php echo $parts_category_id ? '?category=' . htmlspecialchars($parts_category_id) : ''; ?>">周邊與配件</a>
+                                <a href="products.php<?php echo $parts_category_id ? '?category=' . htmlspecialchars($parts_category_id) : ''; ?>">周邊與零件</a>
                             </div>
                             <div class="mega-column">
                                 <h4>更多資訊</h4>

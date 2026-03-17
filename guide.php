@@ -91,7 +91,7 @@ $guide_cards = [
                     <h3 class="footer-title">聯絡我們</h3>
                     <ul class="footer-links">
                         <li>電話：02-2905-2000</li>
-                        <li>Email：service@helmetvr.com</li>
+                        <li>Email：helmetvrsefju@gmail.com</li>
                         <li>地址：新北市新莊區中正路510號</li>
                     </ul>
                 </div>

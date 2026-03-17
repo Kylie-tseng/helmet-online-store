@@ -27,8 +27,27 @@ try {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>退貨政策 - HelmetVRse</title>
+    <title>退換貨政策 - HelmetVRse</title>
     <link rel="stylesheet" href="assets/css/style.css">
+    <style>
+        /* 簡單修飾退貨內容的樣式 */
+        .return-content {
+            background: #fff;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            line-height: 1.8;
+        }
+        .return-info-list {
+            list-style: none;
+            padding: 0;
+            margin-top: 20px;
+        }
+        .return-info-list li {
+            margin-bottom: 10px;
+            font-size: 1.1rem;
+        }
+    </style>
 </head>
 <body>
 <?php renderNavbar($pdo, $categories, $parts_category_id); ?>
@@ -36,10 +55,21 @@ try {
     <section class="products-section">
         <div class="container">
             <div class="section-header">
-                <h1 class="section-title">退貨政策</h1>
-                <p class="section-subtitle">此頁為基本頁面，可後續補充完整退貨流程與規範</p>
+                <h1 class="section-title">退貨服務</h1>
+            </div>
+
+            <div class="return-content">
+                <p>若您有任何有關退換貨問題，麻煩寄送 email 與我們聯絡！</p>
+                <p>我們會儘快與回覆您的來信，謝謝。</p>
+                
+                <ul class="return-info-list">
+                    <li><strong>電話：</strong>02-2905-2000</li>
+                    <li><strong>Email：</strong><a href="mailto:helmetvrsefju@gmail.com">helmetvrsefju@gmail.com</a></li>
+                    <li><strong>地址：</strong>新北市新莊區中正路510號</li>
+                </ul>
             </div>
         </div>
     </section>
-</body>
+
+    </body>
 </html>
