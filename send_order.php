@@ -1,15 +1,25 @@
 <?php
+/**
+ * 訂單通知信發送腳本 (自動識別來源變數)
+ */
+
+// 1. 變數兼容性處理 (重要：解決不同頁面引入時的變數命名差異)
+$mail_order_id = $order_id ?? ($order['id'] ?? 'N/A');
+$mail_payment_method = $payment_method ?? ($order['payment_method'] ?? 'unknown');
+
+// 決定要循環的商品陣列 (信用卡頁面使用 $order_items, 確認頁面使用 $cart_items)
+$mail_items = !empty($cart_items) ? $cart_items : ($order_items ?? []);
+
+// 決定金額 (優先從 $order_summary 拿，沒有則從資料庫 $order 拿)
+$mail_discount = $order_summary['discount'] ?? 0;
+$mail_total = $order_summary['final_total'] ?? ($order['total_amount'] ?? 0);
 
 $payment_method_names = [
     'credit_card' => '信用卡',
     'cod' => '貨到付款'
 ];
 
-$coupon_discount = isset($order_summary['discount']) ? (float)$order_summary['discount'] : 0;
-$final_total = isset($order_summary['final_total']) ? (float)$order_summary['final_total'] : (float)$order_amount['total'];
-
-// 因為是用 include 引入，這裡不需要重新連接資料庫 config.php
-// 只需要載入 PHPMailer 的檔案
+// 2. 載入 PHPMailer
 require_once 'PHPMailer/src/Exception.php';
 require_once 'PHPMailer/src/PHPMailer.php';
 require_once 'PHPMailer/src/SMTP.php';
@@ -17,7 +27,7 @@ require_once 'PHPMailer/src/SMTP.php';
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
-// 1. 抓取消費者的 Email (從資料庫抓取目前登入者的 Email)
+// 3. 抓取消費者 Email
 try {
     $userStmt = $pdo->prepare("SELECT email FROM users WHERE id = :id");
     $userStmt->execute([':id' => $user_id]);
@@ -27,17 +37,15 @@ try {
     $customer_email = ''; 
 }
 
-// 2. 如果有抓到 Email 才執行發信
-if (!empty($customer_email)) {
+if (!empty($customer_email) && !empty($mail_items)) {
     $mail = new PHPMailer(true);
-
     try {
         // --- 伺服器設定 ---
         $mail->isSMTP();
         $mail->Host       = 'smtp.gmail.com';
         $mail->SMTPAuth   = true;
-        $mail->Username   = 'bobby930910@gmail.com';         // [修改] 你的 Gmail
-        $mail->Password   = 'xhxitqgddgzvpxba';          // [修改] 16位應用程式密碼
+        $mail->Username   = 'bobby930910@gmail.com';
+        $mail->Password   = 'xhxitqgddgzvpxba';
         $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port       = 587;
         $mail->CharSet    = 'utf-8';
@@ -48,12 +56,13 @@ if (!empty($customer_email)) {
 
         // --- 郵件內容 ---
         $mail->isHTML(true);
-        $mail->Subject = "【HelmetVRse】訂單確認通知 - 單號 #$order_id";
+        $mail->Subject = "【HelmetVRse】訂單確認通知 - 單號 #$mail_order_id";
 
-        // 動態生成訂單明細表格
         $item_rows = "";
-        foreach ($cart_items as $item) {
-            $sub = number_format($item['price'] * $item['quantity']);
+        foreach ($mail_items as $item) {
+            // 這裡自動處理 $item['price'] (購物車) 或 $item['unit_price'] (訂單明細)
+            $unit_p = $item['price'] ?? ($item['unit_price'] ?? 0);
+            $sub = number_format($unit_p * $item['quantity']);
             $item_rows .= "
                 <tr>
                     <td style='border:1px solid #ddd; padding:8px;'>{$item['product_name']} ({$item['size']})</td>
@@ -66,8 +75,8 @@ if (!empty($customer_email)) {
             <div style='font-family: Arial, sans-serif; max-width: 600px; margin: auto;'>
                 <h2 style='color: #2c3e50;'>感謝您的訂購！</h2>
                 <p>親愛的顧客您好，我們已收到您的訂單，正在為您準備出貨。</p>
-                <p><strong>訂單編號：</strong> #$order_id</p>
-                <p><strong>付款方式：</strong> " . $payment_method_names[$payment_method] . "</p>
+                <p><strong>訂單編號：</strong> #$mail_order_id</p>
+                <p><strong>付款方式：</strong> " . ($payment_method_names[$mail_payment_method] ?? $mail_payment_method) . "</p>
                 
                 <table style='width:100%; border-collapse: collapse; margin-top: 20px;'>
                     <thead>
@@ -83,11 +92,11 @@ if (!empty($customer_email)) {
                     <tfoot>
                         <tr>
                             <td colspan='2' style='border:1px solid #ddd; padding:8px; text-align:right;'>優惠券折扣</td>
-                            <td style='border:1px solid #ddd; padding:8px; text-align:right;'>- NT$ " . number_format($coupon_discount) . "</td>
+                            <td style='border:1px solid #ddd; padding:8px; text-align:right;'>- NT$ " . number_format($mail_discount) . "</td>
                         </tr>
                         <tr>
                             <td colspan='2' style='border:1px solid #ddd; padding:8px; text-align:right;'><strong>最終總價</strong></td>
-                            <td style='border:1px solid #ddd; padding:8px; text-align:right; color: #e74c3c;'><strong>NT$ " . number_format($final_total) . "</strong></td>
+                            <td style='border:1px solid #ddd; padding:8px; text-align:right; color: #e74c3c;'><strong>NT$ " . number_format($mail_total) . "</strong></td>
                         </tr>
                     </tfoot>
                 </table>
@@ -97,7 +106,6 @@ if (!empty($customer_email)) {
 
         $mail->send();
     } catch (Exception $e) {
-        // 如果發信失敗，我們悄悄記錄在伺服器，不要打斷使用者的畫面
         error_log("郵件發送失敗: {$mail->ErrorInfo}");
     }
 }

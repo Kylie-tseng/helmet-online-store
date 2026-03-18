@@ -58,43 +58,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_payment'])) {
     $card_expiry = isset($_POST['card_expiry']) ? trim($_POST['card_expiry']) : '';
     $card_cvv = isset($_POST['card_cvv']) ? trim($_POST['card_cvv']) : '';
     
-    // 基本格式驗證
     $errors = [];
-    
-    // 卡號驗證（移除空格後檢查是否為16位數字）
     $card_number_clean = preg_replace('/\s+/', '', $card_number);
     if (!preg_match('/^\d{16}$/', $card_number_clean)) {
         $errors[] = '請輸入有效的16位信用卡號';
     }
-    
     if (empty($card_name)) {
         $errors[] = '請輸入持卡人姓名';
     }
-    
-    // 有效期限驗證（格式：MM/YY）
     if (!preg_match('/^\d{2}\/\d{2}$/', $card_expiry)) {
         $errors[] = '請輸入有效的有效期限（格式：MM/YY）';
     }
-    
-    // CVV 驗證（3位數字）
     if (!preg_match('/^\d{3}$/', $card_cvv)) {
         $errors[] = '請輸入有效的安全碼（3位數字）';
     }
     
     if (empty($errors)) {
         try {
-            // 更新訂單狀態為已付款
+            // 1. 更新訂單狀態
             $stmt = $pdo->prepare("UPDATE orders SET status = 'paid', updated_at = NOW() WHERE id = :order_id AND user_id = :user_id");
             $stmt->execute([':order_id' => $order_id, ':user_id' => $user_id]);
             
+            // 2. 觸發發信 (send_order.php 會使用這裡的 $order, $order_items, $order_id)
+            $payment_method = $order['payment_method']; 
             include 'send_order.php';
 
-            // 清除 session
+            // 3. 清除 Session (確保不會重複支付)
             unset($_SESSION['pending_order_id']);
             unset($_SESSION['checkout_data']);
-            clearAppliedCoupon();
+            if (function_exists('clearAppliedCoupon')) {
+                clearAppliedCoupon();
+            }
             
+            // 4. 關鍵：設定成功 flag，讓下方 HTML 顯示成功資訊，不執行跳轉
             $payment_success = true;
+            
         } catch (PDOException $e) {
             $payment_error = '付款處理時發生錯誤：' . $e->getMessage();
         }
@@ -103,28 +101,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_payment'])) {
     }
 }
 
-// 查詢所有分類（用於導覽列）
+// 導覽列分類查詢
 try {
     $stmt = $pdo->query("SELECT id, name, description FROM categories ORDER BY id");
     $categories = $stmt->fetchAll();
-} catch (PDOException $e) {
-    $categories = [];
-}
-
-// 查詢「周邊與配件」的分類 ID
-$parts_category_id = null;
-try {
     $stmt = $pdo->prepare("SELECT id FROM categories WHERE name = '周邊與配件' LIMIT 1");
     $stmt->execute();
     $parts_category = $stmt->fetch();
-    if ($parts_category) {
-        $parts_category_id = $parts_category['id'];
-    }
+    $parts_category_id = $parts_category ? $parts_category['id'] : null;
 } catch (PDOException $e) {
-    // 如果查詢失敗，保持為 null
+    $categories = [];
+    $parts_category_id = null;
 }
-
-$is_logged_in = isset($_SESSION['user_id']);
 ?>
 <!DOCTYPE html>
 <html lang="zh-TW">
@@ -135,20 +123,19 @@ $is_logged_in = isset($_SESSION['user_id']);
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
-<!-- 導覽列 -->
     <?php renderNavbar($pdo, $categories, $parts_category_id); ?>
 
-    <!-- 信用卡繳費內容 -->
     <div class="checkout-container">
         <div class="container">
             <?php
             if ($payment_success) {
-                renderCheckoutSteps(5, ['信用卡繳費', '訂單完成']);
+                renderCheckoutSteps(3); // 模仿 order_confirm.php 的最後一步
             } else {
                 renderCheckoutSteps(4, '信用卡繳費');
             }
             ?>
-            <h1 class="checkout-page-title">訂單建立成功</h1>
+            
+            <h1 class="checkout-page-title"><?php echo $payment_success ? '訂單建立成功' : '信用卡繳費'; ?></h1>
             
             <?php if ($payment_success): ?>
                 <div class="order-success">
@@ -161,7 +148,6 @@ $is_logged_in = isset($_SESSION['user_id']);
                     </div>
                 </div>
             <?php else: ?>
-                <!-- 訂單摘要 -->
                 <div class="payment-summary">
                     <h2 class="section-title">訂單摘要</h2>
                     <div class="order-summary">
@@ -176,66 +162,33 @@ $is_logged_in = isset($_SESSION['user_id']);
                     </div>
                 </div>
 
-                <!-- 信用卡表單 -->
                 <div class="payment-form-wrapper">
                     <h2 class="section-title">信用卡資訊</h2>
-                    
                     <?php if ($payment_error): ?>
-                        <div class="error-message">
-                            <?php echo $payment_error; ?>
-                        </div>
+                        <div class="error-message"><?php echo $payment_error; ?></div>
                     <?php endif; ?>
 
                     <form method="POST" class="payment-form">
                         <div class="form-group">
                             <label class="form-label">卡號 <span class="required">*</span></label>
-                            <input type="text" 
-                                   name="card_number" 
-                                   class="form-input" 
-                                   placeholder="0000 0000 0000 0000"
-                                   maxlength="19"
-                                   pattern="[0-9\s]{13,19}"
-                                   required>
-                            <small class="form-hint">請輸入16位信用卡號碼</small>
+                            <input type="text" name="card_number" class="form-input" placeholder="0000 0000 0000 0000" maxlength="19" required>
                         </div>
-
                         <div class="form-group">
                             <label class="form-label">持卡人姓名 <span class="required">*</span></label>
-                            <input type="text" 
-                                   name="card_name" 
-                                   class="form-input" 
-                                   placeholder="請輸入持卡人姓名"
-                                   required>
+                            <input type="text" name="card_name" class="form-input" placeholder="請輸入持卡人姓名" required>
                         </div>
-
                         <div class="form-row">
                             <div class="form-group">
                                 <label class="form-label">有效期限 <span class="required">*</span></label>
-                                <input type="text" 
-                                       name="card_expiry" 
-                                       class="form-input" 
-                                       placeholder="MM/YY"
-                                       maxlength="5"
-                                       pattern="\d{2}/\d{2}"
-                                       required>
-                                <small class="form-hint">格式：MM/YY</small>
+                                <input type="text" name="card_expiry" class="form-input" placeholder="MM/YY" maxlength="5" required>
                             </div>
-
                             <div class="form-group">
                                 <label class="form-label">安全碼 <span class="required">*</span></label>
-                                <input type="text" 
-                                       name="card_cvv" 
-                                       class="form-input" 
-                                       placeholder="000"
-                                       maxlength="3"
-                                       pattern="\d{3}"
-                                       required>
-                                <small class="form-hint">卡片背面3位數字</small>
+                                <input type="text" name="card_cvv" class="form-input" placeholder="000" maxlength="3" required>
                             </div>
                         </div>
-
                         <div class="form-actions">
-                            <a href="checkout.php?return_from_payment=1" class="btn-secondary">返回修改</a>
+                            <a href="checkout.php" class="btn-secondary">返回修改</a>
                             <button type="submit" name="confirm_payment" class="btn-primary">確認付款</button>
                         </div>
                     </form>
@@ -244,41 +197,8 @@ $is_logged_in = isset($_SESSION['user_id']);
         </div>
     </div>
 
-    <!-- Footer -->
     <footer class="footer">
         <div class="container">
-            <div class="footer-content">
-                <div class="footer-column">
-                    <h3 class="footer-title">關於我們</h3>
-                    <ul class="footer-links">
-                        <li><a href="about.php">公司簡介</a></li>
-                        <li><a href="about.php#history">發展歷程</a></li>
-                        <li><a href="about.php#mission">經營理念</a></li>
-                    </ul>
-                </div>
-                <div class="footer-column">
-                    <h3 class="footer-title">顧客服務</h3>
-                    <ul class="footer-links">
-                        <li><a href="guide.php">購物指南</a></li>
-                        <li><a href="faq.php">常見問題</a></li>
-                        <li><a href="return.php">退換貨政策</a></li>
-                        <li><a href="shipping.php">運送說明</a></li>
-                    </ul>
-                </div>
-                <div class="footer-column">
-                    <h3 class="footer-title">聯絡我們</h3>
-                    <ul class="footer-links">
-                        <li>電話：02-2905-2000</li>
-                        <li>Email：helmetvrsefju@gmail.com</li>
-                        <li>地址：新北市新莊區中正路510號</li>
-                        <li class="social-links">
-                            <a href="#" class="social-icon">Facebook</a>
-                            <a href="#" class="social-icon">Instagram</a>
-                            <a href="#" class="social-icon">Line</a>
-                        </li>
-                    </ul>
-                </div>
-            </div>
             <div class="footer-bottom">
                 <p>Powered by HelmetVRse</p>
             </div>
@@ -286,25 +206,17 @@ $is_logged_in = isset($_SESSION['user_id']);
     </footer>
 
     <script>
-        // 卡號自動格式化（每4位加空格）
+        // 自動格式化邏輯保持不變...
         document.querySelector('input[name="card_number"]')?.addEventListener('input', function(e) {
             let value = e.target.value.replace(/\s/g, '');
             let formatted = value.match(/.{1,4}/g)?.join(' ') || value;
-            if (formatted.length <= 19) {
-                e.target.value = formatted;
-            }
+            e.target.value = formatted;
         });
-
-        // 有效期限自動格式化
         document.querySelector('input[name="card_expiry"]')?.addEventListener('input', function(e) {
             let value = e.target.value.replace(/\D/g, '');
-            if (value.length >= 2) {
-                value = value.substring(0, 2) + '/' + value.substring(2, 4);
-            }
+            if (value.length >= 2) value = value.substring(0, 2) + '/' + value.substring(2, 4);
             e.target.value = value;
         });
-
-        // CVV 只允許數字
         document.querySelector('input[name="card_cvv"]')?.addEventListener('input', function(e) {
             e.target.value = e.target.value.replace(/\D/g, '');
         });
