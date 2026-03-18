@@ -1208,7 +1208,7 @@ body {
     border-radius: 10px;
     background-color: #FCFCFD;
     color: #111111;
-    transition: border-color 0.24s ease, box-shadow 0.24s ease, background-color 0.24s ease;
+    transition: border-color 0.24s ease, box-shadow 0.24s ease, background-color 0.24s ease, transform 0.24s ease;
     box-sizing: border-box;
 }
 
@@ -1221,6 +1221,7 @@ body {
     border-color: #555555;
     box-shadow: 0 0 0 3px rgba(75, 85, 99, 0.14);
     background-color: #FFFFFF;
+    transform: translateY(-1px);
 }
 
 .auth-username-status {
@@ -1275,10 +1276,43 @@ body {
     transition: background-color 0.24s ease, transform 0.24s ease;
 }
 
+.auth-gradient-btn {
+    background: linear-gradient(135deg, #181818 0%, #2F2F2F 52%, #4A4A4A 100%);
+    box-shadow: 0 10px 20px rgba(17, 24, 39, 0.18);
+    transition: background 0.24s ease, transform 0.24s ease, box-shadow 0.24s ease, filter 0.24s ease;
+}
+
 .login-btn:hover,
 .register-btn:hover {
     background-color: #111111;
     transform: translateY(-1px);
+}
+
+.auth-gradient-btn:hover {
+    transform: translateY(-2px) scale(1.01);
+    box-shadow: 0 14px 28px rgba(17, 24, 39, 0.24);
+    filter: brightness(1.06);
+}
+
+.auth-gradient-btn:active {
+    transform: translateY(0);
+    filter: brightness(1);
+}
+
+.auth-inline-link-row {
+    margin: -6px 0 14px;
+    text-align: right;
+}
+
+.auth-inline-link {
+    font-size: 13px;
+    color: #7A7A7A;
+    text-decoration: none;
+    transition: color 0.24s ease;
+}
+
+.auth-inline-link:hover {
+    color: #111111;
 }
 
 .auth-page .login-btn,
@@ -2379,28 +2413,28 @@ body {
 }
 
 /* Navbar 全站白底黑字 */
-.navbar,
-.home-page .home-navbar,
+body:not(.home-page) .navbar,
+body:not(.home-page) .unified-navbar,
 .home-page .home-navbar.is-scrolled,
-.unified-navbar {
+.home-page .home-navbar.scrolled {
     background: #FFFFFF !important;
     color: #111111 !important;
     border-bottom: 1px solid #D5D5D5 !important;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08) !important;
 }
 
-.navbar a,
-.navbar .nav-menu li a,
-.navbar .nav-logo a,
-.navbar .nav-action-link,
-.navbar .nav-action-icon,
-.navbar .user-greeting {
+body:not(.home-page) .navbar a,
+body:not(.home-page) .navbar .nav-menu li a,
+body:not(.home-page) .navbar .nav-logo a,
+body:not(.home-page) .navbar .nav-action-link,
+body:not(.home-page) .navbar .nav-action-icon,
+body:not(.home-page) .navbar .user-greeting {
     color: #111111 !important;
 }
 
-.navbar .nav-menu li a:hover,
-.navbar .nav-action-link:hover,
-.navbar .nav-logo a:hover {
+body:not(.home-page) .navbar .nav-menu li a:hover,
+body:not(.home-page) .navbar .nav-action-link:hover,
+body:not(.home-page) .navbar .nav-logo a:hover {
     color: #555555 !important;
 }
 
@@ -4481,8 +4515,8 @@ input[type="button"]:hover,
 }
 
 /* 全站白底黑字導覽列 */
-.navbar,
-.unified-navbar {
+body:not(.home-page) .navbar,
+body:not(.home-page) .unified-navbar {
     background: #FFFFFF !important;
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
@@ -4607,7 +4641,9 @@ input[type="button"]:hover,
 }
 
 .navbar .nav-icon-link .nav-action-badge {
-    display: none !important;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
 }
 
 .navbar .user-greeting {
@@ -6324,4 +6360,132 @@ body:not(.home-page):not(.auth-page) {
         min-width: 210px;
         padding: 12px 28px;
     }
+}
+
+/* products.php 主內容避開固定 navbar */
+.products-page-container {
+    padding-top: 64px !important;
+}
+
+body {
+    padding-top: 55px !important;
+}
+
+.products-page-container .products-main .products-header {
+    margin-top: 16px !important;
+    margin-bottom: 16px !important;
+    padding-top: 0 !important;
+}
+
+.products-page-container .products-main .products-header h1 {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+}
+
+.products-page-container .products-main .products-header .search-bar,
+.products-page-container .products-main .products-header .search-box,
+.products-page-container .products-main .products-header form {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+}
+
+/* 首頁 navbar 還原：透明疊圖，捲動後白底 */
+.home-page .home-navbar {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    z-index: 5000 !important;
+}
+
+.home-page .home-navbar:not(.is-scrolled):not(.scrolled) {
+    background: transparent !important;
+    border-bottom: 0 !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+.home-page .home-navbar:not(.is-scrolled):not(.scrolled) .nav-logo a,
+.home-page .home-navbar:not(.is-scrolled):not(.scrolled) .nav-menu li a,
+.home-page .home-navbar:not(.is-scrolled):not(.scrolled) .nav-action-link,
+.home-page .home-navbar:not(.is-scrolled):not(.scrolled) .nav-action-icon,
+.home-page .home-navbar:not(.is-scrolled):not(.scrolled) .nav-action-icon svg,
+.home-page .home-navbar:not(.is-scrolled):not(.scrolled) .user-greeting,
+.home-page .home-navbar:not(.is-scrolled):not(.scrolled) .dropdown-arrow {
+    color: #FFFFFF !important;
+    stroke: #FFFFFF !important;
+}
+
+.home-page .home-navbar.is-scrolled,
+.home-page .home-navbar.scrolled {
+    background: #FFFFFF !important;
+    border-bottom: 1px solid #E5E7EB !important;
+    box-shadow: 0 1px 10px rgba(0, 0, 0, 0.08) !important;
+}
+
+.home-page .home-navbar.is-scrolled .nav-logo a,
+.home-page .home-navbar.is-scrolled .nav-menu li a,
+.home-page .home-navbar.is-scrolled .nav-action-link,
+.home-page .home-navbar.is-scrolled .nav-action-icon,
+.home-page .home-navbar.is-scrolled .nav-action-icon svg,
+.home-page .home-navbar.is-scrolled .user-greeting,
+.home-page .home-navbar.is-scrolled .dropdown-arrow,
+.home-page .home-navbar.scrolled .nav-logo a,
+.home-page .home-navbar.scrolled .nav-menu li a,
+.home-page .home-navbar.scrolled .nav-action-link,
+.home-page .home-navbar.scrolled .nav-action-icon,
+.home-page .home-navbar.scrolled .nav-action-icon svg,
+.home-page .home-navbar.scrolled .user-greeting,
+.home-page .home-navbar.scrolled .dropdown-arrow {
+    color: #111111 !important;
+    stroke: #111111 !important;
+}
+
+/* 首頁 Hero 與 navbar 緊貼，避免白色間隔 */
+.home-page {
+    padding-top: 0 !important;
+}
+
+/* 首頁 navbar badge：未捲動與捲動後都保持可讀數字 */
+.home-page .home-navbar .nav-icon-link .nav-action-badge,
+.home-page .home-navbar .wishlist-count,
+.home-page .home-navbar .nav-badge,
+.home-page .home-navbar .badge {
+    position: absolute !important;
+    top: -5px !important;
+    right: -6px !important;
+    z-index: 3 !important;
+    min-width: 18px !important;
+    height: 18px !important;
+    padding: 0 5px !important;
+    border-radius: 999px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    line-height: 1 !important;
+    letter-spacing: 0 !important;
+    text-align: center !important;
+    background: #FFFFFF !important;
+    color: #111111 !important;
+    border: 1px solid rgba(0, 0, 0, 0.1) !important;
+}
+
+.home-page .home-navbar.is-scrolled .nav-icon-link .nav-action-badge,
+.home-page .home-navbar.scrolled .nav-icon-link .nav-action-badge,
+.home-page .home-navbar.is-scrolled .wishlist-count,
+.home-page .home-navbar.scrolled .wishlist-count,
+.home-page .home-navbar.is-scrolled .nav-badge,
+.home-page .home-navbar.scrolled .nav-badge,
+.home-page .home-navbar.is-scrolled .badge,
+.home-page .home-navbar.scrolled .badge {
+    background: #FFFFFF !important;
+    color: #111111 !important;
+    border: 1px solid rgba(0, 0, 0, 0.1) !important;
+}
+
+.home-page .home-navbar .nav-icon-link .nav-action-badge.is-empty {
+    display: none !important;
 }

@@ -23,23 +23,23 @@ function renderNavbar($pdo, $categories, $parts_category_id, $current_page = '')
             </div>
             <ul class="nav-menu home-navbar-center">
                 <li class="helmet-menu nav-item has-mega-menu">
-                    <a href="products.php" id="helmetMenuToggle">安全帽 <span class="dropdown-arrow">▾</span></a>
+                    <a href="products.php?category=全部商品" id="helmetMenuToggle">安全帽 <span class="dropdown-arrow">▾</span></a>
                     <ul class="helmet-submenu">
-                        <li><a href="products.php">全部安全帽</a></li>
-                        <li><a href="products.php?search=<?php echo urlencode('全罩式安全帽'); ?>">全罩式安全帽</a></li>
-                        <li><a href="products.php?search=<?php echo urlencode('半罩式安全帽'); ?>">半罩式安全帽</a></li>
-                        <li><a href="products.php?search=<?php echo urlencode('3/4罩安全帽'); ?>">3/4罩安全帽</a></li>
-                        <li><a href="products.php<?php echo $parts_category_id ? '?category=' . htmlspecialchars($parts_category_id) : ''; ?>">周邊與零件</a></li>
+                        <li><a href="products.php?category=全部商品">全部安全帽</a></li>
+                        <li><a href="products.php?category=全罩式安全帽">全罩式安全帽</a></li>
+                        <li><a href="products.php?category=半罩式安全帽">半罩式安全帽</a></li>
+                        <li><a href="products.php?category=3/4罩安全帽">3/4罩安全帽</a></li>
+                        <li><a href="products.php?category=周邊與配件">周邊與配件</a></li>
                     </ul>
                     <div class="mega-menu">
                         <div class="mega-links">
                             <div class="mega-column">
                                 <h4>商品分類</h4>
-                                <a href="products.php">全部安全帽</a>
-                                <a href="products.php?search=<?php echo urlencode('全罩式安全帽'); ?>">全罩式安全帽</a>
-                                <a href="products.php?search=<?php echo urlencode('半罩式安全帽'); ?>">半罩式安全帽</a>
-                                <a href="products.php?search=<?php echo urlencode('3/4罩安全帽'); ?>">3/4罩安全帽</a>
-                                <a href="products.php<?php echo $parts_category_id ? '?category=' . htmlspecialchars($parts_category_id) : ''; ?>">周邊與零件</a>
+                                <a href="products.php?category=全部商品">全部安全帽</a>
+                                <a href="products.php?category=全罩式安全帽">全罩式安全帽</a>
+                                <a href="products.php?category=半罩式安全帽">半罩式安全帽</a>
+                                <a href="products.php?category=3/4罩安全帽">3/4罩安全帽</a>
+                                <a href="products.php?category=周邊與配件">周邊與配件</a>
                             </div>
                             <div class="mega-column">
                                 <h4>更多資訊</h4>
@@ -52,7 +52,7 @@ function renderNavbar($pdo, $categories, $parts_category_id, $current_page = '')
                     </div>
                 </li>
                 <li class="nav-item">
-                    <a href="products.php<?php echo $parts_category_id ? '?category=' . htmlspecialchars($parts_category_id) : ''; ?>">周邊與配件</a>
+                    <a href="products.php?category=周邊與配件">周邊與配件</a>
                 </li>
                 <li class="helmet-menu nav-item has-mega-menu">
                     <a href="guide.php" id="guideMenuToggle">購物指南 <span class="dropdown-arrow">▾</span></a>
@@ -186,13 +186,16 @@ function renderNavbar($pdo, $categories, $parts_category_id, $current_page = '')
             const updateNavbarState = function() {
                 if (window.scrollY > 0) {
                     navbar.classList.add('is-scrolled');
+                    navbar.classList.add('scrolled');
                 } else {
                     navbar.classList.remove('is-scrolled');
+                    navbar.classList.remove('scrolled');
                 }
             };
 
             updateNavbarState();
             window.addEventListener('scroll', updateNavbarState, { passive: true });
+            window.addEventListener('pageshow', updateNavbarState);
         })();
 
         (function() {
