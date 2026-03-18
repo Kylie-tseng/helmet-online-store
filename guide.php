@@ -23,7 +23,6 @@ try {
 }
 
 $guide_cards = [
-    ['title' => '安全帽尺寸', 'href' => 'helmet_size.php', 'image' => 'https://placehold.co/640x420/E6E8F0/243047?text=Helmet+Size'],
     ['title' => '安全帽知識', 'href' => 'helmet_knowledge.php', 'image' => 'https://placehold.co/640x420/E6E8F0/243047?text=Helmet+Knowledge'],
     ['title' => '頭圍量測教學', 'href' => 'head_measure.php', 'image' => 'https://placehold.co/640x420/E6E8F0/243047?text=Head+Measure'],
     ['title' => '安全帽保養教學', 'href' => 'helmet_care.php', 'image' => 'https://placehold.co/640x420/E6E8F0/243047?text=Helmet+Care'],
