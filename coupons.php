@@ -3,44 +3,52 @@ require_once 'config.php';
 require_once 'includes/cart_functions.php';
 require_once 'includes/navbar.php';
 
+$today = new DateTime('today');
 $coupon_activities = [
     [
-        'title' => '新會員優惠',
-        'lines' => [
-            '新會員註冊後即可使用優惠券',
-            '優惠券：NEW100',
-            '滿 500 元折抵 100 元'
-        ]
+        'tag' => '新會員優惠',
+        'title' => '新會員專屬優惠',
+        'benefit' => '滿 NT$500 折 NT$100',
+        'code' => 'NEW100',
+        'validity' => $today->format('Y-m-d') . ' ～ ' . $today->modify('+6 months')->format('Y-m-d'),
+        'detail_url' => 'coupon_new_member.php',
+        'claim_url' => 'coupon_new_member.php#claim'
     ],
     [
+        'tag' => '限時折扣',
         'title' => '安全帽週年慶',
-        'lines' => [
-            '全館安全帽限時優惠',
-            '優惠券：HELMET10',
-            '全館商品 9 折'
-        ]
+        'benefit' => '全館商品 9 折',
+        'code' => 'HELMET10',
+        'validity' => '活動期間請見詳細頁說明',
+        'detail_url' => 'coupon_anniversary.php',
+        'claim_url' => 'coupon_anniversary.php#claim'
     ],
     [
+        'tag' => '滿額折扣',
         'title' => '滿額折扣活動',
-        'lines' => [
-            '購物滿額即可使用優惠券',
-            '優惠券：SAVE300',
-            '滿 2000 元折抵 300 元'
-        ]
+        'benefit' => '滿 NT$2000 折 NT$300',
+        'code' => 'SAVE300',
+        'validity' => '領取後 3 個月內有效',
+        'detail_url' => 'coupon_discount.php',
+        'claim_url' => 'coupon_discount.php#claim'
     ],
     [
+        'tag' => '節慶活動',
         'title' => '騎士節活動',
-        'lines' => [
-            '騎士節限定優惠',
-            '優惠券：RIDER20',
-            '全館商品 8 折'
-        ]
+        'benefit' => '全館商品 8 折',
+        'code' => 'RIDER20',
+        'validity' => '活動期間請見詳細頁說明',
+        'detail_url' => 'coupon_rider_day.php',
+        'claim_url' => 'coupon_rider_day.php#claim'
     ],
     [
+        'tag' => '免運活動',
         'title' => '滿三千免運',
-        'lines' => [
-            '全站消費滿 NT$3000 即享免運優惠'
-        ]
+        'benefit' => '全站消費滿 NT$3000 即享免運',
+        'code' => null,
+        'validity' => '活動期間請見詳細頁說明',
+        'detail_url' => 'coupon_free_shipping.php',
+        'claim_url' => 'coupon_free_shipping.php#claim'
     ]
 ];
 
@@ -71,29 +79,49 @@ try {
     <title>優惠券專區 - HelmetVRse</title>
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
-<body>
+<body class="coupon-page-directory">
 <?php renderNavbar($pdo, $categories, $parts_category_id); ?>
 
-    <section class="products-section">
-        <div class="container">
-            <div class="section-header">
-                <h1 class="section-title">優惠券專區</h1>
-                <p class="section-subtitle">一次掌握目前所有活動優惠與折扣資訊</p>
-            </div>
-            <div class="products-grid">
+    <main class="coupon-page-shell">
+        <div class="container coupon-page-container">
+            <section class="coupon-page-header">
+                <h1>優惠券專區</h1>
+                <p>一次掌握目前所有活動優惠與折扣資訊</p>
+            </section>
+
+            <section class="coupon-list-panel" aria-label="優惠券總覽列表">
                 <?php foreach ($coupon_activities as $activity): ?>
-                    <article class="product-card">
-                        <div class="product-info">
-                            <h2 class="product-name"><?php echo htmlspecialchars($activity['title']); ?></h2>
-                            <?php foreach ($activity['lines'] as $line): ?>
-                                <p class="product-price"><?php echo htmlspecialchars($line); ?></p>
-                            <?php endforeach; ?>
+                    <article class="coupon-list-item">
+                        <div class="coupon-item-content">
+                            <p class="coupon-item-tag"><?php echo htmlspecialchars($activity['tag']); ?></p>
+                            <h2 class="coupon-item-title"><?php echo htmlspecialchars($activity['title']); ?></h2>
+                            <p class="coupon-item-benefit"><?php echo htmlspecialchars($activity['benefit']); ?></p>
+
+                            <div class="coupon-item-meta">
+                                <p>
+                                    <span class="coupon-meta-label">優惠碼</span>
+                                    <span class="coupon-meta-value">
+                                        <?php echo htmlspecialchars($activity['code'] ?? '免輸入，系統自動套用'); ?>
+                                    </span>
+                                </p>
+                                <p>
+                                    <span class="coupon-meta-label">有效期限</span>
+                                    <span class="coupon-meta-value"><?php echo htmlspecialchars($activity['validity']); ?></span>
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="coupon-item-action">
+                            <div class="coupon-item-actions">
+                                <a href="<?php echo htmlspecialchars($activity['claim_url']); ?>" class="coupon-item-btn coupon-item-btn-primary">立即領取優惠</a>
+                                <a href="<?php echo htmlspecialchars($activity['detail_url']); ?>" class="coupon-item-btn coupon-item-btn-secondary">查看詳情</a>
+                            </div>
                         </div>
                     </article>
                 <?php endforeach; ?>
-            </div>
+            </section>
         </div>
-    </section>
+    </main>
 
     <footer class="footer">
         <div class="container">
@@ -119,7 +147,7 @@ try {
                     <h3 class="footer-title">聯絡我們</h3>
                     <ul class="footer-links">
                         <li>電話：02-2905-2000</li>
-                        <li>Email：service@helmetvr.com</li>
+                        <li>Email：helmetvrsefju@gmail.com</li>
                         <li>地址：新北市新莊區中正路510號</li>
                     </ul>
                 </div>

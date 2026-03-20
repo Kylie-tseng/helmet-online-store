@@ -23,27 +23,27 @@ function renderNavbar($pdo, $categories, $parts_category_id, $current_page = '')
             </div>
             <ul class="nav-menu home-navbar-center">
                 <li class="helmet-menu nav-item has-mega-menu">
-                    <a href="products.php" id="helmetMenuToggle">安全帽 <span class="dropdown-arrow">▾</span></a>
+                    <a href="products.php?category=全部商品" id="helmetMenuToggle">安全帽 <span class="dropdown-arrow">▾</span></a>
                     <ul class="helmet-submenu">
-                        <li><a href="products.php">全部安全帽</a></li>
-                        <li><a href="products.php?search=<?php echo urlencode('全罩式安全帽'); ?>">全罩式安全帽</a></li>
-                        <li><a href="products.php?search=<?php echo urlencode('半罩式安全帽'); ?>">半罩式安全帽</a></li>
-                        <li><a href="products.php?search=<?php echo urlencode('3/4罩安全帽'); ?>">3/4罩安全帽</a></li>
-                        <li><a href="products.php<?php echo $parts_category_id ? '?category=' . htmlspecialchars($parts_category_id) : ''; ?>">周邊與配件</a></li>
+                        <li><a href="products.php?category=全部商品">全部安全帽</a></li>
+                        <li><a href="products.php?category=全罩式安全帽">全罩式安全帽</a></li>
+                        <li><a href="products.php?category=半罩式安全帽">半罩式安全帽</a></li>
+                        <li><a href="products.php?category=3/4罩安全帽">3/4罩安全帽</a></li>
+                        <li><a href="products.php?category=周邊與配件">周邊與配件</a></li>
                     </ul>
                     <div class="mega-menu">
                         <div class="mega-links">
                             <div class="mega-column">
                                 <h4>商品分類</h4>
-                                <a href="products.php">全部安全帽</a>
-                                <a href="products.php?search=<?php echo urlencode('全罩式安全帽'); ?>">全罩式安全帽</a>
-                                <a href="products.php?search=<?php echo urlencode('半罩式安全帽'); ?>">半罩式安全帽</a>
-                                <a href="products.php?search=<?php echo urlencode('3/4罩安全帽'); ?>">3/4罩安全帽</a>
-                                <a href="products.php<?php echo $parts_category_id ? '?category=' . htmlspecialchars($parts_category_id) : ''; ?>">周邊與配件</a>
+                                <a href="products.php?category=全部商品">全部安全帽</a>
+                                <a href="products.php?category=全罩式安全帽">全罩式安全帽</a>
+                                <a href="products.php?category=半罩式安全帽">半罩式安全帽</a>
+                                <a href="products.php?category=3/4罩安全帽">3/4罩安全帽</a>
+                                <a href="products.php?category=周邊與配件">周邊與配件</a>
                             </div>
                             <div class="mega-column">
                                 <h4>更多資訊</h4>
-                                <a href="helmet_size.php">安全帽尺寸</a>
+                                <a href="helmet_knowledge.php">安全帽知識</a>
                                 <a href="head_measure.php">頭圍量測教學</a>
                                 <a href="helmet_care.php">安全帽保養教學</a>
                                 <a href="faq.php">常見問題 FAQ</a>
@@ -52,7 +52,7 @@ function renderNavbar($pdo, $categories, $parts_category_id, $current_page = '')
                     </div>
                 </li>
                 <li class="nav-item">
-                    <a href="products.php<?php echo $parts_category_id ? '?category=' . htmlspecialchars($parts_category_id) : ''; ?>">周邊與配件</a>
+                    <a href="products.php?category=周邊與配件">周邊與配件</a>
                 </li>
                 <li class="helmet-menu nav-item has-mega-menu">
                     <a href="guide.php" id="guideMenuToggle">購物指南 <span class="dropdown-arrow">▾</span></a>
@@ -62,7 +62,6 @@ function renderNavbar($pdo, $categories, $parts_category_id, $current_page = '')
                         <li><a href="coupons.php">優惠券專區</a></li>
                         <li><a href="return_policy.php">退貨政策</a></li>
                         <li><a href="helmet_knowledge.php">安全帽知識</a></li>
-                        <li><a href="helmet_size.php">安全帽尺寸</a></li>
                         <li><a href="head_measure.php">頭圍量測教學</a></li>
                         <li><a href="helmet_care.php">安全帽保養教學</a></li>
                         <li><a href="faq.php">常見問題 FAQ</a></li>
@@ -79,7 +78,6 @@ function renderNavbar($pdo, $categories, $parts_category_id, $current_page = '')
                             <div class="mega-column">
                                 <h4>更多資訊</h4>
                                 <a href="helmet_knowledge.php">安全帽知識</a>
-                                <a href="helmet_size.php">安全帽尺寸</a>
                                 <a href="head_measure.php">頭圍量測教學</a>
                                 <a href="helmet_care.php">安全帽保養教學</a>
                                 <a href="faq.php">常見問題 FAQ</a>
@@ -140,42 +138,60 @@ function renderNavbar($pdo, $categories, $parts_category_id, $current_page = '')
     <script>
         (function() {
             try {
-                const guideLink = document.getElementById('guideMenuToggle');
-                const guideMenu = guideLink ? guideLink.closest('.helmet-menu') : null;
-                if (!guideMenu || !guideLink) return;
+                const bindMegaMenuBehavior = function(toggleId) {
+                    const menuLink = document.getElementById(toggleId);
+                    const menuItem = menuLink ? menuLink.closest('.helmet-menu') : null;
+                    if (!menuLink || !menuItem) return null;
 
-                let guideArmedForNavigation = false;
+                    let armedForNavigation = false;
 
-                guideMenu.addEventListener('mouseenter', function() {
-                    guideMenu.classList.add('open');
-                });
+                    menuItem.addEventListener('mouseenter', function() {
+                        menuItem.classList.add('open');
+                    });
 
-                guideMenu.addEventListener('mouseleave', function() {
-                    if (!guideArmedForNavigation) {
-                        guideMenu.classList.remove('open');
-                    }
-                });
+                    menuItem.addEventListener('mouseleave', function() {
+                        if (!armedForNavigation) {
+                            menuItem.classList.remove('open');
+                        }
+                    });
 
-                guideLink.addEventListener('click', function(e) {
-                    // First click opens dropdown; second click navigates to guide.php
-                    if (!guideMenu.classList.contains('open') || !guideArmedForNavigation) {
-                        e.preventDefault();
-                        guideMenu.classList.add('open');
-                        guideArmedForNavigation = true;
-                        return;
-                    }
+                    menuLink.addEventListener('click', function(e) {
+                        // First click opens dropdown; second click follows link
+                        if (!menuItem.classList.contains('open') || !armedForNavigation) {
+                            e.preventDefault();
+                            menuItem.classList.add('open');
+                            armedForNavigation = true;
+                            return;
+                        }
 
-                    guideArmedForNavigation = false;
-                });
+                        armedForNavigation = false;
+                    });
+
+                    return {
+                        element: menuItem,
+                        reset: function() {
+                            menuItem.classList.remove('open');
+                            armedForNavigation = false;
+                        }
+                    };
+                };
+
+                const managedMenus = [
+                    bindMegaMenuBehavior('helmetMenuToggle'),
+                    bindMegaMenuBehavior('guideMenuToggle')
+                ].filter(Boolean);
+
+                if (managedMenus.length === 0) return;
 
                 document.addEventListener('click', function(e) {
-                    if (!guideMenu.contains(e.target)) {
-                        guideMenu.classList.remove('open');
-                        guideArmedForNavigation = false;
-                    }
+                    managedMenus.forEach(function(menuState) {
+                        if (!menuState.element.contains(e.target)) {
+                            menuState.reset();
+                        }
+                    });
                 });
             } catch (error) {
-                console.error('購物指南下拉選單功能錯誤:', error);
+                console.error('下拉選單功能錯誤:', error);
             }
         })();
 
@@ -186,13 +202,16 @@ function renderNavbar($pdo, $categories, $parts_category_id, $current_page = '')
             const updateNavbarState = function() {
                 if (window.scrollY > 0) {
                     navbar.classList.add('is-scrolled');
+                    navbar.classList.add('scrolled');
                 } else {
                     navbar.classList.remove('is-scrolled');
+                    navbar.classList.remove('scrolled');
                 }
             };
 
             updateNavbarState();
             window.addEventListener('scroll', updateNavbarState, { passive: true });
+            window.addEventListener('pageshow', updateNavbarState);
         })();
 
         (function() {

@@ -133,8 +133,8 @@ if (is_array($promo_offers) && !empty($promo_offers)) {
         </div>
     </section>
 
-    <!-- 分類區 -->
-    <section class="categories-section">
+    <!-- 精選分類區 -->
+    <section class="categories-section split-category-section">
         <div class="container">
             <section class="promo-section" aria-label="限時優惠活動">
                 <div class="promo-container">
@@ -175,95 +175,194 @@ if (is_array($promo_offers) && !empty($promo_offers)) {
                     </div>
                 </div>
             </section>
-            <div class="section-header">
-                <h2 class="section-title">商品分類</h2>
-                <p class="section-subtitle">探索我們的精選分類</p>
-            </div>
-            <div class="categories-grid">
-                <?php if (empty($categories)): ?>
-                    <div class="empty-message">目前尚未設定分類</div>
-                <?php else: ?>
-                    <?php foreach ($categories as $category): ?>
-                        <a href="products.php?category=<?php echo htmlspecialchars($category['id']); ?>" class="category-card">
-                            <div class="category-content">
-                                <h3 class="category-name"><?php echo htmlspecialchars($category['name']); ?></h3>
-                                <p class="category-description">
-                                    <?php echo !empty($category['description']) ? htmlspecialchars($category['description']) : '探索此分類的優質商品'; ?>
-                                </p>
-                            </div>
-                        </a>
+            <div class="split-category-shell">
+                <header class="featured-section-header">
+                    <p class="featured-section-eyebrow">CURATED CATEGORIES</p>
+                    <h2 class="featured-section-title">精選分類</h2>
+                    <p class="featured-section-subtitle">以騎乘情境為核心，快速找到最適合的防護選擇</p>
+                </header>
+
+                <?php
+                $split_category_lookup = [];
+                foreach ($categories as $category) {
+                    $name = trim((string)($category['name'] ?? ''));
+                    if ($name === '') {
+                        continue;
+                    }
+                    $split_category_lookup[$name] = $category;
+                }
+
+                $split_categories = [
+                    [
+                        'name' => '全罩式安全帽',
+                        'description' => '完整包覆與穩定防護，適合長途與高速騎乘。',
+                        'tone' => 'split-tone-dark-1'
+                    ],
+                    [
+                        'name' => '半罩式安全帽',
+                        'description' => '輕量通勤，保留日常穿梭的自由感。',
+                        'tone' => 'split-tone-dark-2'
+                    ],
+                    [
+                        'name' => '3/4罩安全帽',
+                        'description' => '在保護性與透氣感之間取得平衡。',
+                        'tone' => 'split-tone-dark-3'
+                    ],
+                    [
+                        'name' => '周邊與配件',
+                        'description' => '補足騎乘細節，完成整體配戴體驗。',
+                        'tone' => 'split-tone-light'
+                    ]
+                ];
+                ?>
+
+                <div class="split-category-grid">
+                    <?php foreach ($split_categories as $item): ?>
+                        <?php
+                        $name = $item['name'];
+                        $resolved = $split_category_lookup[$name] ?? null;
+                        $target = $resolved
+                            ? 'products.php?category=' . urlencode((string)$resolved['id'])
+                            : 'products.php?category=' . urlencode($name);
+                        ?>
+                        <div class="split-category-item">
+                            <h3 class="split-category-title"><?php echo htmlspecialchars($name); ?></h3>
+                            <p class="split-category-text"><?php echo htmlspecialchars($item['description']); ?></p>
+                            <a href="<?php echo htmlspecialchars($target); ?>" class="split-category-link">前往選購 <span aria-hidden="true">→</span></a>
+                        </div>
                     <?php endforeach; ?>
-                <?php endif; ?>
+                </div>
             </div>
         </div>
     </section>
 
     <!-- 熱門商品區 -->
-    <section class="products-section">
+    <section class="products-section featured-products-section-home">
         <div class="container">
-            <div class="section-header">
-                <h2 class="section-title">熱門商品</h2>
-                <p class="section-subtitle">精選推薦商品</p>
-            </div>
-            <?php if (!empty($_SESSION['favorite_message'])): ?>
-                <div class="success-message"><?php echo htmlspecialchars($_SESSION['favorite_message']); ?></div>
-                <?php unset($_SESSION['favorite_message']); ?>
-            <?php endif; ?>
-            <div class="products-grid">
+            <div class="featured-products-shell">
+                <header class="featured-section-header">
+                    <p class="featured-section-eyebrow">FEATURED PICKS</p>
+                    <h2 class="featured-section-title">熱門商品</h2>
+                    <p class="featured-section-subtitle">精選推薦，為不同騎乘風格而設計</p>
+                </header>
+
+                <?php if (!empty($_SESSION['favorite_message'])): ?>
+                    <div class="success-message"><?php echo htmlspecialchars($_SESSION['favorite_message']); ?></div>
+                    <?php unset($_SESSION['favorite_message']); ?>
+                <?php endif; ?>
+
+                <?php
+                $product_tags = ['全罩式', '競賽款', '入門款'];
+                ?>
+
                 <?php if (empty($hotProducts)): ?>
                     <div class="empty-message">目前尚未有熱門商品</div>
                 <?php else: ?>
-                    <?php foreach ($hotProducts as $product): ?>
-                        <?php $is_favorited = in_array((int)$product['id'], $favorite_ids, true); ?>
-                        <div class="product-card">
-                            <div class="product-image">
-                                <?php 
-                                // 檢查 image_url 是否為 NULL 或空字串
-                                $has_image = !empty($product['image_url']) && trim($product['image_url']) !== '';
-                                if ($has_image): 
-                                ?>
-                                    <img src="<?php echo htmlspecialchars($product['image_url'], ENT_QUOTES); ?>" alt="<?php echo htmlspecialchars($product['name']); ?>">
-                                <?php else: ?>
-                                    <div class="product-image-placeholder">
-                                        <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#9A9A9A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                                            <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                                            <polyline points="21 15 16 10 5 21"></polyline>
-                                        </svg>
-                                        <span>無圖片</span>
+                    <div class="featured-products-grid-home">
+                        <?php foreach ($hotProducts as $idx => $product): ?>
+                            <?php
+                            $is_favorited = in_array((int)$product['id'], $favorite_ids, true);
+                            $has_image = !empty($product['image_url']) && trim($product['image_url']) !== '';
+                            $tag = $product_tags[$idx % count($product_tags)];
+                            ?>
+                            <article class="featured-product-card">
+                                <div class="featured-product-media">
+                                    <div class="featured-product-frame">
+                                        <?php if ($has_image): ?>
+                                            <img class="featured-product-image" src="<?php echo htmlspecialchars($product['image_url'], ENT_QUOTES); ?>" alt="<?php echo htmlspecialchars($product['name']); ?>">
+                                        <?php else: ?>
+                                            <div class="featured-product-placeholder">
+                                                <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#9A9A9A" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+                                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                                    <polyline points="21 15 16 10 5 21"></polyline>
+                                                </svg>
+                                                <span>無圖片</span>
+                                            </div>
+                                        <?php endif; ?>
                                     </div>
-                                <?php endif; ?>
-                            </div>
-                            <div class="product-info">
-                                <h3 class="product-name"><?php echo htmlspecialchars($product['name']); ?></h3>
-                                <div class="product-price-row">
-                                    <p class="product-price">NT$ <?php echo number_format($product['price']); ?></p>
-                                    <form action="api/toggle_favorite.php" method="POST" class="product-favorite-inline-form">
-                                        <input type="hidden" name="product_id" value="<?php echo (int)$product['id']; ?>">
-                                        <input type="hidden" name="redirect" value="index.php">
-                                        <button
-                                            type="submit"
-                                            class="favorite-btn favorite-icon-btn <?php echo $is_favorited ? 'active' : ''; ?>"
-                                            aria-label="<?php echo $is_favorited ? '取消收藏' : '加入收藏'; ?>"
-                                            title="<?php echo $is_favorited ? '取消收藏' : '加入收藏'; ?>"
-                                        >
-                                            <svg class="heart-icon" viewBox="0 0 24 24" aria-hidden="true">
-                                                <path class="heart-outline" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"></path>
-                                                <path class="heart-fill" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"></path>
-                                            </svg>
-                                        </button>
-                                    </form>
                                 </div>
-                                <div class="product-card-actions">
-                                    <a href="product_detail.php?id=<?php echo htmlspecialchars($product['id']); ?>" class="product-btn">查看詳情</a>
+
+                                <div class="featured-product-body">
+                                    <div class="featured-product-meta">
+                                        <span class="featured-product-tag"><?php echo htmlspecialchars($tag); ?></span>
+                                        <form action="api/toggle_favorite.php" method="POST" class="product-favorite-inline-form">
+                                            <input type="hidden" name="product_id" value="<?php echo (int)$product['id']; ?>">
+                                            <input type="hidden" name="redirect" value="index.php">
+                                            <button
+                                                type="submit"
+                                                class="favorite-btn favorite-icon-btn featured-wishlist-btn <?php echo $is_favorited ? 'active' : ''; ?>"
+                                                aria-label="<?php echo $is_favorited ? '取消收藏' : '加入收藏'; ?>"
+                                                title="<?php echo $is_favorited ? '取消收藏' : '加入收藏'; ?>"
+                                            >
+                                                <svg class="heart-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                                    <path class="heart-outline" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"></path>
+                                                    <path class="heart-fill" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"></path>
+                                                </svg>
+                                            </button>
+                                        </form>
+                                    </div>
+
+                                    <h3 class="featured-product-title"><?php echo htmlspecialchars($product['name']); ?></h3>
+
+                                    <div class="featured-product-footer">
+                                        <p class="featured-product-price">NT$ <?php echo number_format($product['price']); ?></p>
+                                        <a href="product_detail.php?id=<?php echo htmlspecialchars($product['id']); ?>" class="featured-product-link">查看詳情 <span aria-hidden="true">→</span></a>
+                                    </div>
                                 </div>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
+                            </article>
+                        <?php endforeach; ?>
+                    </div>
                 <?php endif; ?>
             </div>
         </div>
     </section>
+
+    <!-- 風格圖片導覽 -->
+    <section class="lifestyle-gallery-section">
+        <div class="container">
+            <div class="lifestyle-gallery-shell">
+                <header class="lifestyle-gallery-header">
+                    <p class="featured-section-eyebrow">STYLE GUIDE</p>
+                    <h2 class="featured-section-title">騎乘風格導覽</h2>
+                    <p class="featured-section-subtitle">從不同場景出發，探索適合你的裝備搭配</p>
+                </header>
+
+                <div class="lifestyle-gallery-track">
+                    <article class="lifestyle-gallery-item">
+                        <img class="lifestyle-gallery-image" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 380'%3E%3Crect fill='%23d8dde3' width='600' height='380'/%3E%3Cpath d='M0 310L130 220L250 265L360 200L470 250L600 190V380H0Z' fill='%23b8c0ca'/%3E%3C/svg%3E" alt="通勤騎乘">
+                        <h3 class="lifestyle-gallery-title">通勤騎乘</h3>
+                    </article>
+                    <article class="lifestyle-gallery-item">
+                        <img class="lifestyle-gallery-image" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 380'%3E%3Crect fill='%23d9dfe5' width='600' height='380'/%3E%3Cpath d='M0 292L120 210L220 245L340 195L470 255L600 182V380H0Z' fill='%23b7bec8'/%3E%3C/svg%3E" alt="長途旅行">
+                        <h3 class="lifestyle-gallery-title">長途旅行</h3>
+                    </article>
+                    <article class="lifestyle-gallery-item">
+                        <img class="lifestyle-gallery-image" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 380'%3E%3Crect fill='%23d6dce2' width='600' height='380'/%3E%3Cpath d='M0 300L90 240L210 270L325 205L460 248L600 190V380H0Z' fill='%23b1bbc5'/%3E%3C/svg%3E" alt="城市風格">
+                        <h3 class="lifestyle-gallery-title">城市風格</h3>
+                    </article>
+                    <article class="lifestyle-gallery-item">
+                        <img class="lifestyle-gallery-image" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 380'%3E%3Crect fill='%23dce1e6' width='600' height='380'/%3E%3Cpath d='M0 305L120 228L250 275L370 210L500 258L600 200V380H0Z' fill='%23bcc4cd'/%3E%3C/svg%3E" alt="競速性能">
+                        <h3 class="lifestyle-gallery-title">競速性能</h3>
+                    </article>
+                    <article class="lifestyle-gallery-item">
+                        <img class="lifestyle-gallery-image" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 380'%3E%3Crect fill='%23d7dde2' width='600' height='380'/%3E%3Cpath d='M0 296L128 220L236 258L352 202L462 244L600 187V380H0Z' fill='%23b4bcc5'/%3E%3C/svg%3E" alt="女性精選">
+                        <h3 class="lifestyle-gallery-title">女性精選</h3>
+                    </article>
+                    <article class="lifestyle-gallery-item">
+                        <img class="lifestyle-gallery-image" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 380'%3E%3Crect fill='%23d4dae0' width='600' height='380'/%3E%3Cpath d='M0 302L112 226L234 266L350 204L472 256L600 194V380H0Z' fill='%23adb6bf'/%3E%3C/svg%3E" alt="周邊配件">
+                        <h3 class="lifestyle-gallery-title">周邊配件</h3>
+                    </article>
+                    <article class="lifestyle-gallery-item">
+                        <img class="lifestyle-gallery-image" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 380'%3E%3Crect fill='%23d8dde1' width='600' height='380'/%3E%3Cpath d='M0 299L122 222L246 268L362 208L478 252L600 196V380H0Z' fill='%23b3bcc4'/%3E%3C/svg%3E" alt="禮物推薦">
+                        <h3 class="lifestyle-gallery-title">禮物推薦</h3>
+                    </article>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <button type="button" class="back-to-top-btn" id="backToTopBtn" aria-label="回到最上方">↑</button>
 
     <!-- Footer -->
     <footer class="footer">
@@ -290,7 +389,7 @@ if (is_array($promo_offers) && !empty($promo_offers)) {
                     <h3 class="footer-title">聯絡我們</h3>
                     <ul class="footer-links">
                         <li>電話：02-2905-2000</li>
-                        <li>Email：service@helmetvr.com</li>
+                        <li>Email：helmetvrsefju@gmail.com</li>
                         <li>地址：新北市新莊區中正路510號</li>
                         <li class="social-links">
                             <a href="#" class="social-icon">Facebook</a>
@@ -446,6 +545,27 @@ if (is_array($promo_offers) && !empty($promo_offers)) {
             } catch (error) {
                 console.error('Hero 輪播功能錯誤:', error);
             }
+        })();
+
+        // 回到最上方按鈕
+        (function() {
+            const backToTopBtn = document.getElementById('backToTopBtn');
+            if (!backToTopBtn) return;
+
+            const toggleVisibility = function() {
+                if (window.scrollY > 520) {
+                    backToTopBtn.classList.add('is-visible');
+                } else {
+                    backToTopBtn.classList.remove('is-visible');
+                }
+            };
+
+            toggleVisibility();
+            window.addEventListener('scroll', toggleVisibility, { passive: true });
+
+            backToTopBtn.addEventListener('click', function() {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
         })();
     </script>
 </body>

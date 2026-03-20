@@ -116,6 +116,10 @@ if ($notice_message === '') {
                         required
                     >
                 </div>
+                
+                <div class="auth-inline-link-row">
+                    <a href="forgot_password.php" class="auth-inline-link">忘記密碼？立即重設</a>
+                </div>
 
                 <button type="submit" class="login-btn">登入</button>
             </form>
