@@ -5,28 +5,35 @@ require_once 'includes/auth_layout.php';
 $token = $_GET['token'] ?? '';
 $error = '';
 $success = false;
+$token_valid = true;
+$submitted = $_SERVER["REQUEST_METHOD"] === "POST";
 
 // --- 第一步：驗證 Token 是否有效 ---
 if (empty($token)) {
-    die("無效的請求，缺少 Token。");
+    $token_valid = false;
+    $error = '無效的請求，缺少重設資訊。';
 }
 
-// 查詢 Token 是否存在且尚未過期
-$stmt = $pdo->prepare("SELECT id FROM users WHERE reset_token = ? AND reset_expires_at > NOW()");
-$stmt->execute([$token]);
-$user = $stmt->fetch();
+if ($token_valid) {
+    // 查詢 Token 是否存在且尚未過期
+    $stmt = $pdo->prepare("SELECT id FROM users WHERE reset_token = ? AND reset_expires_at > NOW()");
+    $stmt->execute([$token]);
+    $user = $stmt->fetch();
 
-if (!$user) {
-    die("此連結已失效或已過期，請重新申請「忘記密碼」。");
+    if (!$user) {
+        $token_valid = false;
+        $error = '此連結已失效或已過期，請重新申請「忘記密碼」。';
+    }
 }
 
 // --- 第二步：處理密碼更新表單提交 ---
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
+if ($submitted) {
     $new_password = $_POST['new_password'] ?? '';
     $confirm_password = $_POST['confirm_password'] ?? '';
 
-    // 後端再次檢查（防止跳過前端 JS）
-    if (strlen($new_password) < 8) {
+    if (!$token_valid) {
+        // 若 token 已失效，維持前面錯誤訊息
+    } elseif (strlen($new_password) < 8) {
         $error = '密碼長度至少需要 8 碼';
     } elseif ($new_password !== $confirm_password) {
         $error = '兩次輸入的密碼不一致';
@@ -67,10 +74,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             <?php else: ?>
                 <p class="login-subtitle">請輸入您的新密碼</p>
 
-                <div id="resetPasswordError" class="error-message" style="<?php echo $error ? 'display:block' : ''; ?>">
-                    <?php echo $error ?: '兩次輸入的密碼不一致，請重新確認。'; ?>
-                </div>
+                <?php if ($error !== ''): ?>
+                    <div id="resetPasswordError" class="error-message" style="display:block;">
+                        <?php echo htmlspecialchars($error); ?>
+                    </div>
+                <?php else: ?>
+                    <div id="resetPasswordError" class="error-message" style="display:none;"></div>
+                <?php endif; ?>
 
+                <?php if ($token_valid): ?>
                 <form id="resetPasswordForm" action="reset_password.php?token=<?php echo htmlspecialchars($token); ?>" method="POST" novalidate>
                     <div class="form-group">
                         <label for="new_password" class="form-label">新密碼</label>
@@ -102,6 +114,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
                     <button type="submit" class="login-btn auth-gradient-btn">確認送出</button>
                 </form>
+                <?php endif; ?>
 
                 <div class="login-footer">
                     <p><a href="login.php">返回登入</a></p>
@@ -118,6 +131,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             const passwordInput = document.getElementById('new_password');
             const confirmInput = document.getElementById('confirm_password');
             const errorBox = document.getElementById('resetPasswordError');
+            let hasSubmitted = <?php echo $submitted ? 'true' : 'false'; ?>;
 
             function setError(message) {
                 errorBox.textContent = message;
@@ -131,6 +145,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             function validatePasswords() {
                 const password = passwordInput.value;
                 const confirm = confirmInput.value;
+
+                if (!hasSubmitted && !password && !confirm) {
+                    clearError();
+                    return true;
+                }
 
                 if (!password || !confirm) {
                     setError('請完整填寫新密碼與確認密碼');
@@ -155,6 +174,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             confirmInput.addEventListener('input', validatePasswords);
 
             form.addEventListener('submit', function(e) {
+                hasSubmitted = true;
                 if (!validatePasswords()) {
                     e.preventDefault();
                     if (!passwordInput.value || passwordInput.value.length < 8) {

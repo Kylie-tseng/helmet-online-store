@@ -1,6 +1,25 @@
 <?php
 require_once 'config.php';
 require_once 'includes/auth_layout.php';
+
+$error = '';
+$success = '';
+$old_email = '';
+
+if (isset($_SESSION['forgot_error'])) {
+    $error = (string)$_SESSION['forgot_error'];
+    unset($_SESSION['forgot_error']);
+}
+
+if (isset($_SESSION['forgot_success'])) {
+    $success = (string)$_SESSION['forgot_success'];
+    unset($_SESSION['forgot_success']);
+}
+
+if (isset($_SESSION['forgot_old_email'])) {
+    $old_email = (string)$_SESSION['forgot_old_email'];
+    unset($_SESSION['forgot_old_email']);
+}
 ?>
 <!DOCTYPE html>
 <html lang="zh-TW">
@@ -18,9 +37,19 @@ require_once 'includes/auth_layout.php';
             <h1 class="login-title">忘記密碼</h1>
             <p class="login-subtitle">請輸入您註冊時使用的電子郵件，我們將寄送重設密碼連結給您</p>
 
-            <div id="forgotPasswordError" class="error-message">
-                找不到此電子郵件對應的帳號，請確認後再試一次。
-            </div>
+            <?php if ($error !== ''): ?>
+                <div id="forgotPasswordError" class="error-message" style="display:block;">
+                    <?php echo htmlspecialchars($error); ?>
+                </div>
+            <?php else: ?>
+                <div id="forgotPasswordError" class="error-message" style="display:none;"></div>
+            <?php endif; ?>
+
+            <?php if ($success !== ''): ?>
+                <div class="success-message" style="display:block;">
+                    <?php echo htmlspecialchars($success); ?>
+                </div>
+            <?php endif; ?>
 
             <form id="forgotPasswordForm" action="process_forgot_password.php" method="POST" novalidate>
                 <div class="form-group">
@@ -31,6 +60,7 @@ require_once 'includes/auth_layout.php';
                         name="email"
                         class="form-input"
                         placeholder="請輸入您的電子郵件"
+                        value="<?php echo htmlspecialchars($old_email); ?>"
                         required
                         autofocus
                     >
