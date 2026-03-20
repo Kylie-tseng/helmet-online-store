@@ -22,7 +22,7 @@ require_once 'includes/auth_layout.php';
                 找不到此電子郵件對應的帳號，請確認後再試一次。
             </div>
 
-            <form id="forgotPasswordForm" action="#" method="POST" novalidate>
+            <form id="forgotPasswordForm" action="process_forgot_password.php" method="POST" novalidate>
                 <div class="form-group">
                     <label for="email" class="form-label">Email</label>
                     <input
