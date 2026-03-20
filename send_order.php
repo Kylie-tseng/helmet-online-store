@@ -44,14 +44,14 @@ if (!empty($customer_email) && !empty($mail_items)) {
         $mail->isSMTP();
         $mail->Host       = 'smtp.gmail.com';
         $mail->SMTPAuth   = true;
-        $mail->Username   = 'bobby930910@gmail.com';
-        $mail->Password   = 'xhxitqgddgzvpxba';
+        $mail->Username   = 'helmetvrsefju@gmail.com';
+        $mail->Password   = 'avpwtgymnlgekpyv';
         $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port       = 587;
         $mail->CharSet    = 'utf-8';
 
         // --- 收寄件人 ---
-        $mail->setFrom('bobby930910@gmail.com', 'HelmetVRse 客服中心');
+        $mail->setFrom('helmetvrsefju@gmail.com', 'HelmetVRse 客服中心');
         $mail->addAddress($customer_email); 
 
         // --- 郵件內容 ---
