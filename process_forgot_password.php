@@ -1,5 +1,6 @@
 <?php
 require_once 'config.php';
+require_once 'includes/app_config.php';
 date_default_timezone_set('Asia/Taipei');
 
 // 1. 手動載入 PHPMailer (參考你跑得動的那份路徑)
@@ -12,6 +13,13 @@ use PHPMailer\PHPMailer\Exception;
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $email = filter_var($_POST['email'], FILTER_SANITIZE_EMAIL);
+    $_SESSION['forgot_old_email'] = $email;
+
+    if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $_SESSION['forgot_error'] = '請輸入有效的電子郵件格式';
+        header('Location: forgot_password.php');
+        exit;
+    }
 
     // 2. 檢查資料庫
     $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
@@ -44,8 +52,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $mail->setFrom('helmetvrsefju@gmail.com', 'HelmetVRse 客服中心');
             $mail->addAddress($email); 
 
-            // 重設連結 (請確保路徑正確)
-            $resetLink = "http://localhost/dashboard/helmetvrse/helmet-online-store/reset_password.php?token=" . $token;
+            // 重設連結：統一由 APP_URL 組出
+            $base_url = rtrim(APP_URL, '/');
+            $resetLink = $base_url . '/reset_password.php?token=' . urlencode($token);
 
             $mail->isHTML(true);
             $mail->Subject = "【HelmetVRse】重設您的帳號密碼";
@@ -65,13 +74,20 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             ";
 
             $mail->send();
-            echo "<script>alert('重設連結已寄出，請檢查您的信箱！'); window.location.href='login.php';</script>";
+            unset($_SESSION['forgot_old_email']);
+            $_SESSION['forgot_success'] = '重設連結已寄出，請檢查您的信箱。';
+            header('Location: forgot_password.php');
+            exit;
 
         } catch (Exception $e) {
             error_log("郵件發送失敗: {$mail->ErrorInfo}");
-            echo "<script>alert('發送失敗，請稍後再試。'); history.back();</script>";
+            $_SESSION['forgot_error'] = '發送失敗，請稍後再試。';
+            header('Location: forgot_password.php');
+            exit;
         }
     } else {
-        echo "<script>alert('找不到此電子郵件對應的帳號。'); history.back();</script>";
+        $_SESSION['forgot_error'] = '找不到此電子郵件對應的帳號，請確認後再試。';
+        header('Location: forgot_password.php');
+        exit;
     }
 }
