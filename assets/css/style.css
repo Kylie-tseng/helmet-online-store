@@ -4965,22 +4965,6 @@ body:not(.home-page) .unified-navbar {
 
 /* 非首頁內容補償，避免被 fixed navbar 擋住 */
 body:not(.home-page):not(.auth-page) {
-    padding-top: 0 !important;
-}
-
-/* 全站主內容統一避開固定 navbar（首頁 hero 例外） */
-body:not(.home-page):not(.auth-page) main,
-body:not(.home-page):not(.auth-page) .page-content,
-body:not(.home-page):not(.auth-page) .content-wrapper,
-body:not(.home-page):not(.auth-page) .page-shell,
-body:not(.home-page):not(.auth-page) .products-section,
-body:not(.home-page):not(.auth-page) .products-page-container,
-body:not(.home-page):not(.auth-page) .product-detail-container,
-body:not(.home-page):not(.auth-page) .cart-container,
-body:not(.home-page):not(.auth-page) .checkout-container,
-body:not(.home-page):not(.auth-page) .dashboard-container,
-body:not(.home-page):not(.auth-page) .coupon-page-shell,
-body:not(.home-page):not(.auth-page) .about-main {
     padding-top: var(--page-safe-top) !important;
 }
 
@@ -5141,6 +5125,44 @@ body:not(.home-page):not(.auth-page) .about-main {
     background: #FFFFFF !important;
     border-color: #FFFFFF !important;
     color: #111111 !important;
+}
+
+.home-page .promo-main-card .hero-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+}
+
+.home-page .promo-main-card .hero-actions .promo-btn {
+    margin-top: 0 !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: #FFFFFF !important;
+    border: 1.5px solid rgba(255, 255, 255, 0.75) !important;
+    border-radius: 999px !important;
+    padding: 10px 22px !important;
+    min-width: 120px !important;
+    height: 44px !important;
+    font-weight: 600 !important;
+    font-size: 14px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-decoration: none !important;
+    box-sizing: border-box !important;
+    transition: all 0.3s ease !important;
+}
+
+.home-page .promo-main-card .hero-actions .promo-btn:visited {
+    color: #FFFFFF !important;
+}
+
+.home-page .promo-main-card .hero-actions .promo-btn:hover {
+    background: rgba(255, 255, 255, 0.12) !important;
+    border-color: #FFFFFF !important;
+    color: #FFFFFF !important;
+    transform: translateY(-1px) !important;
 }
 
 .promo-card-title {
@@ -7765,5 +7787,174 @@ body:not(.home-page):not(.auth-page) .about-main {
     .about-page .about-why-item {
         padding: 24px 20px;
     }
+}
+
+/* =========================================
+   Products Page Sidebar Width + Alignment Fix
+   ========================================= */
+.products-page-wrapper,
+.products-layout,
+.shop-layout,
+.shop-container {
+    display: flex !important;
+    align-items: flex-start !important;
+    gap: 32px !important;
+}
+
+.products-sidebar,
+.shop-sidebar,
+.category-sidebar {
+    width: 260px !important;
+    min-width: 260px !important;
+    flex-shrink: 0 !important;
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+.products-main,
+.shop-main,
+.content-area {
+    flex: 1 !important;
+    min-width: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+.products-header,
+.shop-header {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: flex-start !important;
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+    margin-bottom: 24px !important;
+}
+
+.products-header-row {
+    width: 100% !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: flex-start !important;
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+.products-page-title,
+.shop-main h1,
+.shop-main h2,
+.products-main h1,
+.products-main h2 {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+    line-height: 1.2 !important;
+}
+
+.products-search-form {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+.products-grid-page {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(220px, 1fr)) !important;
+    gap: 28px !important;
+}
+
+@media (max-width: 1280px) {
+    .products-grid-page {
+        grid-template-columns: repeat(3, minmax(220px, 1fr)) !important;
+    }
+}
+
+@media (max-width: 768px) {
+    .products-sidebar,
+    .shop-sidebar,
+    .category-sidebar {
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+
+    .products-grid-page {
+        grid-template-columns: repeat(2, minmax(165px, 1fr)) !important;
+        gap: 18px !important;
+    }
+}
+
+/* =========================================
+   Products Sidebar Premium Refresh
+   ========================================= */
+.products-sidebar,
+.sidebar,
+.shop-sidebar {
+    width: 260px !important;
+    min-width: 260px !important;
+    flex-shrink: 0 !important;
+    background: #ffffff !important;
+    border-radius: 20px !important;
+    padding: 28px 24px !important;
+    border: 1px solid rgba(18, 22, 28, 0.06) !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06) !important;
+}
+
+.products-sidebar .sidebar-title,
+.sidebar h3,
+.shop-sidebar h3 {
+    position: relative;
+    margin: 0 0 20px !important;
+    padding: 0 0 14px !important;
+    border-bottom: none !important;
+    font-size: 18px !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.5px !important;
+    color: #20242a !important;
+}
+
+.products-sidebar .sidebar-title::after,
+.sidebar h3::after,
+.shop-sidebar h3::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 1px;
+    background: linear-gradient(to right, transparent, #d7dbe2, transparent);
+}
+
+.products-sidebar .category-list {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.products-sidebar .category-list li,
+.sidebar ul li,
+.shop-sidebar ul li {
+    margin: 0 0 8px !important;
+}
+
+.products-sidebar .category-link {
+    display: block;
+    font-size: 16px !important;
+    line-height: 1.6 !important;
+    letter-spacing: 0.5px !important;
+    padding: 12px 14px !important;
+    border-radius: 12px !important;
+    color: #383f48 !important;
+    background: transparent !important;
+    transition: background-color 0.25s ease, transform 0.25s ease, color 0.25s ease !important;
+}
+
+.products-sidebar .category-link:hover {
+    background: #f5f5f5 !important;
+    transform: translateX(4px);
+    color: #1e2329 !important;
+}
+
+.products-sidebar .category-link.active {
+    background: linear-gradient(135deg, #2b2b2b, #444444) !important;
+    color: #ffffff !important;
+    font-weight: 500 !important;
 }
 

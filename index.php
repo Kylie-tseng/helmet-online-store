@@ -44,35 +44,40 @@ $promo_offers = [
         'text' => '新會員註冊後即可使用優惠券',
         'coupon' => 'NEW100',
         'highlight' => '滿 500 元折抵 100 元',
-        'link' => 'coupon_new_member.php'
+        'link' => 'coupon_new_member.php',
+        'detail_link' => 'coupon_new_member.php'
     ],
     [
         'title' => '安全帽週年慶',
         'text' => '全館安全帽限時優惠',
         'coupon' => 'HELMET10',
         'highlight' => '全館商品 9 折',
-        'link' => 'coupon_anniversary.php'
+        'link' => 'coupon_anniversary.php',
+        'detail_link' => 'coupon_anniversary.php'
     ],
     [
         'title' => '滿額折扣活動',
         'text' => '購物滿額即可使用優惠券',
         'coupon' => 'SAVE300',
         'highlight' => '滿 2000 元折抵 300 元',
-        'link' => 'coupon_discount.php'
+        'link' => 'coupon_discount.php',
+        'detail_link' => 'coupon_discount.php'
     ],
     [
         'title' => '騎士節活動',
         'text' => '騎士節限定優惠',
         'coupon' => 'RIDER20',
         'highlight' => '全館商品 8 折',
-        'link' => 'coupon_rider_day.php'
+        'link' => 'coupon_rider_day.php',
+        'detail_link' => 'coupon_rider_day.php'
     ],
     [
         'title' => '滿三千免運',
         'text' => '全站購物滿額即可享免運優惠',
         'coupon' => '',
         'highlight' => '全站滿 3000 元免運',
-        'link' => 'coupon_free_shipping.php'
+        'link' => 'coupon_free_shipping.php',
+        'detail_link' => 'coupon_free_shipping.php'
     ],
 ];
 
@@ -156,7 +161,10 @@ if (is_array($promo_offers) && !empty($promo_offers)) {
                                     <h3 class="promo-main-title"><?php echo htmlspecialchars($promo_main_offer['title'] ?? '限時優惠'); ?></h3>
                                     <p class="promo-main-highlight"><?php echo htmlspecialchars($promo_main_offer['highlight'] ?? '優惠進行中'); ?></p>
                                     <p class="promo-main-text"><?php echo htmlspecialchars($promo_main_offer['text'] ?? '精選回饋活動'); ?></p>
-                                    <a href="<?php echo htmlspecialchars($promo_main_offer['link'] ?? 'coupons.php'); ?>" class="promo-btn">立即選購</a>
+                                    <div class="hero-actions">
+                                        <a href="<?php echo htmlspecialchars($promo_main_offer['link'] ?? 'coupons.php'); ?>" class="promo-btn btn-primary">立即選購</a>
+                                        <a href="<?php echo htmlspecialchars($promo_main_offer['detail_link'] ?? $promo_main_offer['link'] ?? 'coupon_anniversary.php'); ?>" class="promo-btn btn-secondary">查看活動</a>
+                                    </div>
                                 </div>
                             </article>
                         <?php endif; ?>

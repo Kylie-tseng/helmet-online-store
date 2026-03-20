@@ -79,11 +79,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_payment'])) {
             $stmt = $pdo->prepare("UPDATE orders SET status = 'paid', updated_at = NOW() WHERE id = :order_id AND user_id = :user_id");
             $stmt->execute([':order_id' => $order_id, ':user_id' => $user_id]);
             
-            // 2. 觸發發信 (send_order.php 會使用這裡的 $order, $order_items, $order_id)
-            $payment_method = $order['payment_method']; 
             include 'send_order.php';
-
-            // 3. 清除 Session (確保不會重複支付)
+            
+            // 清除 session
             unset($_SESSION['pending_order_id']);
             unset($_SESSION['checkout_data']);
             if (function_exists('clearAppliedCoupon')) {
