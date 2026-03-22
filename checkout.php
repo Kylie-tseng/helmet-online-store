@@ -26,12 +26,15 @@ if (isset($_SESSION['pending_order_id']) && isset($_GET['return_from_payment']))
         
         // 恢復購物車
         foreach ($order_items as $item) {
+            $cart_restore_size = ($item['size'] === null || $item['size'] === '')
+                ? getCartSizeNoneValue()
+                : $item['size'];
             // 檢查購物車中是否已存在相同商品+尺寸
             $stmt = $pdo->prepare("SELECT id, quantity FROM cart WHERE user_id = :user_id AND product_id = :product_id AND size = :size");
             $stmt->execute([
                 ':user_id' => $user_id,
                 ':product_id' => $item['product_id'],
-                ':size' => $item['size']
+                ':size' => $cart_restore_size
             ]);
             $existing = $stmt->fetch();
             
@@ -50,7 +53,7 @@ if (isset($_SESSION['pending_order_id']) && isset($_GET['return_from_payment']))
                 $stmt->execute([
                     ':user_id' => $user_id,
                     ':product_id' => $item['product_id'],
-                    ':size' => $item['size'],
+                    ':size' => $cart_restore_size,
                     ':quantity' => $item['quantity'],
                     ':unit_price' => $item['unit_price']
                 ]);
@@ -130,16 +133,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($payment_method === 'credit_card') {
             // 計算金額
             $order_summary = calculateOrderSummary($cart_items, $shipping_method, $coupon_status['coupon']);
+            $order_amounts = build_orders_amount_fields($order_summary);
+            $order_coupon_id = !empty($coupon_status['coupon']['id']) ? (int)$coupon_status['coupon']['id'] : null;
             
             try {
                 $pdo->beginTransaction();
                 
                 // 建立訂單（狀態為 pending_payment）
-                $stmt = $pdo->prepare("INSERT INTO orders (user_id, total_amount, status, payment_method, shipping_method, shipping_address, pickup_store) 
-                                     VALUES (:user_id, :total_amount, 'pending_payment', :payment_method, :shipping_method, :shipping_address, :pickup_store)");
+                $stmt = $pdo->prepare("INSERT INTO orders (user_id, coupon_id, total_amount, discount_amount, final_amount, status, payment_method, shipping_method, shipping_address, pickup_store) 
+                                     VALUES (:user_id, :coupon_id, :total_amount, :discount_amount, :final_amount, 'pending_payment', :payment_method, :shipping_method, :shipping_address, :pickup_store)");
                 $stmt->execute([
                     ':user_id' => $user_id,
-                    ':total_amount' => $order_summary['final_total'],
+                    ':coupon_id' => $order_coupon_id,
+                    ':total_amount' => $order_amounts['total_amount'],
+                    ':discount_amount' => $order_amounts['discount_amount'],
+                    ':final_amount' => $order_amounts['final_amount'],
                     ':payment_method' => $payment_method,
                     ':shipping_method' => $shipping_method,
                     ':shipping_address' => $shipping_method === 'home' ? $shipping_address : null,
@@ -151,12 +159,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // 建立訂單明細
                 foreach ($cart_items as $item) {
                     $subtotal = $item['price'] * $item['quantity'];
+                    $cs = (string)($item['size'] ?? '');
+                    $order_item_size = ($cs === '' || $cs === getCartSizeNoneValue() || $cs === 'N') ? null : $item['size'];
                     $stmt = $pdo->prepare("INSERT INTO order_items (order_id, product_id, size, quantity, unit_price, subtotal) 
                                          VALUES (:order_id, :product_id, :size, :quantity, :unit_price, :subtotal)");
                     $stmt->execute([
                         ':order_id' => $order_id,
                         ':product_id' => $item['product_id'],
-                        ':size' => $item['size'],
+                        ':size' => $order_item_size,
                         ':quantity' => $item['quantity'],
                         ':unit_price' => $item['price'],
                         ':subtotal' => $subtotal

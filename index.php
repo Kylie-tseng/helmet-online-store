@@ -1,6 +1,7 @@
 <?php
 require_once 'config.php';
 require_once 'includes/cart_functions.php';
+require_once 'includes/category_utils.php';
 require_once 'includes/navbar.php';
 
 // 查詢分類資料
@@ -26,7 +27,19 @@ try {
 
 // 查詢熱門商品
 try {
-    $stmt = $pdo->query("SELECT id, name, price, image_url FROM products WHERE status = 'active' ORDER BY created_at DESC LIMIT 6");
+    $stmt = $pdo->query("SELECT p.id, p.name, p.price,
+            (
+                SELECT pi.image_url
+                FROM product_images pi
+                WHERE pi.product_id = p.id
+                ORDER BY pi.sort_order ASC, pi.id ASC
+                LIMIT 1
+            ) AS primary_image
+            FROM products p
+            WHERE p.status = 'active'
+              AND p.is_featured = 1
+            ORDER BY p.id ASC
+            LIMIT 6");
     $hotProducts = $stmt->fetchAll();
 } catch (PDOException $e) {
     $hotProducts = [];
@@ -198,6 +211,10 @@ if (is_array($promo_offers) && !empty($promo_offers)) {
                         continue;
                     }
                     $split_category_lookup[$name] = $category;
+                    $norm = normalize_product_category_label($name);
+                    if ($norm !== '' && !isset($split_category_lookup[$norm])) {
+                        $split_category_lookup[$norm] = $category;
+                    }
                 }
 
                 $split_categories = [
@@ -228,10 +245,11 @@ if (is_array($promo_offers) && !empty($promo_offers)) {
                     <?php foreach ($split_categories as $item): ?>
                         <?php
                         $name = $item['name'];
-                        $resolved = $split_category_lookup[$name] ?? null;
+                        $norm = normalize_product_category_label($name);
+                        $resolved = $split_category_lookup[$name] ?? $split_category_lookup[$norm] ?? null;
                         $target = $resolved
-                            ? 'products.php?category=' . urlencode((string)$resolved['id'])
-                            : 'products.php?category=' . urlencode($name);
+                            ? 'products.php?category=' . (int)$resolved['id']
+                            : 'products.php?category=' . rawurlencode($name);
                         ?>
                         <div class="split-category-item">
                             <h3 class="split-category-title"><?php echo htmlspecialchars($name); ?></h3>
@@ -254,11 +272,6 @@ if (is_array($promo_offers) && !empty($promo_offers)) {
                     <p class="featured-section-subtitle">精選推薦，為不同騎乘風格而設計</p>
                 </header>
 
-                <?php if (!empty($_SESSION['favorite_message'])): ?>
-                    <div class="success-message"><?php echo htmlspecialchars($_SESSION['favorite_message']); ?></div>
-                    <?php unset($_SESSION['favorite_message']); ?>
-                <?php endif; ?>
-
                 <?php
                 $product_tags = ['全罩式', '競賽款', '入門款'];
                 ?>
@@ -270,24 +283,13 @@ if (is_array($promo_offers) && !empty($promo_offers)) {
                         <?php foreach ($hotProducts as $idx => $product): ?>
                             <?php
                             $is_favorited = in_array((int)$product['id'], $favorite_ids, true);
-                            $has_image = !empty($product['image_url']) && trim($product['image_url']) !== '';
+                            $card_img_src = resolve_product_card_image_src($product['primary_image'] ?? null);
                             $tag = $product_tags[$idx % count($product_tags)];
                             ?>
                             <article class="featured-product-card">
                                 <div class="featured-product-media">
                                     <div class="featured-product-frame">
-                                        <?php if ($has_image): ?>
-                                            <img class="featured-product-image" src="<?php echo htmlspecialchars($product['image_url'], ENT_QUOTES); ?>" alt="<?php echo htmlspecialchars($product['name']); ?>">
-                                        <?php else: ?>
-                                            <div class="featured-product-placeholder">
-                                                <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#9A9A9A" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
-                                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                                                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                                                    <polyline points="21 15 16 10 5 21"></polyline>
-                                                </svg>
-                                                <span>無圖片</span>
-                                            </div>
-                                        <?php endif; ?>
+                                        <img class="featured-product-image" src="<?php echo htmlspecialchars($card_img_src, ENT_QUOTES); ?>" alt="<?php echo htmlspecialchars($product['name']); ?>">
                                     </div>
                                 </div>
 
@@ -337,34 +339,22 @@ if (is_array($promo_offers) && !empty($promo_offers)) {
                 </header>
 
                 <div class="lifestyle-gallery-track">
-                    <article class="lifestyle-gallery-item">
-                        <img class="lifestyle-gallery-image" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 380'%3E%3Crect fill='%23d8dde3' width='600' height='380'/%3E%3Cpath d='M0 310L130 220L250 265L360 200L470 250L600 190V380H0Z' fill='%23b8c0ca'/%3E%3C/svg%3E" alt="通勤騎乘">
-                        <h3 class="lifestyle-gallery-title">通勤騎乘</h3>
-                    </article>
-                    <article class="lifestyle-gallery-item">
-                        <img class="lifestyle-gallery-image" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 380'%3E%3Crect fill='%23d9dfe5' width='600' height='380'/%3E%3Cpath d='M0 292L120 210L220 245L340 195L470 255L600 182V380H0Z' fill='%23b7bec8'/%3E%3C/svg%3E" alt="長途旅行">
-                        <h3 class="lifestyle-gallery-title">長途旅行</h3>
-                    </article>
-                    <article class="lifestyle-gallery-item">
-                        <img class="lifestyle-gallery-image" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 380'%3E%3Crect fill='%23d6dce2' width='600' height='380'/%3E%3Cpath d='M0 300L90 240L210 270L325 205L460 248L600 190V380H0Z' fill='%23b1bbc5'/%3E%3C/svg%3E" alt="城市風格">
-                        <h3 class="lifestyle-gallery-title">城市風格</h3>
-                    </article>
-                    <article class="lifestyle-gallery-item">
-                        <img class="lifestyle-gallery-image" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 380'%3E%3Crect fill='%23dce1e6' width='600' height='380'/%3E%3Cpath d='M0 305L120 228L250 275L370 210L500 258L600 200V380H0Z' fill='%23bcc4cd'/%3E%3C/svg%3E" alt="競速性能">
-                        <h3 class="lifestyle-gallery-title">競速性能</h3>
-                    </article>
-                    <article class="lifestyle-gallery-item">
-                        <img class="lifestyle-gallery-image" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 380'%3E%3Crect fill='%23d7dde2' width='600' height='380'/%3E%3Cpath d='M0 296L128 220L236 258L352 202L462 244L600 187V380H0Z' fill='%23b4bcc5'/%3E%3C/svg%3E" alt="女性精選">
-                        <h3 class="lifestyle-gallery-title">女性精選</h3>
-                    </article>
-                    <article class="lifestyle-gallery-item">
-                        <img class="lifestyle-gallery-image" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 380'%3E%3Crect fill='%23d4dae0' width='600' height='380'/%3E%3Cpath d='M0 302L112 226L234 266L350 204L472 256L600 194V380H0Z' fill='%23adb6bf'/%3E%3C/svg%3E" alt="周邊配件">
-                        <h3 class="lifestyle-gallery-title">周邊配件</h3>
-                    </article>
-                    <article class="lifestyle-gallery-item">
-                        <img class="lifestyle-gallery-image" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 380'%3E%3Crect fill='%23d8dde1' width='600' height='380'/%3E%3Cpath d='M0 299L122 222L246 268L362 208L478 252L600 196V380H0Z' fill='%23b3bcc4'/%3E%3C/svg%3E" alt="禮物推薦">
-                        <h3 class="lifestyle-gallery-title">禮物推薦</h3>
-                    </article>
+                    <?php
+                    $home_style_cards = [
+                        ['label' => '復古', 'svg_rect' => '%23d8dde3', 'svg_path' => '%23b8c0ca', 'path_d' => 'M0 310L130 220L250 265L360 200L470 250L600 190V380H0Z'],
+                        ['label' => '通勤', 'svg_rect' => '%23d9dfe5', 'svg_path' => '%23b7bec8', 'path_d' => 'M0 292L120 210L220 245L340 195L470 255L600 182V380H0Z'],
+                        ['label' => '競速', 'svg_rect' => '%23dce1e6', 'svg_path' => '%23bcc4cd', 'path_d' => 'M0 305L120 228L250 275L370 210L500 258L600 200V380H0Z'],
+                        ['label' => '女性', 'svg_rect' => '%23d7dde2', 'svg_path' => '%23b4bcc5', 'path_d' => 'M0 296L128 220L236 258L352 202L462 244L600 187V380H0Z'],
+                    ];
+                    foreach ($home_style_cards as $sc):
+                        $style_href = 'products.php?style=' . rawurlencode($sc['label']);
+                        $svg_src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 380'%3E%3Crect fill='" . $sc['svg_rect'] . "' width='600' height='380'/%3E%3Cpath d='" . $sc['path_d'] . "' fill='" . $sc['svg_path'] . "'/%3E%3C/svg%3E";
+                    ?>
+                    <a class="lifestyle-gallery-item" href="<?php echo htmlspecialchars($style_href); ?>">
+                        <img class="lifestyle-gallery-image" src="<?php echo htmlspecialchars($svg_src, ENT_QUOTES); ?>" alt="<?php echo htmlspecialchars($sc['label']); ?> 風格">
+                        <h3 class="lifestyle-gallery-title"><?php echo htmlspecialchars($sc['label']); ?></h3>
+                    </a>
+                    <?php endforeach; ?>
                 </div>
             </div>
         </div>

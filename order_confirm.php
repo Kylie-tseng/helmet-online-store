@@ -58,12 +58,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_order'])) {
             $order_status = 'pending'; // 貨到付款，待出貨
         }
         
+        $order_amounts = build_orders_amount_fields($order_summary);
+        $order_coupon_id = !empty($coupon_status['coupon']['id']) ? (int)$coupon_status['coupon']['id'] : null;
+
         // 建立訂單
-        $stmt = $pdo->prepare("INSERT INTO orders (user_id, total_amount, status, payment_method, shipping_method, shipping_address, pickup_store) 
-                               VALUES (:user_id, :total_amount, :status, :payment_method, :shipping_method, :shipping_address, :pickup_store)");
+        $stmt = $pdo->prepare("INSERT INTO orders (user_id, coupon_id, total_amount, discount_amount, final_amount, status, payment_method, shipping_method, shipping_address, pickup_store) 
+                               VALUES (:user_id, :coupon_id, :total_amount, :discount_amount, :final_amount, :status, :payment_method, :shipping_method, :shipping_address, :pickup_store)");
         $stmt->execute([
             ':user_id' => $user_id,
-            ':total_amount' => $order_summary['final_total'],
+            ':coupon_id' => $order_coupon_id,
+            ':total_amount' => $order_amounts['total_amount'],
+            ':discount_amount' => $order_amounts['discount_amount'],
+            ':final_amount' => $order_amounts['final_amount'],
             ':status' => $order_status,
             ':payment_method' => $payment_method,
             ':shipping_method' => $shipping_method,
@@ -76,12 +82,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_order'])) {
         // 建立訂單明細
         foreach ($cart_items as $item) {
             $subtotal = $item['price'] * $item['quantity'];
+            $cs = (string)($item['size'] ?? '');
+            $order_item_size = ($cs === '' || $cs === getCartSizeNoneValue() || $cs === 'N') ? null : $item['size'];
             $stmt = $pdo->prepare("INSERT INTO order_items (order_id, product_id, size, quantity, unit_price, subtotal) 
                                  VALUES (:order_id, :product_id, :size, :quantity, :unit_price, :subtotal)");
             $stmt->execute([
                 ':order_id' => $order_id,
                 ':product_id' => $item['product_id'],
-                ':size' => $item['size'],
+                ':size' => $order_item_size,
                 ':quantity' => $item['quantity'],
                 ':unit_price' => $item['price'],
                 ':subtotal' => $subtotal
@@ -194,31 +202,20 @@ $shipping_method_names = [
                                 <tbody>
                                     <?php foreach ($cart_items as $item): 
                                         $subtotal = $item['price'] * $item['quantity'];
-                                        $has_image = !empty($item['image_url']) && trim($item['image_url']) !== '';
+                                        $confirm_line_img = resolve_product_card_image_src($item['primary_image'] ?? null);
                                     ?>
                                         <tr class="cart-table-row">
                                             <td class="col-product">
                                                 <div class="cart-product-info">
                                                     <div class="cart-item-image">
-                                                        <?php if ($has_image): ?>
-                                                            <img src="<?php echo htmlspecialchars($item['image_url'], ENT_QUOTES); ?>" 
-                                                                 alt="<?php echo htmlspecialchars($item['product_name']); ?>">
-                                                        <?php else: ?>
-                                                            <div class="product-image-placeholder">
-                                                                <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#9A9A9A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                                                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                                                                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                                                                    <polyline points="21 15 16 10 5 21"></polyline>
-                                                                </svg>
-                                                                <span>無圖片</span>
-                                                            </div>
-                                                        <?php endif; ?>
+                                                        <img src="<?php echo htmlspecialchars($confirm_line_img, ENT_QUOTES); ?>"
+                                                             alt="<?php echo htmlspecialchars($item['product_name']); ?>">
                                                     </div>
                                                     <div class="cart-item-info">
                                                         <h3 class="cart-item-name"><?php echo htmlspecialchars($item['product_name']); ?></h3>
                                                         <p class="cart-item-meta">
                                                             <span class="cart-item-category"><?php echo htmlspecialchars($item['category_name']); ?></span>
-                                                            <span class="cart-item-size">尺寸：<?php echo htmlspecialchars($item['size']); ?></span>
+                                                            <span class="cart-item-size">尺寸：<?php echo htmlspecialchars(formatCartSizeForDisplay($item['size'] ?? '')); ?></span>
                                                         </p>
                                                     </div>
                                                 </div>

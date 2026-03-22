@@ -1,14 +1,18 @@
 <?php
 require_once 'config.php';
 require_once 'includes/cart_functions.php';
+require_once 'includes/category_utils.php';
+require_once 'includes/product_style_utils.php';
 require_once 'includes/navbar.php';
 
-// 取得 GET 參數
+// 取得 GET 參數（category 可為數字 id 或分類名稱；category_id 為明確 id；style 為風格篩選）
 $category_param = isset($_GET['category']) ? trim((string)$_GET['category']) : '';
-$category_id = null;
-$category_name = null;
-$category_keyword = null;
+$category_id_get = isset($_GET['category_id']) ? (int)$_GET['category_id'] : 0;
 $search_keyword = isset($_GET['search']) ? trim($_GET['search']) : '';
+$style_param = isset($_GET['style']) ? trim((string)$_GET['style']) : '';
+$style_label = resolve_product_list_style($style_param);
+
+[$category_id, $category_name] = resolve_product_list_category($pdo, $category_param, $category_id_get);
 
 // 查詢所有分類（左側列表）
 try {
@@ -31,59 +35,29 @@ try {
     // 如果查詢失敗，保持為 null
 }
 
-// 查詢選中分類的名稱（用於標題顯示）
+// 頁面標題
 $page_title = '商品總覽';
-if ($category_param !== '') {
-    $preset_keyword_map = [
-        '全罩式安全帽' => '全罩式安全帽',
-        '半罩式安全帽' => '半罩式安全帽',
-        '3/4罩安全帽' => '3/4罩安全帽'
-    ];
-
-    if ($category_param === '全部商品') {
-        $category_id = null;
-        $category_name = null;
-        $category_keyword = null;
-    } elseif (isset($preset_keyword_map[$category_param])) {
-        $category_name = $category_param;
-        $category_keyword = $preset_keyword_map[$category_param];
-    } elseif (ctype_digit($category_param)) {
-        $category_id = (int)$category_param;
-    } else {
-        try {
-            $stmt = $pdo->prepare("SELECT id, name FROM categories WHERE name = :category_name LIMIT 1");
-            $stmt->execute([':category_name' => $category_param]);
-            $matched_category = $stmt->fetch();
-            if ($matched_category) {
-                $category_id = (int)$matched_category['id'];
-                $category_name = $matched_category['name'];
-            }
-        } catch (PDOException $e) {
-            // ignore
-        }
-    }
-}
-
-if ($category_id && $category_name === null) {
-    try {
-        $stmt = $pdo->prepare("SELECT name FROM categories WHERE id = :category_id");
-        $stmt->execute([':category_id' => $category_id]);
-        $category = $stmt->fetch();
-        if ($category) {
-            $category_name = $category['name'];
-        }
-    } catch (PDOException $e) {
-        // ignore
-    }
-}
-
-if ($category_name !== null) {
+if ($category_name !== null && $category_name !== '') {
     $page_title = $category_name;
+}
+if ($style_label !== null) {
+    if ($category_name !== null && $category_name !== '') {
+        $page_title = $category_name . ' · ' . $style_label . ' 風格';
+    } else {
+        $page_title = $style_label . ' 風格商品';
+    }
 }
 
 // 查詢商品（根據分類和搜尋條件）
 try {
-    $sql = "SELECT p.id, p.name, p.description, p.price, p.status, p.image_url, 
+    $sql = "SELECT p.id, p.name, p.description, p.price, p.status,
+                   (
+                       SELECT pi.image_url
+                       FROM product_images pi
+                       WHERE pi.product_id = p.id
+                       ORDER BY pi.sort_order ASC, pi.id ASC
+                       LIMIT 1
+                   ) AS primary_image,
                    c.name AS category_name, c.id AS category_id
             FROM products p
             INNER JOIN categories c ON p.category_id = c.id
@@ -91,27 +65,39 @@ try {
     
     $params = [];
     
-    // 分類過濾（ID）
+    // 分類過濾（以 category_id，與 products.category_id 一致）
     if ($category_id) {
         $sql .= " AND p.category_id = :category_id";
         $params[':category_id'] = $category_id;
     }
 
-    // 分類過濾（指定分類關鍵字）
-    if (!empty($category_keyword)) {
-        $sql .= " AND (p.name LIKE :category_keyword_name OR p.description LIKE :category_keyword_desc)";
-        $params[':category_keyword_name'] = '%' . $category_keyword . '%';
-        $params[':category_keyword_desc'] = '%' . $category_keyword . '%';
+    // 風格過濾（products.style，可與分類並用為 AND）
+    if ($style_label !== null) {
+        $sql .= " AND p.style = :style_filter";
+        $params[':style_filter'] = $style_label;
     }
-    
+
     // 關鍵字搜尋（商品名稱與描述）
     if (!empty($search_keyword)) {
         $sql .= " AND (p.name LIKE :search_keyword_name OR p.description LIKE :search_keyword_desc)";
         $params[':search_keyword_name'] = '%' . $search_keyword . '%';
         $params[':search_keyword_desc'] = '%' . $search_keyword . '%';
     }
-    
-    $sql .= " ORDER BY p.created_at DESC";
+
+    // 排序：全部商品（無分類、無搜尋）依分類固定順序 → 同分類內 id 升冪；單一分類頁依 id 升冪；搜尋維持建立時間新到舊
+    if (!empty($search_keyword)) {
+        $sql .= " ORDER BY p.created_at DESC";
+    } elseif ($category_id) {
+        $sql .= " ORDER BY p.id ASC";
+    } else {
+        $ordered_cat_ids = get_category_ids_sorted_for_product_list($categories);
+        if (!empty($ordered_cat_ids)) {
+            $field_list = implode(',', array_map('intval', $ordered_cat_ids));
+            $sql .= " ORDER BY FIELD(p.category_id, {$field_list}), p.id ASC";
+        } else {
+            $sql .= " ORDER BY p.category_id ASC, p.id ASC";
+        }
+    }
     
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
@@ -125,6 +111,8 @@ try {
 if (!empty($search_keyword)) {
     if ($category_name) {
         $page_title = $category_name . ' - 搜尋：「' . htmlspecialchars($search_keyword) . '」';
+    } elseif ($style_label !== null) {
+        $page_title = $style_label . ' 風格 - 搜尋：「' . htmlspecialchars($search_keyword) . '」';
     } else {
         $page_title = '搜尋：「' . htmlspecialchars($search_keyword) . '」';
     }
@@ -157,19 +145,24 @@ if ($is_logged_in) {
                 <h3 class="sidebar-title">商品分類</h3>
                 <ul class="category-list">
                     <li>
-                        <a href="products.php?category=全部商品" class="category-link <?php echo ($category_param === '' || $category_param === '全部商品') ? 'active' : ''; ?>">
+                        <?php
+                            $all_href = ($style_label !== null)
+                                ? ('products.php?style=' . rawurlencode($style_label))
+                                : 'products.php?category=全部商品';
+                            $all_active = ($category_id === null && ($category_param === '' || $category_param === '全部商品'));
+                        ?>
+                        <a href="<?php echo htmlspecialchars($all_href); ?>" class="category-link <?php echo $all_active ? 'active' : ''; ?>">
                             全部商品
                         </a>
                     </li>
                     <?php foreach ($categories as $cat): ?>
                         <?php
-                            $is_parts_category = ($cat['name'] === '周邊與配件');
-                            $cat_link = $is_parts_category
-                                ? 'products.php?category=周邊與配件'
-                                : ('products.php?category=' . urlencode((string)$cat['name']));
-                            $is_active = $is_parts_category
-                                ? ($category_name === '周邊與配件' || $category_param === '周邊與配件')
-                                : ($category_param === (string)$cat['name'] || $category_name === (string)$cat['name']);
+                            $cid = (int)$cat['id'];
+                            $cat_link = 'products.php?category=' . $cid;
+                            if ($style_label !== null) {
+                                $cat_link .= '&style=' . rawurlencode($style_label);
+                            }
+                            $is_active = ($category_id !== null && (int)$category_id === $cid);
                         ?>
                         <li>
                             <a href="<?php echo htmlspecialchars($cat_link); ?>" 
@@ -188,8 +181,13 @@ if ($is_logged_in) {
                     <div class="products-header-row">
                         <h1 class="products-page-title"><?php echo htmlspecialchars($page_title); ?></h1>
                         <form action="products.php" method="GET" class="products-search-form" role="search">
-                            <?php if ($category_param !== ''): ?>
+                            <?php if ($category_id !== null): ?>
+                                <input type="hidden" name="category" value="<?php echo (int)$category_id; ?>">
+                            <?php elseif ($category_param !== '' && $category_param !== '全部商品'): ?>
                                 <input type="hidden" name="category" value="<?php echo htmlspecialchars($category_param); ?>">
+                            <?php endif; ?>
+                            <?php if ($style_label !== null): ?>
+                                <input type="hidden" name="style" value="<?php echo htmlspecialchars($style_label); ?>">
                             <?php endif; ?>
                             <input
                                 type="text"
@@ -204,10 +202,6 @@ if ($is_logged_in) {
                 </div>
 
                 <!-- 商品卡片網格 -->
-                <?php if (!empty($_SESSION['favorite_message'])): ?>
-                    <div class="success-message"><?php echo htmlspecialchars($_SESSION['favorite_message']); ?></div>
-                    <?php unset($_SESSION['favorite_message']); ?>
-                <?php endif; ?>
                 <?php if (isset($error_message)): ?>
                     <div class="error-message"><?php echo htmlspecialchars($error_message); ?></div>
                 <?php elseif (empty($products)): ?>
@@ -224,23 +218,11 @@ if ($is_logged_in) {
                             <?php $is_favorited = in_array((int)$product['id'], $favorite_ids, true); ?>
                             <div class="product-card-page">
                                 <div class="product-image-page">
-                                    <?php 
-                                    // 檢查 image_url 是否為 NULL 或空字串
-                                    $has_image = !empty($product['image_url']) && trim($product['image_url']) !== '';
-                                    if ($has_image): 
+                                    <?php
+                                    $list_img = resolve_product_card_image_src($product['primary_image'] ?? null);
                                     ?>
-                                        <img src="<?php echo htmlspecialchars($product['image_url'], ENT_QUOTES); ?>" 
-                                             alt="<?php echo htmlspecialchars($product['name']); ?>">
-                                    <?php else: ?>
-                                        <div class="product-image-placeholder">
-                                            <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#9A9A9A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                                                <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                                                <polyline points="21 15 16 10 5 21"></polyline>
-                                            </svg>
-                                            <span>無圖片</span>
-                                        </div>
-                                    <?php endif; ?>
+                                    <img src="<?php echo htmlspecialchars($list_img, ENT_QUOTES); ?>"
+                                         alt="<?php echo htmlspecialchars($product['name']); ?>">
                                 </div>
                                 <div class="product-info-page">
                                     <h3 class="product-name-page"><?php echo htmlspecialchars($product['name']); ?></h3>

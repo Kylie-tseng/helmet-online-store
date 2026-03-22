@@ -84,12 +84,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 $order_items = $stmt->fetchAll();
                 
                 foreach ($order_items as $item) {
+                    $sz = $item['size'] ?? null;
+                    if ($sz === null || $sz === '' || $sz === getCartSizeNoneValue() || $sz === 'N') {
+                        continue;
+                    }
                     $stmt = $pdo->prepare("UPDATE product_sizes SET stock = stock + :quantity, updated_at = NOW() 
                                          WHERE product_id = :product_id AND size = :size");
                     $stmt->execute([
                         ':quantity' => $item['quantity'],
                         ':product_id' => $item['product_id'],
-                        ':size' => $item['size']
+                        ':size' => $sz
                     ]);
                 }
                 
@@ -174,7 +178,7 @@ try {
 $orders = [];
 if ($active_tab === 'orders') {
     try {
-        $stmt = $pdo->prepare("SELECT id, total_amount, status, payment_method, shipping_method, shipping_address, pickup_store, created_at, updated_at 
+        $stmt = $pdo->prepare("SELECT id, coupon_id, total_amount, discount_amount, final_amount, status, payment_method, shipping_method, shipping_address, pickup_store, created_at, updated_at 
                               FROM orders 
                               WHERE user_id = :user_id 
                               ORDER BY created_at DESC");
@@ -433,7 +437,7 @@ try {
                                                 <span class="order-status status-<?php echo htmlspecialchars($order['status']); ?>">
                                                     <?php echo htmlspecialchars($status_map[$order['status']] ?? $order['status']); ?>
                                                 </span>
-                                                <span class="order-amount">NT$ <?php echo number_format($order['total_amount'], 0); ?></span>
+                                                <span class="order-amount">NT$ <?php echo number_format(get_order_payable_amount($order), 0); ?></span>
                                                 <?php if (in_array($order['status'], ['pending', 'pending_payment', 'paid'])): ?>
                                                     <form method="POST" style="display:inline;" onsubmit="return confirm('確定要取消此訂單嗎？');">
                                                         <input type="hidden" name="action" value="cancel_order">
@@ -474,7 +478,7 @@ try {
                                                         <?php foreach ($order['items'] as $item): ?>
                                                             <tr>
                                                                 <td><?php echo htmlspecialchars($item['product_name']); ?></td>
-                                                                <td><?php echo htmlspecialchars($item['size'] ?? '-'); ?></td>
+                                                                <td><?php echo htmlspecialchars(formatCartSizeForDisplay($item['size'] ?? '')); ?></td>
                                                                 <td><?php echo htmlspecialchars($item['quantity']); ?></td>
                                                                 <td>NT$ <?php echo number_format($item['unit_price'], 0); ?></td>
                                                                 <td>NT$ <?php echo number_format($item['subtotal'], 0); ?></td>
@@ -484,7 +488,7 @@ try {
                                                     <tfoot>
                                                         <tr>
                                                             <td colspan="4" class="text-right"><strong>總計：</strong></td>
-                                                            <td><strong>NT$ <?php echo number_format($order['total_amount'], 0); ?></strong></td>
+                                                            <td><strong>NT$ <?php echo number_format(get_order_payable_amount($order), 0); ?></strong></td>
                                                         </tr>
                                                     </tfoot>
                                                 </table>

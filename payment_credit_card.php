@@ -38,7 +38,14 @@ try {
 
 // 查詢訂單明細
 try {
-    $stmt = $pdo->prepare("SELECT oi.*, p.name AS product_name, p.image_url
+    $stmt = $pdo->prepare("SELECT oi.*, p.name AS product_name,
+                          (
+                              SELECT pi.image_url
+                              FROM product_images pi
+                              WHERE pi.product_id = p.id
+                              ORDER BY pi.sort_order ASC, pi.id ASC
+                              LIMIT 1
+                          ) AS primary_image
                           FROM order_items oi
                           INNER JOIN products p ON oi.product_id = p.id
                           WHERE oi.order_id = :order_id");
@@ -155,7 +162,7 @@ try {
                         </div>
                         <div class="summary-row">
                             <span class="summary-label">訂單總金額：</span>
-                            <span class="summary-value summary-total">NT$ <?php echo number_format($order['total_amount'], 0); ?></span>
+                            <span class="summary-value summary-total">NT$ <?php echo number_format(get_order_payable_amount($order), 0); ?></span>
                         </div>
                     </div>
                 </div>

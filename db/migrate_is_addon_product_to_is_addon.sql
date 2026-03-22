@@ -1,0 +1,2 @@
+-- 若資料庫仍為舊欄位名 is_addon_product，請在 MySQL 執行一次（已為 is_addon 則略過）：
+-- ALTER TABLE `products` CHANGE COLUMN `is_addon_product` `is_addon` tinyint(1) NOT NULL DEFAULT 0;
