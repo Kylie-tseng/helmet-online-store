@@ -5,6 +5,7 @@
  */
 
 function renderNavbar($pdo, $categories, $parts_category_id, $current_page = '') {
+    require_once __DIR__ . '/category_utils.php';
     $is_logged_in = isset($_SESSION['user_id']);
     $user_id = $is_logged_in ? $_SESSION['user_id'] : 0;
     $cart_count = getCartItemCount($pdo, $user_id);
@@ -26,20 +27,20 @@ function renderNavbar($pdo, $categories, $parts_category_id, $current_page = '')
                     <a href="products.php?category=全部商品" id="helmetMenuToggle">安全帽 <span class="dropdown-arrow">▾</span></a>
                     <ul class="helmet-submenu">
                         <li><a href="products.php?category=全部商品">全部安全帽</a></li>
-                        <li><a href="products.php?category=全罩式安全帽">全罩式安全帽</a></li>
-                        <li><a href="products.php?category=半罩式安全帽">半罩式安全帽</a></li>
-                        <li><a href="products.php?category=3/4罩安全帽">3/4罩安全帽</a></li>
-                        <li><a href="products.php?category=周邊與配件">周邊與配件</a></li>
+                        <li><a href="<?php echo htmlspecialchars(products_category_list_url_by_name($categories, '全罩式安全帽')); ?>">全罩式安全帽</a></li>
+                        <li><a href="<?php echo htmlspecialchars(products_category_list_url_by_name($categories, '半罩式安全帽')); ?>">半罩式安全帽</a></li>
+                        <li><a href="<?php echo htmlspecialchars(products_category_list_url_by_name($categories, '3/4罩安全帽')); ?>">3/4罩安全帽</a></li>
+                        <li><a href="<?php echo htmlspecialchars(products_category_list_url_by_name($categories, '周邊與配件')); ?>">周邊與配件</a></li>
                     </ul>
                     <div class="mega-menu">
                         <div class="mega-links">
                             <div class="mega-column">
                                 <h4>商品分類</h4>
                                 <a href="products.php?category=全部商品">全部安全帽</a>
-                                <a href="products.php?category=全罩式安全帽">全罩式安全帽</a>
-                                <a href="products.php?category=半罩式安全帽">半罩式安全帽</a>
-                                <a href="products.php?category=3/4罩安全帽">3/4罩安全帽</a>
-                                <a href="products.php?category=周邊與配件">周邊與配件</a>
+                                <a href="<?php echo htmlspecialchars(products_category_list_url_by_name($categories, '全罩式安全帽')); ?>">全罩式安全帽</a>
+                                <a href="<?php echo htmlspecialchars(products_category_list_url_by_name($categories, '半罩式安全帽')); ?>">半罩式安全帽</a>
+                                <a href="<?php echo htmlspecialchars(products_category_list_url_by_name($categories, '3/4罩安全帽')); ?>">3/4罩安全帽</a>
+                                <a href="<?php echo htmlspecialchars(products_category_list_url_by_name($categories, '周邊與配件')); ?>">周邊與配件</a>
                             </div>
                             <div class="mega-column">
                                 <h4>更多資訊</h4>
@@ -52,7 +53,7 @@ function renderNavbar($pdo, $categories, $parts_category_id, $current_page = '')
                     </div>
                 </li>
                 <li class="nav-item">
-                    <a href="products.php?category=周邊與配件">周邊與配件</a>
+                    <a href="<?php echo htmlspecialchars(products_category_list_url_by_name($categories, '周邊與配件')); ?>">周邊與配件</a>
                 </li>
                 <li class="helmet-menu nav-item has-mega-menu">
                     <a href="guide.php" id="guideMenuToggle">購物指南 <span class="dropdown-arrow">▾</span></a>

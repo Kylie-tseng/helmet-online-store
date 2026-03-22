@@ -44,13 +44,9 @@ if ($product_id <= 0) {
     exit;
 }
 
-$is_favorited = toggleFavorite($pdo, $user_id, $product_id);
+toggleFavorite($pdo, $user_id, $product_id);
 
-if ($is_favorited) {
-    $_SESSION['favorite_message'] = '已加入收藏';
-} else {
-    $_SESSION['favorite_message'] = '已取消收藏';
-}
+unset($_SESSION['favorite_message']);
 
 header('Location: ' . $redirect_location);
 exit;

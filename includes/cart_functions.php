@@ -2,6 +2,27 @@
 /**
  * 購物車相關共用函數
  */
+require_once __DIR__ . '/product_card_image.php';
+
+/**
+ * 購物車 cart.size：配件／不需選尺寸時固定為 F（須與資料庫 ENUM 一致）
+ */
+function getCartSizeNoneValue() {
+    return 'F';
+}
+
+/**
+ * 購物車／訂單／列表顯示用尺寸文字。
+ * 配件代號 F、舊資料 N、NULL／空字串：顯示「統一尺寸」（不顯示字母 F）。
+ * 安全帽維持 S／M／L／XL 原樣。
+ */
+function formatCartSizeForDisplay($size) {
+    $size = (string)($size ?? '');
+    if ($size === '' || $size === getCartSizeNoneValue() || $size === 'N') {
+        return '統一尺寸';
+    }
+    return $size;
+}
 
 /**
  * 取得使用者購物車商品總數
@@ -33,7 +54,14 @@ function getCartItems($pdo, $user_id) {
         $sql = "SELECT cart.id AS cart_id, cart.product_id, cart.size, cart.quantity,
                        COALESCE(cart.unit_price, p.price) AS price,
                        p.price AS original_price,
-                       p.name AS product_name, p.image_url,
+                       p.name AS product_name,
+                       (
+                           SELECT pi.image_url
+                           FROM product_images pi
+                           WHERE pi.product_id = p.id
+                           ORDER BY pi.sort_order ASC, pi.id ASC
+                           LIMIT 1
+                       ) AS primary_image,
                        cat.name AS category_name
                 FROM cart
                 INNER JOIN products p ON cart.product_id = p.id
@@ -291,6 +319,53 @@ function calculateOrderSummary($cart_items, $shipping_method = 'pickup', $coupon
         'discount' => $discount,
         'final_total' => round($final_total, 2)
     ];
+}
+
+/**
+ * 寫入 orders 的 total_amount / discount_amount / final_amount（不依賴資料表預設值）
+ *
+ * - total_amount：商品小計 + 運費（折前合計，等同 calculateOrderSummary 的 original_total）
+ * - discount_amount：優惠券折扣；null、空字串或非數字視為 0
+ * - final_amount：應付金額（等同 calculateOrderSummary 的 final_total，即 total_amount - 折扣後四捨五入）
+ */
+function build_orders_amount_fields(array $order_summary) {
+    $total_amount = round((float)($order_summary['original_total'] ?? 0), 2);
+
+    $raw_discount = $order_summary['discount'] ?? 0;
+    if ($raw_discount === null || $raw_discount === '' || !is_numeric($raw_discount)) {
+        $discount_amount = 0.0;
+    } else {
+        $discount_amount = round((float)$raw_discount, 2);
+    }
+    if (!is_finite($discount_amount) || $discount_amount < 0) {
+        $discount_amount = 0.0;
+    }
+
+    $final_amount = round((float)($order_summary['final_total'] ?? ($total_amount - $discount_amount)), 2);
+    if ($final_amount < 0) {
+        $final_amount = 0.0;
+    }
+
+    return [
+        'total_amount' => $total_amount,
+        'discount_amount' => $discount_amount,
+        'final_amount' => $final_amount,
+    ];
+}
+
+/**
+ * 訂單應付金額（相容舊資料：僅寫入折後 total_amount 且 final_amount、discount_amount 皆為 0 時）
+ */
+function get_order_payable_amount(array $order) {
+    $final = isset($order['final_amount']) ? (float)$order['final_amount'] : 0.0;
+    $discount = isset($order['discount_amount']) ? (float)$order['discount_amount'] : 0.0;
+    $total = isset($order['total_amount']) ? (float)$order['total_amount'] : 0.0;
+
+    if ($discount > 0.00001 || $final > 0.00001) {
+        return round($final, 2);
+    }
+
+    return round($total, 2);
 }
 
 /**

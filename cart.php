@@ -88,23 +88,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $cart_item = $stmt->fetch();
 
                 if ($cart_item) {
-                    // 檢查庫存
-                    $stmt = $pdo->prepare("SELECT stock FROM product_sizes WHERE product_id = :product_id AND size = :size");
-                    $stmt->execute([':product_id' => $cart_item['product_id'], ':size' => $cart_item['size']]);
-                    $size_stock = $stmt->fetch();
+                    $size_none = getCartSizeNoneValue();
+                    $cart_size = (string)($cart_item['size'] ?? '');
 
-                    if ($size_stock && $quantity > 0) {
-                        if ($quantity > $size_stock['stock']) {
-                            $quantity = $size_stock['stock'];
-                            $_SESSION['cart_message'] = '數量超過庫存，已調整為最大可購買數量：' . $quantity;
-                            $_SESSION['cart_message_type'] = 'warning';
+                    // 配件尺寸 F（舊資料可能為 N）：不對 product_sizes 驗證庫存
+                    if ($cart_size === $size_none || $cart_size === 'N') {
+                        if ($quantity == 0) {
+                            $stmt = $pdo->prepare("DELETE FROM cart WHERE id = :cart_id AND user_id = :user_id");
+                            $stmt->execute([':cart_id' => $cart_id, ':user_id' => $user_id]);
+                        } elseif ($quantity > 0) {
+                            if ($quantity > 9999) {
+                                $quantity = 9999;
+                                $_SESSION['cart_message'] = '數量已調整為上限 9999';
+                                $_SESSION['cart_message_type'] = 'warning';
+                            }
+                            $stmt = $pdo->prepare("UPDATE cart SET quantity = :quantity WHERE id = :cart_id AND user_id = :user_id");
+                            $stmt->execute([':quantity' => $quantity, ':cart_id' => $cart_id, ':user_id' => $user_id]);
                         }
-                        $stmt = $pdo->prepare("UPDATE cart SET quantity = :quantity WHERE id = :cart_id AND user_id = :user_id");
-                        $stmt->execute([':quantity' => $quantity, ':cart_id' => $cart_id, ':user_id' => $user_id]);
-                    } elseif ($quantity == 0) {
-                        // 刪除項目
-                        $stmt = $pdo->prepare("DELETE FROM cart WHERE id = :cart_id AND user_id = :user_id");
-                        $stmt->execute([':cart_id' => $cart_id, ':user_id' => $user_id]);
+                    } else {
+                        // 檢查庫存（安全帽尺寸）
+                        $stmt = $pdo->prepare("SELECT stock FROM product_sizes WHERE product_id = :product_id AND size = :size");
+                        $stmt->execute([':product_id' => $cart_item['product_id'], ':size' => $cart_item['size']]);
+                        $size_stock = $stmt->fetch();
+
+                        if ($size_stock && $quantity > 0) {
+                            if ($quantity > $size_stock['stock']) {
+                                $quantity = $size_stock['stock'];
+                                $_SESSION['cart_message'] = '數量超過庫存，已調整為最大可購買數量：' . $quantity;
+                                $_SESSION['cart_message_type'] = 'warning';
+                            }
+                            $stmt = $pdo->prepare("UPDATE cart SET quantity = :quantity WHERE id = :cart_id AND user_id = :user_id");
+                            $stmt->execute([':quantity' => $quantity, ':cart_id' => $cart_id, ':user_id' => $user_id]);
+                        } elseif ($quantity == 0) {
+                            $stmt = $pdo->prepare("DELETE FROM cart WHERE id = :cart_id AND user_id = :user_id");
+                            $stmt->execute([':cart_id' => $cart_id, ':user_id' => $user_id]);
+                        }
                     }
                 }
             } catch (PDOException $e) {
@@ -153,43 +171,25 @@ if (!empty($cart_message) &&
     $coupon_panel_message_type = $cart_message_type;
 }
 
-// 加價購商品（僅購物車有商品時顯示）
+// 加價購商品（僅購物車有商品時顯示；配件購物車尺寸固定為 F，不需選 S/M/L/XL）
 $addon_products = [];
-$addon_sizes_map = [];
 if (!empty($cart_items)) {
     try {
-        $stmt = $pdo->query("SELECT id, name, price, image_url
-                             FROM products
-                             WHERE status = 'active' AND is_addon_product = 1
-                             ORDER BY created_at DESC
+        $stmt = $pdo->query("SELECT p.id, p.name, p.price,
+                             (
+                                 SELECT pi.image_url
+                                 FROM product_images pi
+                                 WHERE pi.product_id = p.id
+                                 ORDER BY pi.sort_order ASC, pi.id ASC
+                                 LIMIT 1
+                             ) AS primary_image
+                             FROM products p
+                             WHERE p.status = 'active' AND p.is_addon = 1
+                             ORDER BY p.created_at DESC
                              LIMIT 8");
         $addon_products = $stmt->fetchAll();
-
-        if (!empty($addon_products)) {
-            $addon_ids = array_map(function ($p) {
-                return (int)$p['id'];
-            }, $addon_products);
-
-            $in_placeholders = implode(',', array_fill(0, count($addon_ids), '?'));
-            $size_stmt = $pdo->prepare("SELECT product_id, size
-                                        FROM product_sizes
-                                        WHERE product_id IN ($in_placeholders)
-                                          AND stock > 0
-                                        ORDER BY FIELD(size, 'S', 'M', 'L', 'XL')");
-            $size_stmt->execute($addon_ids);
-            $size_rows = $size_stmt->fetchAll();
-
-            foreach ($size_rows as $row) {
-                $pid = (int)$row['product_id'];
-                if (!isset($addon_sizes_map[$pid])) {
-                    $addon_sizes_map[$pid] = [];
-                }
-                $addon_sizes_map[$pid][] = $row['size'];
-            }
-        }
     } catch (PDOException $e) {
         $addon_products = [];
-        $addon_sizes_map = [];
     }
 }
 
@@ -270,31 +270,20 @@ $is_logged_in = isset($_SESSION['user_id']);
                         <tbody>
                             <?php foreach ($cart_items as $item): 
                                 $subtotal = $item['price'] * $item['quantity'];
-                                $has_image = !empty($item['image_url']) && trim($item['image_url']) !== '';
+                                $cart_line_img = resolve_product_card_image_src($item['primary_image'] ?? null);
                             ?>
                                 <tr class="cart-table-row">
                                     <td class="col-product">
                                         <div class="cart-product-info">
                                             <div class="cart-item-image">
-                                                <?php if ($has_image): ?>
-                                                    <img src="<?php echo htmlspecialchars($item['image_url'], ENT_QUOTES); ?>" 
-                                                         alt="<?php echo htmlspecialchars($item['product_name']); ?>">
-                                                <?php else: ?>
-                                                    <div class="product-image-placeholder">
-                                                        <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#9A9A9A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                                                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                                                            <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                                                            <polyline points="21 15 16 10 5 21"></polyline>
-                                                        </svg>
-                                                        <span>無圖片</span>
-                                                    </div>
-                                                <?php endif; ?>
+                                                <img src="<?php echo htmlspecialchars($cart_line_img, ENT_QUOTES); ?>"
+                                                     alt="<?php echo htmlspecialchars($item['product_name']); ?>">
                                             </div>
                                             <div class="cart-item-info">
                                                 <h3 class="cart-item-name"><?php echo htmlspecialchars($item['product_name']); ?></h3>
                                                 <p class="cart-item-meta">
                                                     <span class="cart-item-category"><?php echo htmlspecialchars($item['category_name']); ?></span>
-                                                    <span class="cart-item-size">尺寸：<?php echo htmlspecialchars($item['size']); ?></span>
+                                                    <span class="cart-item-size">尺寸：<?php echo htmlspecialchars(formatCartSizeForDisplay($item['size'] ?? '')); ?></span>
                                                 </p>
                                             </div>
                                         </div>
@@ -345,19 +334,14 @@ $is_logged_in = isset($_SESSION['user_id']);
                                     <?php
                                         $addon_original_price = (float)$addon['price'];
                                         $addon_price = round($addon_original_price * 0.9, 2);
-                                        $addon_has_image = !empty($addon['image_url']) && trim($addon['image_url']) !== '';
-                                        $addon_sizes = $addon_sizes_map[(int)$addon['id']] ?? [];
+                                        $addon_img_src = resolve_product_card_image_src($addon['primary_image'] ?? null);
                                     ?>
                                     <article class="addon-card" data-product-id="<?php echo (int)$addon['id']; ?>">
                                         <a href="product_detail.php?id=<?php echo (int)$addon['id']; ?>" class="addon-image-link">
                                             <div class="addon-image-wrap">
-                                                <?php if ($addon_has_image): ?>
-                                                    <img src="<?php echo htmlspecialchars($addon['image_url'], ENT_QUOTES); ?>"
-                                                         alt="<?php echo htmlspecialchars($addon['name']); ?>"
-                                                         class="addon-image">
-                                                <?php else: ?>
-                                                    <div class="addon-image-fallback">無圖片</div>
-                                                <?php endif; ?>
+                                                <img src="<?php echo htmlspecialchars($addon_img_src, ENT_QUOTES); ?>"
+                                                     alt="<?php echo htmlspecialchars($addon['name']); ?>"
+                                                     class="addon-image">
                                             </div>
                                         </a>
                                         <div class="addon-info">
@@ -370,23 +354,12 @@ $is_logged_in = isset($_SESSION['user_id']);
                                                 <span class="addon-price">加購價 NT$ <?php echo number_format($addon_price, 0); ?></span>
                                             </div>
 
-                                            <?php if (!empty($addon_sizes)): ?>
-                                                <div class="addon-sizes addon-size-group" data-product-id="<?php echo (int)$addon['id']; ?>">
-                                                    <?php foreach ($addon_sizes as $size): ?>
-                                                        <button type="button" class="addon-size-pill" data-size="<?php echo htmlspecialchars($size); ?>">
-                                                            <?php echo htmlspecialchars($size); ?>
-                                                        </button>
-                                                    <?php endforeach; ?>
-                                                </div>
-                                                <p class="addon-size-error" id="addonError_<?php echo (int)$addon['id']; ?>"></p>
-                                                <button type="button"
-                                                        class="addon-cta-btn addon-add-btn"
-                                                        data-product-id="<?php echo (int)$addon['id']; ?>">
-                                                    加入購物車
-                                                </button>
-                                            <?php else: ?>
-                                                <button type="button" class="addon-cta-btn" disabled>目前無可用尺寸</button>
-                                            <?php endif; ?>
+                                            <p class="addon-size-error" id="addonError_<?php echo (int)$addon['id']; ?>"></p>
+                                            <button type="button"
+                                                    class="addon-cta-btn addon-add-btn"
+                                                    data-product-id="<?php echo (int)$addon['id']; ?>">
+                                                加入購物車
+                                            </button>
                                         </div>
                                     </article>
                                 <?php endforeach; ?>
@@ -581,22 +554,6 @@ $is_logged_in = isset($_SESSION['user_id']);
                 updateNavState();
             }
 
-            const sizeGroups = document.querySelectorAll('.addon-size-group');
-            sizeGroups.forEach(function(group) {
-                const pills = group.querySelectorAll('.addon-size-pill');
-                pills.forEach(function(pill) {
-                    pill.addEventListener('click', function() {
-                        pills.forEach(function(p) { p.classList.remove('active'); });
-                        pill.classList.add('active');
-                        group.setAttribute('data-selected-size', pill.getAttribute('data-size'));
-
-                        const pid = group.getAttribute('data-product-id');
-                        const err = document.getElementById('addonError_' + pid);
-                        if (err) err.textContent = '';
-                    });
-                });
-            });
-
             const buttons = document.querySelectorAll('.addon-add-btn');
             if (!buttons.length) return;
 
@@ -606,16 +563,9 @@ $is_logged_in = isset($_SESSION['user_id']);
                     if (!productId) return;
 
                     const formData = new FormData();
-                    const sizeGroup = document.querySelector('.addon-size-group[data-product-id="' + productId + '"]');
-                    const selectedSize = sizeGroup ? sizeGroup.getAttribute('data-selected-size') : '';
                     const errorEl = document.getElementById('addonError_' + productId);
-                    if (!selectedSize) {
-                        if (errorEl) errorEl.textContent = '請先選擇尺寸';
-                        return;
-                    }
 
                     formData.append('product_id', productId);
-                    formData.append('size', selectedSize);
                     formData.append('quantity', '1');
                     formData.append('is_addon', '1');
 

@@ -57,15 +57,60 @@ try {
     // 如果查詢失敗，保持為 null
 }
 
-// 查詢商品尺寸庫存（包含庫存為0的尺寸）
+// 查詢商品尺寸庫存（包含庫存為0的尺寸，僅顯示資料表實際有的尺寸）
 $product_sizes = [];
+$show_helmet_size_block = false;
+$sizes_in_stock = false;
+$first_in_stock = null;
 if ($product) {
     try {
         $stmt = $pdo->prepare("SELECT size, stock FROM product_sizes WHERE product_id = :product_id ORDER BY FIELD(size, 'S', 'M', 'L', 'XL')");
         $stmt->execute([':product_id' => $product_id]);
         $product_sizes = $stmt->fetchAll();
+        foreach ($product_sizes as $ps) {
+            if ((int)$ps['stock'] > 0) {
+                $sizes_in_stock = true;
+                if ($first_in_stock === null) {
+                    $first_in_stock = $ps;
+                }
+            }
+        }
+        // 安全帽尺寸區塊：非配件、且有尺寸列
+        $show_helmet_size_block = (int)($product['is_addon'] ?? 0) !== 1 && !empty($product_sizes);
     } catch (PDOException $e) {
-        // 如果查詢失敗，保持為空陣列
+        $product_sizes = [];
+    }
+}
+
+// 商品多圖（product_images）：sort_order ASC, id ASC；第一張為主圖
+$product_gallery_urls = [];
+$gallery_images_dir = 'assets/images/products/';
+$gallery_default = $gallery_images_dir . 'default.jpg';
+
+if ($product) {
+    try {
+        $img_stmt = $pdo->prepare("SELECT image_url FROM product_images WHERE product_id = :product_id ORDER BY sort_order ASC, id ASC");
+        $img_stmt->execute([':product_id' => $product_id]);
+        $img_rows = $img_stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($img_rows as $img_row) {
+            $rel = trim((string)($img_row['image_url'] ?? ''));
+            if ($rel === '') {
+                continue;
+            }
+            $rel = str_replace('\\', '/', $rel);
+            if (strpos($rel, '..') !== false) {
+                continue;
+            }
+            $rel = ltrim($rel, '/');
+            $product_gallery_urls[] = $gallery_images_dir . $rel;
+        }
+    } catch (PDOException $e) {
+        // 資料表不存在或其他錯誤時略過，改走下方 fallback
+        $product_gallery_urls = [];
+    }
+
+    if (empty($product_gallery_urls)) {
+        $product_gallery_urls[] = $gallery_default;
     }
 }
 ?>
@@ -91,25 +136,35 @@ if ($product) {
                 </div>
             <?php elseif ($product): ?>
                 <div class="product-detail-wrapper">
-                    <!-- 左側圖片區 -->
-                    <div class="product-detail-image">
-                        <?php 
-                        // 檢查 image_url 是否為 NULL 或空字串
-                        $has_image = !empty($product['image_url']) && trim($product['image_url']) !== '';
-                        if ($has_image): 
-                        ?>
-                            <img src="<?php echo htmlspecialchars($product['image_url'], ENT_QUOTES); ?>" 
-                                 alt="<?php echo htmlspecialchars($product['name']); ?>">
-                        <?php else: ?>
-                            <div class="product-detail-image-placeholder">
-                                <svg width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="#9A9A9A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                                    <polyline points="21 15 16 10 5 21"></polyline>
-                                </svg>
-                                <span>無圖片</span>
+                    <!-- 左側：縮圖列表 + 右側：主圖（多圖切換） -->
+                    <?php
+                    $gallery_count = count($product_gallery_urls);
+                    $main_image_src = $product_gallery_urls[0];
+                    $gallery_single_class = $gallery_count <= 1 ? ' product-detail-gallery--single' : '';
+                    ?>
+                    <div class="product-detail-gallery<?php echo $gallery_single_class; ?>">
+                        <?php if ($gallery_count > 1): ?>
+                            <div class="product-detail-thumbs" role="tablist" aria-label="商品圖片縮圖">
+                                <?php foreach ($product_gallery_urls as $gi => $gurl): ?>
+                                    <button
+                                        type="button"
+                                        class="product-detail-thumb<?php echo $gi === 0 ? ' is-active' : ''; ?>"
+                                        data-src="<?php echo htmlspecialchars($gurl, ENT_QUOTES); ?>"
+                                        aria-label="檢視圖片 <?php echo (int)($gi + 1); ?>"
+                                        aria-pressed="<?php echo $gi === 0 ? 'true' : 'false'; ?>"
+                                    >
+                                        <img src="<?php echo htmlspecialchars($gurl, ENT_QUOTES); ?>" alt="" loading="lazy">
+                                    </button>
+                                <?php endforeach; ?>
                             </div>
                         <?php endif; ?>
+                        <div class="product-detail-main-image product-detail-image">
+                            <img
+                                id="productDetailMainImg"
+                                src="<?php echo htmlspecialchars($main_image_src, ENT_QUOTES); ?>"
+                                alt="<?php echo htmlspecialchars($product['name']); ?>"
+                            >
+                        </div>
                     </div>
 
                     <!-- 右側資訊區 -->
@@ -144,10 +199,18 @@ if ($product) {
                             </div>
                         <?php endif; ?>
 
+                        <?php if (!$show_helmet_size_block): ?>
+                            <p class="product-detail-unified-size-msg">此商品為統一尺寸</p>
+                        <?php endif; ?>
+
                         <!-- 互動區塊 -->
                         <div class="product-detail-actions">
                             <?php if ($is_logged_in): ?>
-                                <?php if (!empty($product_sizes)): ?>
+                                <?php if ($show_helmet_size_block && !$sizes_in_stock): ?>
+                                    <div class="product-detail-no-size">
+                                        <p>此商品所有尺寸目前皆已售完，無法加入購物車。</p>
+                                    </div>
+                                <?php elseif ($show_helmet_size_block): ?>
                                     <form class="product-detail-form" id="addToCartForm">
                                         <input type="hidden" name="product_id" value="<?php echo htmlspecialchars($product['id']); ?>">
                                         
@@ -155,11 +218,13 @@ if ($product) {
                                             <label class="form-label">尺寸</label>
                                             <select name="size" class="form-input" id="sizeSelect" required>
                                                 <?php foreach ($product_sizes as $ps): 
-                                                    $is_out_of_stock = $ps['stock'] <= 0;
+                                                    $is_out_of_stock = (int)$ps['stock'] <= 0;
+                                                    $is_selected = !$is_out_of_stock && $first_in_stock && ($ps['size'] === $first_in_stock['size']);
                                                 ?>
                                                     <option value="<?php echo htmlspecialchars($ps['size']); ?>" 
                                                             data-stock="<?php echo htmlspecialchars($ps['stock']); ?>"
-                                                            <?php echo $is_out_of_stock ? 'disabled' : ''; ?>>
+                                                            <?php echo $is_out_of_stock ? 'disabled' : ''; ?>
+                                                            <?php echo $is_selected ? 'selected' : ''; ?>>
                                                         <?php 
                                                         if ($is_out_of_stock) {
                                                             echo htmlspecialchars($ps['size']) . '（已售完）';
@@ -179,7 +244,7 @@ if ($product) {
                                                    class="form-input" 
                                                    id="quantityInput"
                                                    min="1" 
-                                                   max="<?php echo htmlspecialchars($product_sizes[0]['stock']); ?>" 
+                                                   max="<?php echo htmlspecialchars($first_in_stock ? (int)$first_in_stock['stock'] : 1); ?>" 
                                                    value="1" 
                                                    required>
                                         </div>
@@ -188,91 +253,107 @@ if ($product) {
                                             加入購物車
                                         </button>
                                     </form>
-                                    
-                                    <!-- Toast 訊息 -->
+                                <?php else: ?>
+                                    <!-- 配件（is_addon=1）或無 product_sizes：不顯示尺寸；後端購物車 size 寫入 F -->
+                                    <form class="product-detail-form" id="addToCartFormSimple">
+                                        <input type="hidden" name="product_id" value="<?php echo htmlspecialchars($product['id']); ?>">
+                                        <div class="form-group">
+                                            <label class="form-label">數量</label>
+                                            <input type="number"
+                                                   name="quantity"
+                                                   class="form-input"
+                                                   id="quantityInputSimple"
+                                                   min="1"
+                                                   max="99"
+                                                   value="1"
+                                                   required>
+                                        </div>
+                                        <button type="submit" class="btn-primary product-detail-add-cart">
+                                            加入購物車
+                                        </button>
+                                    </form>
+                                <?php endif; ?>
+
+                                <?php if ($show_helmet_size_block && $sizes_in_stock || (!$show_helmet_size_block && $product)): ?>
+                                    <!-- Toast 訊息（有加入購物車表單時顯示） -->
                                     <div id="cartToast" class="cart-toast" style="display: none;">
                                         <span id="cartToastMessage"></span>
                                     </div>
                                     
                                     <script>
-                                        // 當尺寸改變時，更新數量的最大值
-                                        document.getElementById('sizeSelect').addEventListener('change', function() {
-                                            const selectedOption = this.options[this.selectedIndex];
-                                            const maxStock = parseInt(selectedOption.getAttribute('data-stock'));
-                                            document.getElementById('quantityInput').max = maxStock;
-                                            if (parseInt(document.getElementById('quantityInput').value) > maxStock) {
-                                                document.getElementById('quantityInput').value = maxStock;
-                                            }
-                                        });
-                                        
-                                        // AJAX 加入購物車
-                                        document.getElementById('addToCartForm').addEventListener('submit', function(e) {
-                                            e.preventDefault();
-                                            
-                                            const form = this;
-                                            const formData = new FormData(form);
-                                            const submitBtn = form.querySelector('button[type="submit"]');
-                                            const originalText = submitBtn.textContent;
-                                            
-                                            // 禁用按鈕
-                                            submitBtn.disabled = true;
-                                            submitBtn.textContent = '處理中...';
-                                            
-                                            fetch('api/add_to_cart.php', {
-                                                method: 'POST',
-                                                body: formData
-                                            })
-                                            .then(response => response.json())
-                                            .then(data => {
-                                                if (data.success) {
-                                                    // 即時同步 navbar 購物車 badge
-                                                    if (typeof window.updateNavbarBadges === 'function') {
-                                                        window.updateNavbarBadges({ cart_count: data.cart_count });
-                                                    } else {
-                                                        window.dispatchEvent(new CustomEvent('cart:updated', { detail: { cart_count: data.cart_count } }));
-                                                    }
-                                                    
-                                                    // 顯示成功訊息
-                                                    showToast(data.message, 'success');
-                                                    
-                                                    // 重置表單數量
-                                                    document.getElementById('quantityInput').value = 1;
-                                                } else {
-                                                    if (data.redirect) {
-                                                        window.location.href = data.redirect;
-                                                    } else {
-                                                        showToast(data.message, 'error');
-                                                    }
-                                                }
-                                            })
-                                            .catch(error => {
-                                                showToast('加入購物車時發生錯誤', 'error');
-                                                console.error('Error:', error);
-                                            })
-                                            .finally(() => {
-                                                submitBtn.disabled = false;
-                                                submitBtn.textContent = originalText;
-                                            });
-                                        });
-                                        
-                                        // 顯示 Toast 訊息
                                         function showToast(message, type) {
-                                            const toast = document.getElementById('cartToast');
-                                            const toastMessage = document.getElementById('cartToastMessage');
-                                            
+                                            var toast = document.getElementById('cartToast');
+                                            var toastMessage = document.getElementById('cartToastMessage');
+                                            if (!toast || !toastMessage) return;
                                             toastMessage.textContent = message;
                                             toast.className = 'cart-toast ' + type;
                                             toast.style.display = 'block';
-                                            
-                                            setTimeout(() => {
-                                                toast.style.display = 'none';
-                                            }, 3000);
+                                            setTimeout(function() { toast.style.display = 'none'; }, 3000);
                                         }
+
+                                        function bindAddToCartForm(formId, qtyResetId) {
+                                            var form = document.getElementById(formId);
+                                            if (!form) return;
+                                            form.addEventListener('submit', function(e) {
+                                                e.preventDefault();
+                                                var submitBtn = form.querySelector('button[type="submit"]');
+                                                var originalText = submitBtn.textContent;
+                                                submitBtn.disabled = true;
+                                                submitBtn.textContent = '處理中...';
+                                                fetch('api/add_to_cart.php', {
+                                                    method: 'POST',
+                                                    body: new FormData(form)
+                                                })
+                                                .then(function(r) { return r.json(); })
+                                                .then(function(data) {
+                                                    if (data.success) {
+                                                        if (typeof window.updateNavbarBadges === 'function') {
+                                                            window.updateNavbarBadges({ cart_count: data.cart_count });
+                                                        } else {
+                                                            window.dispatchEvent(new CustomEvent('cart:updated', { detail: { cart_count: data.cart_count } }));
+                                                        }
+                                                        showToast(data.message, 'success');
+                                                        var q = document.getElementById(qtyResetId);
+                                                        if (q) q.value = 1;
+                                                    } else {
+                                                        if (data.redirect) {
+                                                            window.location.href = data.redirect;
+                                                        } else {
+                                                            showToast(data.message, 'error');
+                                                        }
+                                                    }
+                                                })
+                                                .catch(function(err) {
+                                                    showToast('加入購物車時發生錯誤', 'error');
+                                                    console.error(err);
+                                                })
+                                                .finally(function() {
+                                                    submitBtn.disabled = false;
+                                                    submitBtn.textContent = originalText;
+                                                });
+                                            });
+                                        }
+
+                                        <?php if ($show_helmet_size_block && $sizes_in_stock): ?>
+                                        (function() {
+                                            var sizeSelect = document.getElementById('sizeSelect');
+                                            var qtyInput = document.getElementById('quantityInput');
+                                            if (sizeSelect && qtyInput) {
+                                                sizeSelect.addEventListener('change', function() {
+                                                    var opt = this.options[this.selectedIndex];
+                                                    var maxStock = parseInt(opt.getAttribute('data-stock'), 10) || 1;
+                                                    qtyInput.max = maxStock;
+                                                    if (parseInt(qtyInput.value, 10) > maxStock) {
+                                                        qtyInput.value = maxStock;
+                                                    }
+                                                });
+                                            }
+                                        })();
+                                        bindAddToCartForm('addToCartForm', 'quantityInput');
+                                        <?php else: ?>
+                                        bindAddToCartForm('addToCartFormSimple', 'quantityInputSimple');
+                                        <?php endif; ?>
                                     </script>
-                                <?php else: ?>
-                                    <div class="product-detail-no-size">
-                                        <p>此商品尚未設定尺寸庫存，無法加入購物車。</p>
-                                    </div>
                                 <?php endif; ?>
                             <?php else: ?>
                                 <div class="product-detail-login-prompt">
@@ -384,6 +465,26 @@ if ($product) {
                     navToggle.classList.toggle('active');
                 });
             }
+        })();
+
+        // 商品詳情：縮圖切換主圖
+        (function() {
+            const mainImg = document.getElementById('productDetailMainImg');
+            if (!mainImg) return;
+            document.querySelectorAll('.product-detail-thumb').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    const src = btn.getAttribute('data-src');
+                    if (src) {
+                        mainImg.src = src;
+                    }
+                    document.querySelectorAll('.product-detail-thumb').forEach(function(b) {
+                        b.classList.remove('is-active');
+                        b.setAttribute('aria-pressed', 'false');
+                    });
+                    btn.classList.add('is-active');
+                    btn.setAttribute('aria-pressed', 'true');
+                });
+            });
         })();
     </script>
 </body>
