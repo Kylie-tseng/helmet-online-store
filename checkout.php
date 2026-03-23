@@ -2,7 +2,6 @@
 require_once 'config.php';
 require_once 'includes/cart_functions.php';
 require_once 'includes/navbar.php';
-require_once 'includes/checkout_steps.php';
 
 // 檢查是否已登入
 if (!isset($_SESSION['user_id'])) {
@@ -254,7 +253,7 @@ $is_logged_in = isset($_SESSION['user_id']);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>填寫資料 - HelmetVRse</title>
-    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/style.css?v=20260323-checkout-toggle">
 </head>
 <body>
 <!-- 導覽列 -->
@@ -263,8 +262,58 @@ $is_logged_in = isset($_SESSION['user_id']);
     <!-- 填寫資料內容 -->
     <div class="checkout-container">
         <div class="container">
-            <?php renderCheckoutSteps(2); ?>
             <h1 class="checkout-page-title">選擇送貨及付款方式</h1>
+
+            <!-- 查看商品清單（收合/展開）-->
+            <div class="checkout-order-toggle" role="region" aria-label="查看商品清單">
+                <button
+                    type="button"
+                    class="checkout-order-toggle-header"
+                    data-checkout-items-toggle="1"
+                    data-checkout-items-target="checkoutItemsList"
+                    aria-expanded="false"
+                >
+                    <span class="checkout-order-toggle-header-text">查看商品清單</span>
+                    <svg class="checkout-order-toggle-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M6 9L12 15L18 9" stroke="#333333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+
+                <div id="checkoutItemsList" class="checkout-order-toggle-body" aria-hidden="true">
+                    <div class="checkout-summary-items-inner">
+                        <?php foreach ($cart_items as $ci): 
+                            $ci_subtotal = (float)$ci['price'] * (int)$ci['quantity'];
+                            $ci_img_src = resolve_product_card_image_src($ci['primary_image'] ?? null);
+                        ?>
+                            <div class="checkout-summary-items-row">
+                                <div class="checkout-summary-items-media">
+                                    <img
+                                        src="<?php echo htmlspecialchars($ci_img_src, ENT_QUOTES); ?>"
+                                        alt="<?php echo htmlspecialchars($ci['product_name']); ?>"
+                                    >
+                                </div>
+
+                                <div class="checkout-summary-items-left">
+                                    <div class="checkout-summary-items-name"><?php echo htmlspecialchars($ci['product_name']); ?></div>
+                                    <div class="checkout-summary-items-meta">
+                                        <?php echo htmlspecialchars($ci['category_name']); ?>
+                                        &nbsp;&nbsp; 尺寸：<?php echo htmlspecialchars(formatCartSizeForDisplay($ci['size'] ?? '')); ?>
+                                    </div>
+                                    <div class="checkout-summary-items-unit-price">
+                                        單價 NT$ <?php echo number_format((float)$ci['price'], 0); ?>
+                                    </div>
+                                </div>
+
+                                <div class="checkout-summary-items-right">
+                                    <div class="checkout-summary-items-amount">
+                                        小計 NT$ <?php echo number_format($ci_subtotal, 0); ?>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            </div>
             
             <?php if (!empty($errors)): ?>
                 <div class="error-message">
@@ -278,102 +327,109 @@ $is_logged_in = isset($_SESSION['user_id']);
 
             <div class="checkout-form-wrapper">
                 <form method="POST" id="checkoutForm" class="checkout-form">
-                    <!-- 送貨方式 -->
-                    <div class="form-section">
-                        <h2 class="form-section-title">送貨方式</h2>
-                        <div class="shipping-methods">
-                            <label class="shipping-method-option">
-                                <input type="radio" name="shipping_method" value="pickup" 
-                                       <?php echo $shipping_method === 'pickup' ? 'checked' : ''; ?>
-                                       onchange="updateShippingMethod()">
-                                <span class="method-label">超商取貨</span>
-                                <span class="method-fee"><?php echo $order_amount['shipping'] == 0 ? '免運費' : '運費 60 元'; ?></span>
-                            </label>
-                            <label class="shipping-method-option">
-                                <input type="radio" name="shipping_method" value="home"
-                                       <?php echo $shipping_method === 'home' ? 'checked' : ''; ?>
-                                       onchange="updateShippingMethod()">
-                                <span class="method-label">宅配到府</span>
-                                <span class="method-fee"><?php echo $order_amount['shipping'] == 0 ? '免運費' : '運費 60 元'; ?></span>
-                            </label>
-                        </div>
-                        
-                        <!-- 超商取貨欄位 -->
-                        <div id="pickupFields" class="shipping-fields" style="display: <?php echo $shipping_method === 'pickup' ? 'block' : 'none'; ?>;">
-                            <div class="form-group">
-                                <label class="form-label">超商門市代碼 <span class="required">*</span></label>
-                                <div class="form-input-group">
-                                    <input type="text" name="pickup_store" class="form-input" 
-                                           value="<?php echo htmlspecialchars($pickup_store); ?>"
-                                           placeholder="請輸入門市代碼">
-                                    <a href="https://emap.pcsc.com.tw/" 
-                                       target="_blank" 
-                                       class="btn-store-lookup">超商代碼查詢</a>
+                    <div class="checkout-page-layout">
+                        <!-- 左欄：送貨方式 / 付款方式 -->
+                        <div class="checkout-main">
+                            <div class="form-section">
+                                <h2 class="form-section-title">送貨方式</h2>
+                                <div class="shipping-methods">
+                                    <label class="shipping-method-option">
+                                        <input type="radio" name="shipping_method" value="pickup" 
+                                               <?php echo $shipping_method === 'pickup' ? 'checked' : ''; ?>
+                                               onchange="updateShippingMethod()">
+                                        <span class="method-label">超商取貨</span>
+                                        <span class="method-fee"><?php echo $order_amount['shipping'] == 0 ? '免運費' : '運費 60 元'; ?></span>
+                                    </label>
+                                    <label class="shipping-method-option">
+                                        <input type="radio" name="shipping_method" value="home"
+                                               <?php echo $shipping_method === 'home' ? 'checked' : ''; ?>
+                                               onchange="updateShippingMethod()">
+                                        <span class="method-label">宅配到府</span>
+                                        <span class="method-fee"><?php echo $order_amount['shipping'] == 0 ? '免運費' : '運費 60 元'; ?></span>
+                                    </label>
+                                </div>
+                                
+                                <!-- 超商取貨欄位 -->
+                                <div id="pickupFields" class="shipping-fields" style="display: <?php echo $shipping_method === 'pickup' ? 'block' : 'none'; ?>;">
+                                    <div class="form-group">
+                                        <label class="form-label">超商門市代碼 <span class="required">*</span></label>
+                                        <div class="form-input-group">
+                                            <input type="text" name="pickup_store" class="form-input" 
+                                                   value="<?php echo htmlspecialchars($pickup_store); ?>"
+                                                   placeholder="請輸入門市代碼">
+                                            <a href="https://emap.pcsc.com.tw/" 
+                                               target="_blank" 
+                                               class="btn-store-lookup">超商代碼查詢</a>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 宅配地址欄位 -->
+                                <div id="homeFields" class="shipping-fields" style="display: <?php echo $shipping_method === 'home' ? 'block' : 'none'; ?>;">
+                                    <div class="form-group">
+                                        <label class="form-label">送貨地址 <span class="required">*</span></label>
+                                        <textarea name="shipping_address" class="form-input" rows="3" 
+                                                  placeholder="請輸入完整地址"><?php echo htmlspecialchars($shipping_address); ?></textarea>
+                                        <small class="form-hint">地址已自動帶入您的會員資料，您仍可手動修改</small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 付款方式 -->
+                            <div class="form-section">
+                                <h2 class="form-section-title">付款方式</h2>
+                                <div class="payment-methods">
+                                    <label class="payment-method-option">
+                                        <input type="radio" name="payment_method" value="credit_card"
+                                               <?php echo $payment_method === 'credit_card' ? 'checked' : ''; ?>>
+                                        <span class="method-label">信用卡</span>
+                                    </label>
+                                    <label class="payment-method-option">
+                                        <input type="radio" name="payment_method" value="cod"
+                                               <?php echo $payment_method === 'cod' ? 'checked' : ''; ?>>
+                                        <span class="method-label">貨到付款</span>
+                                    </label>
                                 </div>
                             </div>
                         </div>
-                        
-                        <!-- 宅配地址欄位 -->
-                        <div id="homeFields" class="shipping-fields" style="display: <?php echo $shipping_method === 'home' ? 'block' : 'none'; ?>;">
-                            <div class="form-group">
-                                <label class="form-label">送貨地址 <span class="required">*</span></label>
-                                <textarea name="shipping_address" class="form-input" rows="3" 
-                                          placeholder="請輸入完整地址"><?php echo htmlspecialchars($shipping_address); ?></textarea>
-                                <small class="form-hint">地址已自動帶入您的會員資料，您仍可手動修改</small>
-                            </div>
-                        </div>
-                    </div>
 
-                    <!-- 付款方式 -->
-                    <div class="form-section">
-                        <h2 class="form-section-title">付款方式</h2>
-                        <div class="payment-methods">
-                            <label class="payment-method-option">
-                                <input type="radio" name="payment_method" value="credit_card"
-                                       <?php echo $payment_method === 'credit_card' ? 'checked' : ''; ?>>
-                                <span class="method-label">信用卡</span>
-                            </label>
-                            <label class="payment-method-option">
-                                <input type="radio" name="payment_method" value="cod"
-                                       <?php echo $payment_method === 'cod' ? 'checked' : ''; ?>>
-                                <span class="method-label">貨到付款</span>
-                            </label>
-                        </div>
-                    </div>
+                        <!-- 右欄：付款明細 / 訂單摘要 + 按鈕 -->
+                        <aside class="checkout-sidebar">
+                            <div class="checkout-sidebar-stack">
+                                <div class="checkout-summary-panel">
+                                    <h3 class="checkout-summary-title">小計明細</h3>
+                                    <div class="order-summary">
+                                        <div class="summary-row">
+                                            <span class="summary-label">商品小計：</span>
+                                            <span class="summary-value">NT$ <?php echo number_format($order_summary['subtotal'], 0); ?></span>
+                                        </div>
+                                        <div class="summary-row">
+                                            <span class="summary-label">運費：</span>
+                                            <span class="summary-value" id="shippingFee">
+                                                <?php if ($order_summary['shipping'] == 0): ?>
+                                                    免運費
+                                                <?php else: ?>
+                                                    運費 60 元
+                                                <?php endif; ?>
+                                            </span>
+                                        </div>
+                                        <div class="summary-row">
+                                            <span class="summary-label">優惠券折扣：</span>
+                                            <span class="summary-value" id="couponDiscount">- NT$ <?php echo number_format($order_summary['discount'], 0); ?></span>
+                                        </div>
+                                        <div class="summary-row summary-total">
+                                            <span class="summary-label">最終總價：</span>
+                                            <span class="summary-value" id="totalAmount">NT$ <?php echo number_format($order_summary['final_total'], 0); ?></span>
+                                        </div>
+                                    </div>
+                                </div>
 
-                    <!-- 訂單摘要 -->
-                    <div class="form-section">
-                        <h2 class="form-section-title">訂單摘要</h2>
-                        <div class="order-summary">
-                            <div class="summary-row">
-                                <span class="summary-label">商品小計：</span>
-                                <span class="summary-value">NT$ <?php echo number_format($order_summary['subtotal'], 0); ?></span>
+                                <div class="form-actions checkout-submit-actions">
+                                    <a href="cart.php" class="btn-secondary">返回購物車</a>
+                                    <button type="submit" class="btn-primary">訂單確認</button>
+                                </div>
                             </div>
-                            <div class="summary-row">
-                                <span class="summary-label">運費：</span>
-                                <span class="summary-value" id="shippingFee">
-                                    <?php if ($order_summary['shipping'] == 0): ?>
-                                        免運費
-                                    <?php else: ?>
-                                        運費 60 元
-                                    <?php endif; ?>
-                                </span>
-                            </div>
-                            <div class="summary-row">
-                                <span class="summary-label">優惠券折扣：</span>
-                                <span class="summary-value" id="couponDiscount">- NT$ <?php echo number_format($order_summary['discount'], 0); ?></span>
-                            </div>
-                            <div class="summary-row summary-total">
-                                <span class="summary-label">最終總價：</span>
-                                <span class="summary-value" id="totalAmount">NT$ <?php echo number_format($order_summary['final_total'], 0); ?></span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 按鈕 -->
-                    <div class="form-actions">
-                        <a href="cart.php" class="btn-secondary">返回購物車</a>
-                        <button type="submit" class="btn-primary">訂單確認</button>
+                        </aside>
                     </div>
                 </form>
             </div>
@@ -443,6 +499,23 @@ $is_logged_in = isset($_SESSION['user_id']);
             document.getElementById('totalAmount').textContent = 'NT$ ' + total.toLocaleString();
             document.getElementById('couponDiscount').textContent = '- NT$ ' + couponDiscount.toLocaleString();
         }
+
+        // 摘要：查看商品清單（收合/展開）
+        (function () {
+            const toggles = document.querySelectorAll('[data-checkout-items-toggle="1"]');
+            toggles.forEach((btn) => {
+                btn.addEventListener('click', function () {
+                    const targetId = btn.getAttribute('data-checkout-items-target');
+                    const target = document.getElementById(targetId);
+                    if (!target) return;
+
+                    const isOpen = target.classList.toggle('is-open');
+                    btn.classList.toggle('is-open', isOpen);
+                    btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+                    target.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+                });
+            });
+        })();
     </script>
 </body>
 </html>
