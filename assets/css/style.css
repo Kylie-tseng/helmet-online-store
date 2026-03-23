@@ -30,7 +30,9 @@ body {
 .navbar {
     background-color: #333333;
     color: #FFFFFF;
-    padding: 15px 0;
+    /* 統一 navbar 高度：由 nav-container min-height 決定（首頁標準為 76px）
+       避免非首頁因 padding: 15px 0 造成 navbar 變高。 */
+    padding: 0 !important;
     position: sticky;
     top: 0;
     z-index: 1000;
@@ -677,6 +679,11 @@ body {
         gap: 14px;
     }
 
+    .unified-navbar .nav-container {
+        padding: 14px 18px;
+        gap: 14px;
+    }
+
     .home-page .home-navbar .mega-menu {
         display: none !important;
     }
@@ -823,7 +830,7 @@ body {
     width: 100%;
     height: 250px;
     overflow: hidden;
-    background-color: #DADADA;
+    background-color: #FFFFFF;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -844,7 +851,7 @@ body {
     width: 100%;
     height: 100%;
     color: #9A9A9A;
-    background-color: #F5F6FA;
+    background-color: #FFFFFF;
 }
 
 .product-image .product-image-placeholder svg {
@@ -862,6 +869,7 @@ body {
 
 .product-info {
     padding: 20px;
+    background-color: #FFFFFF;
 }
 
 .product-name {
@@ -1109,7 +1117,7 @@ body {
 
 .auth-header {
     background: #F7F8FA;
-    min-height: 96px;
+    min-height: var(--auth-header-height);
     display: flex;
     align-items: center;
     border-bottom: 1px solid #E5E7EB;
@@ -1154,15 +1162,15 @@ body {
 .register-container {
     min-height: calc(100vh - 200px);
     display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 54px 20px;
+    align-items: flex-start;
+    justify-content: flex-start;
+    padding: 32px 20px 60px;
     background-color: #DADADA;
 }
 
 .auth-page .login-container,
 .auth-page .register-container {
-    min-height: calc(100vh - 94px);
+    min-height: calc(100vh - var(--auth-header-height)) !important;
     background: linear-gradient(180deg, #FFFFFF 0%, #ECECEC 38%, #CFCFCF 68%, #9A9A9A 100%);
 }
 
@@ -1880,7 +1888,7 @@ body {
    ========================================= */
 .products-page-container {
     min-height: calc(100vh - 200px);
-    padding: 40px 20px;
+    padding: 20px 20px;
     background-color: #DADADA;
 }
 
@@ -1901,7 +1909,7 @@ body {
     box-shadow: 0 2px 8px rgba(79, 91, 125, 0.1);
     border: 1px solid #DDD6CE;
     position: sticky;
-    top: 100px;
+    top: 90px;
 }
 
 .sidebar-title {
@@ -1948,6 +1956,133 @@ body {
 .products-main {
     flex: 1;
     min-width: 0;
+}
+
+/* ===============================
+   商品總覽頁：左側文字型分類導覽（MUJI/導覽感）
+   只作用於 overview：products-overview-page
+   =============================== */
+body.products-overview-page .products-sidebar {
+    background: #f7f7f5 !important;
+    border: 1px solid #e8e6e1 !important;
+    box-shadow: none !important;
+    border-radius: 16px !important;
+    padding: 18px 16px 16px !important;
+    top: auto !important;
+    position: relative !important;
+}
+
+/* 為了確保「初始載入」時左側整塊 panel 與右側商品總覽第一排同高 */
+body.products-overview-page .products-sidebar-panel {
+    top: auto !important;
+    position: relative !important;
+    margin-top: 0 !important;
+}
+
+body.products-overview-page .sidebar-text-nav-header {
+    padding: 0 0 12px;
+    border-bottom: 1px solid #e8e6e1;
+    margin-bottom: 12px;
+}
+
+body.products-overview-page .sidebar-title {
+    border: 0 !important;
+    padding-bottom: 0 !important;
+    margin: 0 !important;
+    font-size: 20px;
+    font-weight: 900;
+    color: #111111;
+}
+
+body.products-overview-page .category-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+
+body.products-overview-page .category-list li {
+    margin-bottom: 5px;
+}
+
+body.products-overview-page .category-link {
+    display: block;
+    padding: 7px 0 7px 14px;
+    border-radius: 12px !important;
+    background: transparent !important;
+    border: 0 !important;
+    color: #3F3F3F !important;
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    text-decoration: none;
+    transition: none !important;
+    position: relative;
+}
+
+/* 左側細線（inactive 預設透明） */
+body.products-overview-page .category-link::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 2px;
+    height: 16px;
+    background: transparent;
+    border-radius: 2px;
+}
+
+body.products-overview-page .category-link:hover {
+    color: #111111 !important;
+    background: rgba(17, 17, 17, 0.03) !important;
+    background-color: rgba(17, 17, 17, 0.03) !important;
+}
+
+body.products-overview-page .category-link:hover::after {
+    content: "";
+    position: absolute;
+    left: 14px;
+    right: 0;
+    bottom: -2px;
+    height: 1px;
+    background: #e8e6e1;
+}
+
+body.products-overview-page .category-link.active {
+    color: #111111 !important;
+    font-weight: 800 !important;
+    background: rgba(17, 17, 17, 0.05) !important;
+    background-color: rgba(17, 17, 17, 0.05) !important;
+}
+
+body.products-overview-page .category-link.active::before {
+    background: #1A1A1A;
+}
+
+body.products-overview-page .category-link.active::after {
+    content: "";
+    position: absolute;
+    left: 14px;
+    right: 0;
+    bottom: -2px;
+    height: 1px;
+    background: #1A1A1A;
+    opacity: 0.22; /* 底線保持輕淡但更精緻 */
+}
+
+@media (max-width: 768px) {
+    body.products-overview-page .products-sidebar {
+        position: relative !important;
+        top: auto !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        padding: 0 12px 14px !important;
+    }
+
+    body.products-overview-page .sidebar-text-nav-header {
+        padding: 0 0 10px;
+        margin-bottom: 10px;
+    }
 }
 
 .products-header {
@@ -2041,7 +2176,7 @@ body {
     width: 100%;
     height: 220px;
     overflow: hidden;
-    background-color: #DADADA;
+    background-color: #FFFFFF;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2062,7 +2197,7 @@ body {
     width: 100%;
     height: 100%;
     color: #9A9A9A;
-    background-color: #F5F6FA;
+    background-color: #FFFFFF;
 }
 
 .product-image-placeholder svg {
@@ -2080,6 +2215,7 @@ body {
 
 .product-info-page {
     padding: 20px;
+    background-color: #FFFFFF;
 }
 
 .product-name-page {
@@ -2121,7 +2257,7 @@ body {
 .product-btn-page {
     display: block;
     width: 100%;
-    padding: 12px 20px;
+    padding: 10px 16px;
     text-align: center;
     text-decoration: none;
     border-radius: 8px;
@@ -2275,6 +2411,7 @@ body {
 
 .product-card-page {
     border-radius: 14px;
+    background-color: #FFFFFF;
     box-shadow: 0 8px 22px rgba(0, 0, 0, 0.08);
     border: 1px solid #E2E2E2;
 }
@@ -2285,8 +2422,8 @@ body {
 }
 
 .product-image-page {
-    height: 198px;
-    background-color: #F1F1F1;
+    height: 175px;
+    background-color: #FFFFFF;
 }
 
 .product-image-placeholder span {
@@ -2294,13 +2431,14 @@ body {
 }
 
 .product-info-page {
-    padding: 14px 14px 15px;
+    padding: 12px 12px 12px;
+    background-color: #FFFFFF;
 }
 
 .product-name-page {
-    font-size: 15px;
-    margin-bottom: 10px;
-    min-height: 42px;
+    font-size: 14px;
+    margin-bottom: 7px;
+    min-height: 36px;
     line-height: 1.35;
 }
 
@@ -2309,11 +2447,11 @@ body {
     align-items: center;
     justify-content: space-between;
     gap: 10px;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
 }
 
 .product-price-page {
-    font-size: 21px;
+    font-size: 19px;
     margin-bottom: 0;
     line-height: 1;
 }
@@ -2391,12 +2529,12 @@ body {
     }
 
     .product-image-page {
-        height: 168px;
+        height: 155px;
     }
 
     .product-name-page {
-        font-size: 14px;
-        min-height: 38px;
+        font-size: 13px;
+        min-height: 34px;
     }
 
     .product-price-page {
@@ -5280,7 +5418,8 @@ input[type="button"]:hover,
 
 .unified-navbar .nav-container {
     min-height: 76px;
-    padding: 0 24px;
+    padding: 18px 24px;
+    gap: 28px;
 }
 
 .unified-navbar .nav-logo a,
@@ -5873,9 +6012,11 @@ body:not(.home-page) .unified-navbar {
 :root {
     --navbar-height: 76px;
     --site-navbar-height: var(--navbar-height);
-    --page-top-gap: 24px;
+    --page-top-gap: 12px;
     --page-safe-top: calc(var(--site-navbar-height) + var(--page-top-gap));
-    --auth-header-height: 96px;
+    --auth-header-height: 76px;
+    /* navbar 下方到「第一個主要內容容器」內部內容的基準間距 */
+    --navbar-first-content-padding-top: 20px;
 }
 
 /* 所有主導覽列固定在最上方 */
@@ -5902,6 +6043,69 @@ body:not(.home-page) .unified-navbar {
 /* 非首頁內容補償，避免被 fixed navbar 擋住 */
 body:not(.home-page):not(.auth-page) {
     padding-top: var(--page-safe-top) !important;
+}
+
+/* 統一所有（非首頁、非 auth）navbar 頁面的第一個主要內容起跑線
+   取得方式：navbar 之後的 script，再到下一個第一層主要容器。 */
+body:not(.home-page):not(.auth-page) nav + script + * {
+    padding-top: var(--navbar-first-content-padding-top) !important;
+    margin-top: 0 !important;
+}
+
+/* --- 上述通用規則的額外保險：常見第一層容器統一 padding-top --- */
+body:not(.home-page):not(.auth-page) .products-section {
+    padding-top: var(--navbar-first-content-padding-top) !important;
+}
+
+body:not(.home-page):not(.auth-page) .cart-container {
+    padding-top: var(--navbar-first-content-padding-top) !important;
+}
+
+body:not(.home-page):not(.auth-page) .checkout-container {
+    padding-top: var(--navbar-first-content-padding-top) !important;
+}
+
+body:not(.home-page):not(.auth-page) .dashboard-container {
+    padding-top: var(--navbar-first-content-padding-top) !important;
+}
+
+body:not(.home-page):not(.auth-page) .product-detail-container {
+    padding-top: var(--navbar-first-content-padding-top) !important;
+}
+
+/* 風格館（style collection page）第一個內容為標題區，收斂 header 的上 padding */
+.style-collection-page-container {
+    padding-top: var(--navbar-first-content-padding-top) !important;
+}
+
+.style-collection-header {
+    padding-top: 0 !important;
+}
+
+@media (max-width: 768px) {
+    .style-collection-header {
+        padding-top: 0 !important;
+    }
+}
+
+/* Coupons directory：第一個內容為 header，收斂 shell 的上 padding */
+.coupon-page-directory .coupon-page-shell {
+    padding-top: var(--navbar-first-content-padding-top) !important;
+}
+
+/* About 頁：首個內容為 about-main，統一收斂上方 */
+.about-page .about-main {
+    padding-top: var(--navbar-first-content-padding-top) !important;
+}
+
+/* 商品總覽：避免距離 navbar 過大（只影響 products.php） */
+body.products-overview-page {
+    padding-top: calc(var(--site-navbar-height) + 12px) !important; /* 76 + 12 = 88px */
+}
+
+/* 左側側欄頂部與右側主標題對齊（覆蓋後續 .products-sidebar top 規則） */
+body.products-overview-page .products-sidebar {
+    top: auto !important;
 }
 
 /* 登入/註冊專用 header 也固定頂端 */
@@ -7346,8 +7550,8 @@ body:not(.home-page):not(.auth-page) {
 }
 
 .products-page-container .products-main .products-header {
-    margin-top: 16px !important;
-    margin-bottom: 16px !important;
+    margin-top: 0px !important;
+    margin-bottom: 12px !important;
     padding-top: 0 !important;
 }
 
@@ -7437,43 +7641,29 @@ body:not(.home-page):not(.auth-page) {
     padding-top: 0 !important;
 }
 
-/* 首頁 navbar badge：未捲動與捲動後都保持可讀數字 */
-.home-page .home-navbar .nav-icon-link .nav-action-badge,
-.home-page .home-navbar .wishlist-count,
-.home-page .home-navbar .nav-badge,
-.home-page .home-navbar .badge {
+/* 首頁 navbar badge：統一成與購物車 badge 相同尺寸/定位 */
+.home-page .home-navbar .nav-icon-link .nav-action-badge {
     position: absolute !important;
-    top: -5px !important;
-    right: -6px !important;
-    z-index: 3 !important;
-    min-width: 18px !important;
-    height: 18px !important;
-    padding: 0 5px !important;
+    top: 4px !important;
+    right: 2px !important;
+    min-width: 16px !important;
+    height: 16px !important;
+    padding: 0 4px !important;
     border-radius: 999px !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    font-size: 11px !important;
+    background: #111111 !important;
+    color: #FFFFFF !important;
+    font-size: 10px !important;
     font-weight: 700 !important;
-    line-height: 1 !important;
-    letter-spacing: 0 !important;
+    line-height: 16px !important;
     text-align: center !important;
-    background: #FFFFFF !important;
-    color: #111111 !important;
-    border: 1px solid rgba(0, 0, 0, 0.1) !important;
+    display: inline-block !important;
+    z-index: 3 !important;
 }
 
 .home-page .home-navbar.is-scrolled .nav-icon-link .nav-action-badge,
-.home-page .home-navbar.scrolled .nav-icon-link .nav-action-badge,
-.home-page .home-navbar.is-scrolled .wishlist-count,
-.home-page .home-navbar.scrolled .wishlist-count,
-.home-page .home-navbar.is-scrolled .nav-badge,
-.home-page .home-navbar.scrolled .nav-badge,
-.home-page .home-navbar.is-scrolled .badge,
-.home-page .home-navbar.scrolled .badge {
-    background: #FFFFFF !important;
-    color: #111111 !important;
-    border: 1px solid rgba(0, 0, 0, 0.1) !important;
+.home-page .home-navbar.scrolled .nav-icon-link .nav-action-badge {
+    background: #111111 !important;
+    color: #FFFFFF !important;
 }
 
 .home-page .home-navbar .nav-icon-link .nav-action-badge.is-empty {
@@ -7753,6 +7943,13 @@ body:not(.home-page):not(.auth-page) {
     justify-content: space-between;
 }
 
+.home-page .featured-product-badge-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: nowrap;
+}
+
 .home-page .featured-product-tag {
     height: 19px;
     display: inline-flex;
@@ -7765,6 +7962,39 @@ body:not(.home-page):not(.auth-page) {
     font-size: 10px;
     font-weight: 600;
     letter-spacing: 0.06em;
+}
+
+.home-page .featured-product-helmet-badge {
+    height: 19px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 8px;
+    border-radius: 999px;
+    border: 1px solid #D8D8D8; /* 細邊框 */
+    background: #FFFFFF; /* 輕量：白底/透明感 */
+    color: #626262;
+    font-size: 10px;
+    font-weight: 650;
+    letter-spacing: 0.14em; /* 拉開字距，較輕盈 */
+    text-transform: uppercase;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.home-page .featured-product-style-badge {
+    height: 19px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 8px;
+    border-radius: 999px;
+    border: 1px solid #D8D8D8;
+    background: #ECECEC; /* 較有存在感：淡灰實心底 */
+    color: #626262;
+    font-size: 10px;
+    font-weight: 650;
+    letter-spacing: 0.06em;
+    line-height: 1;
+    white-space: nowrap;
 }
 
 .home-page .featured-wishlist-btn {
@@ -7903,6 +8133,47 @@ body:not(.home-page):not(.auth-page) {
     line-height: 1.35;
     text-align: center;
     background: #F3F3F3;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+}
+
+.home-page .lifestyle-style-badge-cn,
+.home-page .lifestyle-style-badge-en {
+    height: auto;
+    display: inline-block;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border-radius: 0;
+    font-size: 12px;
+    font-weight: 650;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+/* 中文 badge：較輕、細邊框、深灰文字 */
+.home-page .lifestyle-style-badge-cn {
+    background: transparent;
+    border: 0;
+    color: #2B2B2B;
+    letter-spacing: 0.02em;
+    text-transform: none;
+    font-weight: 750;
+    font-size: 12.5px;
+}
+
+/* 英文 badge：較有存在感、淡灰實心、全大寫 + 字距 */
+.home-page .lifestyle-style-badge-en {
+    background: transparent;
+    border: 0;
+    color: #6B6B6B;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-weight: 700;
+    font-size: 11px;
 }
 
 .home-page .lifestyle-gallery-item:hover {
@@ -7917,6 +8188,11 @@ body:not(.home-page):not(.auth-page) {
 
 .home-page .lifestyle-gallery-item:hover .lifestyle-gallery-title {
     color: #121212;
+}
+
+.home-page .lifestyle-gallery-item:hover .lifestyle-style-badge-cn,
+.home-page .lifestyle-gallery-item:hover .lifestyle-style-badge-en {
+    color: #1A1A1A;
 }
 
 /* 回到頂部按鈕 */
@@ -8960,8 +9236,9 @@ body:not(.home-page):not(.auth-page) {
 }
 
 .style-collection-page-container {
-    padding: 34px 20px 70px;
-    background: #F5F6FA;
+    padding: 22px 20px 60px;
+    /* 淡漸層：上方更有層次、下方自然回白（避免大片單一灰底） */
+    background: linear-gradient(180deg, #f7f7f8 0%, #f3f4f6 42%, #ffffff 85%);
     min-height: calc(100vh - 200px);
 }
 
@@ -8983,11 +9260,11 @@ body:not(.home-page):not(.auth-page) {
 }
 
 .style-collection-kicker {
-    font-size: 12px;
-    letter-spacing: 0.14em;
+    font-size: 11px;
+    letter-spacing: 0.16em;
     color: #7A7A7A;
     font-weight: 700;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
 }
 
 .style-collection-title {
@@ -9239,6 +9516,327 @@ body:not(.home-page):not(.auth-page) {
 
     .style-collection-all-grid {
         gap: 16px;
+    }
+}
+
+/* ===============================
+   Style（風格頁）極簡版面：標題 + tabs + 4欄商品 grid
+   僅在 products.php?style=... 使用（用 style-collection-* 前綴避免誤傷）
+   =============================== */
+
+.style-collection-header {
+    text-align: left;
+    padding: 22px 0 6px;
+}
+
+.style-collection-header-title {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    flex-wrap: wrap;
+    font-size: 30px;
+    color: #2B2B2B;
+    font-weight: 900;
+    margin: 6px 0 8px;
+    line-height: 1.2;
+}
+
+.style-collection-header-title-cn {
+    display: inline-block;
+    font-size: 30px;
+    font-weight: 900;
+    color: #2B2B2B;
+}
+
+.style-collection-header-title-en {
+    display: inline-block;
+    font-size: 14px;
+    font-weight: 750;
+    color: #6B6B6B; /* 較淡，避免搶中文 */
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    line-height: 1.2;
+    margin-top: 6px;
+}
+
+.style-collection-header-desc {
+    margin: 0;
+    max-width: 680px;
+    font-size: 15px;
+    color: #6B6B6B;
+    line-height: 1.65;
+}
+
+.style-collection-tabs {
+    display: flex;
+    justify-content: flex-start;
+    gap: 10px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding: 8px 0 14px;
+    -webkit-overflow-scrolling: touch;
+}
+
+.style-collection-tabs::-webkit-scrollbar {
+    height: 6px;
+}
+
+.style-collection-tabs::-webkit-scrollbar-thumb {
+    background: #DADADA;
+    border-radius: 999px;
+}
+
+.style-collection-tab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: 1px solid #E7E7E0;
+    background: transparent;
+    color: #7A7A7A;
+    font-size: 13px;
+    font-weight: 650;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.style-collection-tab.active {
+    background: #2B2B2B;
+    border-color: #2B2B2B;
+    color: #FFFFFF;
+    font-weight: 750;
+}
+
+.style-collection-grid-section {
+    padding-top: 6px;
+    padding-bottom: 50px;
+}
+
+.style-collection-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 24px;
+    align-items: start;
+}
+
+/* 讓風格頁的卡片更一致、不要像商品總覽那樣強烈 hover */
+.style-collection-grid .product-card-page {
+    box-shadow: none !important;
+    transition: none !important;
+}
+
+.style-collection-grid .product-card-page:hover {
+    transform: none !important;
+    box-shadow: none !important;
+    border-color: #DDD6CE !important;
+}
+
+.style-collection-grid .product-image-page {
+    height: 210px;
+}
+
+@media (max-width: 1280px) {
+    .style-collection-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 980px) {
+    .style-collection-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+    }
+
+    .style-collection-header-title {
+        font-size: 30px;
+    }
+}
+
+@media (max-width: 768px) {
+    .style-collection-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .style-collection-header {
+        padding: 18px 0 6px;
+    }
+
+    .style-collection-grid .product-image-page {
+        height: 200px;
+    }
+}
+
+/* =========================================
+   Guide Page
+   ========================================= */
+body.guide-page .guide-hero {
+    padding: 32px 0 8px;
+}
+
+body.guide-page .guide-hero-inner {
+    text-align: center;
+    max-width: 760px;
+    margin: 0 auto;
+}
+
+body.guide-page .guide-hero-title {
+    margin: 0;
+    font-size: clamp(34px, 4vw, 52px);
+    line-height: 1.08;
+    letter-spacing: 0.06em;
+    font-weight: 900;
+    color: #1f1f1f;
+}
+
+body.guide-page .guide-hero-subtitle {
+    margin: 14px auto 0;
+    font-size: 18px;
+    line-height: 1.7;
+    color: #5a5a5a;
+    max-width: 680px;
+}
+
+body.guide-page .guide-grid-section {
+    padding: 18px 0 28px;
+}
+
+body.guide-page .guide-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+}
+
+body.guide-page .guide-card {
+    margin: 0;
+}
+
+body.guide-page .guide-card-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    min-height: 158px;
+    padding: 22px 22px;
+    border-radius: 14px;
+    border: 1px solid #e4e4e1;
+    background: #ffffff;
+    text-decoration: none;
+    color: inherit;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+body.guide-page .guide-card-content {
+    min-width: 0;
+}
+
+body.guide-page .guide-card-title {
+    margin: 0;
+    font-size: 22px;
+    line-height: 1.2;
+    letter-spacing: 0.01em;
+    font-weight: 800;
+    color: #222222;
+}
+
+body.guide-page .guide-card-desc {
+    margin: 12px 0 0;
+    font-size: 15px;
+    line-height: 1.7;
+    color: #666666;
+}
+
+body.guide-page .guide-card-arrow {
+    flex: 0 0 auto;
+    font-size: 20px;
+    line-height: 1;
+    color: #424242;
+    transform: translateX(0);
+    transition: transform 0.2s ease, color 0.2s ease;
+}
+
+body.guide-page .guide-card-link:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 26px rgba(0, 0, 0, 0.08);
+    border-color: #cfcfc8;
+}
+
+body.guide-page .guide-card-link:hover .guide-card-arrow {
+    transform: translateX(4px);
+    color: #111111;
+}
+
+body.guide-page .guide-footnote {
+    padding: 8px 0 52px;
+}
+
+body.guide-page .guide-footnote-inner {
+    border-top: 1px solid #e4e4e1;
+    padding-top: 18px;
+}
+
+body.guide-page .guide-footnote-inner p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.8;
+    color: #555555;
+}
+
+@media (max-width: 1024px) {
+    body.guide-page .guide-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+    }
+
+    body.guide-page .guide-card-link {
+        min-height: 148px;
+    }
+}
+
+@media (max-width: 768px) {
+    body.guide-page .guide-hero {
+        padding: 22px 0 6px;
+    }
+
+    body.guide-page .guide-hero-title {
+        font-size: 34px;
+        letter-spacing: 0.04em;
+    }
+
+    body.guide-page .guide-hero-subtitle {
+        margin-top: 10px;
+        font-size: 15px;
+        line-height: 1.65;
+    }
+
+    body.guide-page .guide-grid-section {
+        padding: 14px 0 20px;
+    }
+
+    body.guide-page .guide-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    body.guide-page .guide-card-link {
+        min-height: 132px;
+        padding: 18px;
+    }
+
+    body.guide-page .guide-card-title {
+        font-size: 20px;
+    }
+
+    body.guide-page .guide-card-desc {
+        margin-top: 10px;
+        font-size: 14px;
+    }
+
+    body.guide-page .guide-footnote {
+        padding-bottom: 34px;
     }
 }
 

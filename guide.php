@@ -23,12 +23,36 @@ try {
 }
 
 $guide_cards = [
-    ['title' => '安全帽知識', 'href' => 'helmet_knowledge.php', 'image' => 'https://placehold.co/640x420/E6E8F0/243047?text=Helmet+Knowledge'],
-    ['title' => '頭圍量測教學', 'href' => 'head_measure.php', 'image' => 'https://placehold.co/640x420/E6E8F0/243047?text=Head+Measure'],
-    ['title' => '安全帽保養教學', 'href' => 'helmet_care.php', 'image' => 'https://placehold.co/640x420/E6E8F0/243047?text=Helmet+Care'],
-    ['title' => '常見問題 FAQ', 'href' => 'faq.php', 'image' => 'https://placehold.co/640x420/E6E8F0/243047?text=FAQ'],
-    ['title' => '優惠券專區', 'href' => 'coupons.php', 'image' => 'https://placehold.co/640x420/E6E8F0/243047?text=Coupons'],
-    ['title' => '退貨政策', 'href' => 'return_policy.php', 'image' => 'https://placehold.co/640x420/E6E8F0/243047?text=Return+Policy'],
+    [
+        'title' => '安全帽知識',
+        'desc' => '認識安全帽種類、材質差異與選購重點。',
+        'href' => 'helmet_knowledge.php',
+    ],
+    [
+        'title' => '頭圍測量教學',
+        'desc' => '了解正確測量方式，找到更適合自己的尺寸。',
+        'href' => 'head_measure.php',
+    ],
+    [
+        'title' => '安全帽保養教學',
+        'desc' => '學會清潔、保存與更換內襯的方法。',
+        'href' => 'helmet_care.php',
+    ],
+    [
+        'title' => '尺寸挑選建議',
+        'desc' => '依照頭型與配戴感受，選擇合適尺寸。',
+        'href' => 'head_measure.php',
+    ],
+    [
+        'title' => '購買流程說明',
+        'desc' => '快速了解選購、加入購物車與結帳流程。',
+        'href' => 'shipping.php',
+    ],
+    [
+        'title' => '常見問題',
+        'desc' => '整理購買前後最常遇到的問題與解答。',
+        'href' => 'faq.php',
+    ],
 ];
 ?>
 <!DOCTYPE html>
@@ -39,29 +63,40 @@ $guide_cards = [
 <title>購物指南 - HelmetVRse</title>
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
-<body>
+<body class="guide-page">
 <?php renderNavbar($pdo, $categories, $parts_category_id); ?>
 
-    <section class="products-section">
+    <section class="guide-hero">
         <div class="container">
-            <div class="section-header">
-                <h1 class="section-title">購物指南</h1>
-                <p class="section-subtitle">請選擇欲查看的主題</p>
-            </div>
+            <header class="guide-hero-inner">
+                <h1 class="guide-hero-title">購物指南</h1>
+                <p class="guide-hero-subtitle">從挑選安全帽到日常保養，快速找到你需要的資訊。</p>
+            </header>
+        </div>
+    </section>
 
-            <div class="products-grid">
+    <section class="guide-grid-section">
+        <div class="container">
+            <div class="guide-grid">
                 <?php foreach ($guide_cards as $card): ?>
-                    <article class="product-card">
-                        <a href="<?php echo htmlspecialchars($card['href']); ?>" style="text-decoration: none; color: inherit; display: block; height: 100%;">
-                            <div class="product-image">
-                                <img src="<?php echo htmlspecialchars($card['image']); ?>" alt="<?php echo htmlspecialchars($card['title']); ?>">
+                    <article class="guide-card">
+                        <a href="<?php echo htmlspecialchars($card['href']); ?>" class="guide-card-link">
+                            <div class="guide-card-content">
+                                <h2 class="guide-card-title"><?php echo htmlspecialchars($card['title']); ?></h2>
+                                <p class="guide-card-desc"><?php echo htmlspecialchars($card['desc']); ?></p>
                             </div>
-                            <div class="product-info">
-                                <h2 class="product-name"><?php echo htmlspecialchars($card['title']); ?></h2>
-                            </div>
+                            <span class="guide-card-arrow" aria-hidden="true">→</span>
                         </a>
                     </article>
                 <?php endforeach; ?>
+            </div>
+        </div>
+    </section>
+
+    <section class="guide-footnote">
+        <div class="container">
+            <div class="guide-footnote-inner">
+                <p>第一次選購安全帽，建議先查看頭圍測量與尺寸挑選說明。</p>
             </div>
         </div>
     </section>

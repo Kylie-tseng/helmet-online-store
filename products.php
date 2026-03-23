@@ -11,6 +11,18 @@ $category_id_get = isset($_GET['category_id']) ? (int)$_GET['category_id'] : 0;
 $search_keyword = isset($_GET['search']) ? trim($_GET['search']) : '';
 $style_param = isset($_GET['style']) ? trim((string)$_GET['style']) : '';
 $style_label = resolve_product_list_style($style_param);
+$style_param_token = strtolower($style_param);
+$legacy_style_tokens = ['retro', 'commuter', 'racing', 'women'];
+$use_legacy_style_collection_layout = in_array($style_param_token, $legacy_style_tokens, true);
+$style_label_to_token_map = [
+    '復古' => 'retro',
+    '通勤' => 'commuter',
+    '競速' => 'racing',
+    '女性' => 'women',
+];
+$active_style_token = $use_legacy_style_collection_layout
+    ? $style_param_token
+    : (($style_label !== null && isset($style_label_to_token_map[$style_label])) ? $style_label_to_token_map[$style_label] : '');
 
 [$category_id, $category_name] = resolve_product_list_category($pdo, $category_param, $category_id_get);
 
@@ -42,9 +54,9 @@ if ($category_name !== null && $category_name !== '') {
 }
 if ($style_label !== null) {
     if ($category_name !== null && $category_name !== '') {
-        $page_title = $category_name . ' · ' . $style_label . ' 風格';
+        $page_title = $category_name . ' · ' . $style_label . '風格';
     } else {
-        $page_title = $style_label . ' 風格商品';
+        $page_title = $style_label . '風格';
     }
 }
 
@@ -125,9 +137,21 @@ if ($is_logged_in) {
     $favorite_ids = getUserFavoriteProductIds($pdo, (int)$_SESSION['user_id']);
 }
 
-// 風格館頁：products.php?style=... 的視覺重排
+// 風格館頁：products.php?style=...（查詢邏輯仍沿用，但版型將統一成商品總覽頁）
 $is_style_collection_page = $style_label !== null;
 $style_order_category_labels = $is_style_collection_page ? get_product_list_category_order_labels() : [];
+
+// 風格頁 tab 不顯示「周邊與配件」
+if ($is_style_collection_page) {
+    $excluded_nk = normalize_product_category_label('周邊與配件');
+    $style_order_category_labels = array_values(array_filter(
+        $style_order_category_labels,
+        function ($label) use ($excluded_nk) {
+            $nk = normalize_product_category_label((string)$label);
+            return $nk !== $excluded_nk;
+        }
+    ));
+}
 
 // 用於「橫向分類 pill」的 category_id 對應
 $style_category_id_map = [];
@@ -138,10 +162,26 @@ if ($is_style_collection_page) {
     }
 }
 
-// 風格館：切出精選商品（不改查詢邏輯，只做前端分區）
-$featured_main_product = $is_style_collection_page ? ($products[0] ?? null) : null;
-$featured_side_products = $is_style_collection_page ? array_slice($products, 1, 2) : [];
-$remaining_products_for_grid = $is_style_collection_page ? array_slice($products, 3) : $products;
+// 風格館：版面僅重新排版（不改查詢邏輯）
+$products_for_grid = $is_style_collection_page ? $products : $products;
+
+// 風格館主標中文 -> 英文（用於 header 主標旁顯示）
+$style_english_title_map = [
+    '復古' => 'VINTAGE',
+    '通勤' => 'COMMUTER',
+    '競速' => 'RACING',
+    '女性' => 'WOMEN',
+];
+$style_english_title = $is_style_collection_page ? ($style_english_title_map[$style_label] ?? '') : '';
+
+// 風格館 header 描述文案（依風格對應）
+$style_desc_map = [
+    '復古' => '把經典輪廓與懷舊質感穿進每一次出發，騎出不退流行的風格態度。',
+    '通勤' => '從日常移動出發，找到兼顧舒適、實用與俐落外型的通勤裝備選擇。',
+    '競速' => '以速度感與性能語彙為靈感，探索更銳利、更有侵略感的騎乘風格配置。',
+    '女性' => '在俐落輪廓與細節質感之間，找到更貼近日常穿搭與個人風格的騎乘選擇。',
+];
+$style_header_desc = $is_style_collection_page ? ($style_desc_map[$style_label] ?? '') : '';
 ?>
 <!DOCTYPE html>
 <html lang="zh-TW">
@@ -151,89 +191,59 @@ $remaining_products_for_grid = $is_style_collection_page ? array_slice($products
     <title>商品總覽 - HelmetVRse</title>
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
-<body>
+<body class="products-overview-page">
 <!-- 導覽列 -->
     <?php renderNavbar($pdo, $categories, $parts_category_id); ?>
 
     <!-- 商品總覽頁面內容 -->
-    <?php if ($is_style_collection_page): ?>
+    <?php if ($is_style_collection_page && $use_legacy_style_collection_layout): ?>
         <div class="style-collection-page-container">
             <div class="style-collection-page-wrapper">
-                <!-- Hero -->
-                <section class="style-collection-hero">
-                    <div class="style-collection-hero-left">
-                        <div class="style-collection-kicker">STYLE EDIT</div>
-                        <h1 class="style-collection-title"><?php echo htmlspecialchars($style_label); ?>風格商品</h1>
-                        <p class="style-collection-desc">把同一種氣質，穿進每天的騎乘。</p>
-                        <div class="style-collection-hero-ctas">
-                            <a href="products.php?style=<?php echo rawurlencode($style_label); ?>" class="btn-secondary">立即探索</a>
-                            <a href="#style-featured" class="btn-primary style-collection-hero-primary">查看精選搭配</a>
-                        </div>
-                    </div>
-                    <div class="style-collection-hero-right">
-                        <?php if (!empty($featured_main_product)): ?>
-                            <?php
-                                $hero_img = resolve_product_card_image_src($featured_main_product['primary_image'] ?? null);
-                            ?>
-                            <div class="style-collection-hero-image">
-                                <img src="<?php echo htmlspecialchars($hero_img, ENT_QUOTES); ?>" alt="<?php echo htmlspecialchars($featured_main_product['name']); ?>">
-                            </div>
-                        <?php else: ?>
-                            <div class="style-collection-hero-image style-collection-hero-image--placeholder"></div>
+                <!-- 標題區（置中，不用大圖 hero） -->
+                <header class="style-collection-header">
+                    <div class="style-collection-kicker">STYLE ARCHIVE</div>
+                    <h1 class="style-collection-header-title">
+                        <span class="style-collection-header-title-cn"><?php echo htmlspecialchars((string)$style_label); ?>風格</span>
+                        <?php if ($style_english_title !== ''): ?>
+                            <span class="style-collection-header-title-en"><?php echo htmlspecialchars($style_english_title); ?></span>
                         <?php endif; ?>
-                    </div>
-                </section>
+                    </h1>
+                    <p class="style-collection-header-desc">
+                        <?php echo htmlspecialchars($style_header_desc); ?>
+                    </p>
+                </header>
 
-                <!-- 橫向分類 + 搜尋 -->
-                <div class="style-collection-toolbar">
-                    <nav class="style-collection-pill-nav" aria-label="風格分類">
+                <!-- 分類 tab（橫向 chips） -->
+                <nav class="style-collection-tabs" aria-label="風格分類">
+                    <?php
+                        $all_is_active = ($category_id === null);
+                        $all_href = 'products.php?style=' . rawurlencode((string)$active_style_token);
+                    ?>
+                    <a href="<?php echo htmlspecialchars($all_href); ?>" class="style-collection-tab <?php echo $all_is_active ? 'active' : ''; ?>">
+                        全部商品
+                    </a>
+
+                    <?php foreach ($style_order_category_labels as $label): ?>
                         <?php
-                            $all_is_active = ($category_id === null);
-                            $all_href = 'products.php?style=' . rawurlencode((string)$style_label);
+                            $nk = normalize_product_category_label($label);
+                            $tab_cat_id = isset($style_category_id_map[$nk]) ? (int)$style_category_id_map[$nk] : 0;
+                            $tab_href = $tab_cat_id > 0
+                                ? ('products.php?category=' . $tab_cat_id . '&style=' . rawurlencode((string)$active_style_token))
+                                : '#';
+                            $tab_active = ($category_id !== null && $tab_cat_id > 0 && (int)$category_id === $tab_cat_id);
                         ?>
-                        <a href="<?php echo htmlspecialchars($all_href); ?>" class="style-pill <?php echo $all_is_active ? 'active' : ''; ?>">
-                            全部商品
-                        </a>
-
-                        <?php foreach ($style_order_category_labels as $label): ?>
-                            <?php
-                                $nk = normalize_product_category_label($label);
-                                $tab_cat_id = isset($style_category_id_map[$nk]) ? (int)$style_category_id_map[$nk] : 0;
-                                $tab_href = $tab_cat_id > 0
-                                    ? ('products.php?category=' . $tab_cat_id . '&style=' . rawurlencode((string)$style_label))
-                                    : '#';
-                                $tab_active = ($category_id !== null && $tab_cat_id > 0 && (int)$category_id === $tab_cat_id);
-                            ?>
-                            <?php if ($tab_cat_id > 0): ?>
-                                <a href="<?php echo htmlspecialchars($tab_href); ?>" class="style-pill <?php echo $tab_active ? 'active' : ''; ?>">
-                                    <?php echo htmlspecialchars($label); ?>
-                                </a>
-                            <?php endif; ?>
-                        <?php endforeach; ?>
-                    </nav>
-
-                    <form action="products.php" method="GET" class="style-collection-search-form" role="search">
-                        <?php if ($category_id !== null): ?>
-                            <input type="hidden" name="category" value="<?php echo (int)$category_id; ?>">
-                        <?php elseif ($category_param !== '' && $category_param !== '全部商品'): ?>
-                            <input type="hidden" name="category" value="<?php echo htmlspecialchars($category_param); ?>">
+                        <?php if ($tab_cat_id > 0): ?>
+                            <a href="<?php echo htmlspecialchars($tab_href); ?>" class="style-collection-tab <?php echo $tab_active ? 'active' : ''; ?>">
+                                <?php echo htmlspecialchars($label); ?>
+                            </a>
                         <?php endif; ?>
-                        <input type="hidden" name="style" value="<?php echo htmlspecialchars($style_label); ?>">
-                        <input
-                            type="text"
-                            name="search"
-                            class="style-collection-search-input"
-                            placeholder="找商品"
-                            value="<?php echo htmlspecialchars($search_keyword); ?>"
-                        >
-                        <button type="submit" class="style-collection-search-btn">搜尋</button>
-                    </form>
-                </div>
+                    <?php endforeach; ?>
+                </nav>
 
-                <!-- 精選商品 -->
+                <!-- 商品 grid -->
                 <?php if (isset($error_message)): ?>
                     <div class="error-message"><?php echo htmlspecialchars($error_message); ?></div>
-                <?php elseif (empty($products)): ?>
+                <?php elseif (empty($products_for_grid)): ?>
                     <div class="empty-products-message">
                         <?php if (!empty($search_keyword)): ?>
                             找不到符合「<?php echo htmlspecialchars($search_keyword); ?>」的商品。
@@ -242,149 +252,45 @@ $remaining_products_for_grid = $is_style_collection_page ? array_slice($products
                         <?php endif; ?>
                     </div>
                 <?php else: ?>
-                    <section id="style-featured" class="style-collection-featured">
-                        <div class="style-collection-featured-grid">
-                            <?php if (!empty($featured_main_product)): ?>
-                                <?php $is_favorited = in_array((int)$featured_main_product['id'], $favorite_ids, true); ?>
-                                <div class="style-featured-main">
-                                    <div class="product-card-page">
-                                        <div class="product-image-page">
-                                            <?php
-                                                $list_img = resolve_product_card_image_src($featured_main_product['primary_image'] ?? null);
-                                            ?>
-                                            <img src="<?php echo htmlspecialchars($list_img, ENT_QUOTES); ?>"
-                                                 alt="<?php echo htmlspecialchars($featured_main_product['name']); ?>">
-                                        </div>
-                                        <div class="product-info-page">
-                                            <h3 class="product-name-page"><?php echo htmlspecialchars($featured_main_product['name']); ?></h3>
-                                            <div class="product-price-row">
-                                                <p class="product-price-page">NT$ <?php echo number_format($featured_main_product['price'], 0); ?></p>
-                                                <form action="api/toggle_favorite.php" method="POST" class="product-favorite-inline-form">
-                                                    <input type="hidden" name="product_id" value="<?php echo (int)$featured_main_product['id']; ?>">
-                                                    <input type="hidden" name="redirect" value="<?php echo htmlspecialchars($_SERVER['REQUEST_URI'] ?? 'products.php'); ?>">
-                                                    <button
-                                                        type="submit"
-                                                        class="favorite-btn favorite-icon-btn <?php echo $is_favorited ? 'active' : ''; ?>"
-                                                        aria-label="<?php echo $is_favorited ? '取消收藏' : '加入收藏'; ?>"
-                                                        title="<?php echo $is_favorited ? '取消收藏' : '加入收藏'; ?>"
-                                                    >
-                                                        <svg class="heart-icon" viewBox="0 0 24 24" aria-hidden="true">
-                                                            <path class="heart-outline" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"></path>
-                                                            <path class="heart-fill" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"></path>
-                                                        </svg>
-                                                    </button>
-                                                </form>
-                                            </div>
-                                            <div class="product-card-actions">
-                                                <a href="product_detail.php?id=<?php echo htmlspecialchars($featured_main_product['id']); ?>" class="btn-primary product-btn-page">
-                                                    查看詳情
-                                                </a>
-                                            </div>
-                                        </div>
+                    <section class="style-collection-grid-section">
+                        <div class="style-collection-grid">
+                            <?php foreach ($products_for_grid as $product): ?>
+                                <?php $is_favorited = in_array((int)$product['id'], $favorite_ids, true); ?>
+                                <div class="product-card-page">
+                                    <div class="product-image-page">
+                                        <?php $list_img = resolve_product_card_image_src($product['primary_image'] ?? null); ?>
+                                        <img src="<?php echo htmlspecialchars($list_img, ENT_QUOTES); ?>"
+                                             alt="<?php echo htmlspecialchars($product['name']); ?>">
                                     </div>
-                                </div>
-                            <?php endif; ?>
-
-                            <?php foreach ($featured_side_products as $side_product): ?>
-                                <?php $is_favorited = in_array((int)$side_product['id'], $favorite_ids, true); ?>
-                                <div class="style-featured-side">
-                                    <div class="product-card-page">
-                                        <div class="product-image-page">
-                                            <?php
-                                                $list_img = resolve_product_card_image_src($side_product['primary_image'] ?? null);
-                                            ?>
-                                            <img src="<?php echo htmlspecialchars($list_img, ENT_QUOTES); ?>"
-                                                 alt="<?php echo htmlspecialchars($side_product['name']); ?>">
+                                    <div class="product-info-page">
+                                        <h3 class="product-name-page"><?php echo htmlspecialchars($product['name']); ?></h3>
+                                        <div class="product-price-row">
+                                            <p class="product-price-page">NT$ <?php echo number_format($product['price'], 0); ?></p>
+                                            <form action="api/toggle_favorite.php" method="POST" class="product-favorite-inline-form">
+                                                <input type="hidden" name="product_id" value="<?php echo (int)$product['id']; ?>">
+                                                <input type="hidden" name="redirect" value="<?php echo htmlspecialchars($_SERVER['REQUEST_URI'] ?? 'products.php'); ?>">
+                                                <button
+                                                    type="submit"
+                                                    class="favorite-btn favorite-icon-btn <?php echo $is_favorited ? 'active' : ''; ?>"
+                                                    aria-label="<?php echo $is_favorited ? '取消收藏' : '加入收藏'; ?>"
+                                                    title="<?php echo $is_favorited ? '取消收藏' : '加入收藏'; ?>"
+                                                >
+                                                    <svg class="heart-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                                        <path class="heart-outline" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"></path>
+                                                        <path class="heart-fill" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"></path>
+                                                    </svg>
+                                                </button>
+                                            </form>
                                         </div>
-                                        <div class="product-info-page">
-                                            <h3 class="product-name-page"><?php echo htmlspecialchars($side_product['name']); ?></h3>
-                                            <div class="product-price-row">
-                                                <p class="product-price-page">NT$ <?php echo number_format($side_product['price'], 0); ?></p>
-                                                <form action="api/toggle_favorite.php" method="POST" class="product-favorite-inline-form">
-                                                    <input type="hidden" name="product_id" value="<?php echo (int)$side_product['id']; ?>">
-                                                    <input type="hidden" name="redirect" value="<?php echo htmlspecialchars($_SERVER['REQUEST_URI'] ?? 'products.php'); ?>">
-                                                    <button
-                                                        type="submit"
-                                                        class="favorite-btn favorite-icon-btn <?php echo $is_favorited ? 'active' : ''; ?>"
-                                                        aria-label="<?php echo $is_favorited ? '取消收藏' : '加入收藏'; ?>"
-                                                        title="<?php echo $is_favorited ? '取消收藏' : '加入收藏'; ?>"
-                                                    >
-                                                        <svg class="heart-icon" viewBox="0 0 24 24" aria-hidden="true">
-                                                            <path class="heart-outline" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"></path>
-                                                            <path class="heart-fill" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"></path>
-                                                        </svg>
-                                                    </button>
-                                                </form>
-                                            </div>
-                                            <div class="product-card-actions">
-                                                <a href="product_detail.php?id=<?php echo htmlspecialchars($side_product['id']); ?>" class="btn-primary product-btn-page">
-                                                    查看詳情
-                                                </a>
-                                            </div>
+                                        <div class="product-card-actions">
+                                            <a href="product_detail.php?id=<?php echo htmlspecialchars($product['id']); ?>" class="btn-primary product-btn-page">
+                                                查看詳情
+                                            </a>
                                         </div>
                                     </div>
                                 </div>
                             <?php endforeach; ?>
                         </div>
-                    </section>
-
-                    <!-- 風格介紹（小型） -->
-                    <section class="style-collection-intro">
-                        <div class="style-collection-intro-card">
-                            <h2 class="style-collection-intro-title">為什麼選這個風格</h2>
-                            <p class="style-collection-intro-text">從視覺到配件，打造一套你會每天想戴上的騎乘氣質。</p>
-                        </div>
-                    </section>
-
-                    <!-- 全部商品區（使用一般 grid） -->
-                    <section class="style-collection-all">
-                        <div class="style-collection-all-header">
-                            <h2 class="style-collection-all-title">全部商品</h2>
-                        </div>
-                        <?php if (empty($remaining_products_for_grid)): ?>
-                            <div class="empty-products-message">
-                                目前此條件下沒有更多商品。
-                            </div>
-                        <?php else: ?>
-                            <div class="style-collection-all-grid">
-                                <?php foreach ($remaining_products_for_grid as $product): ?>
-                                    <?php $is_favorited = in_array((int)$product['id'], $favorite_ids, true); ?>
-                                    <div class="product-card-page">
-                                        <div class="product-image-page">
-                                            <?php $list_img = resolve_product_card_image_src($product['primary_image'] ?? null); ?>
-                                            <img src="<?php echo htmlspecialchars($list_img, ENT_QUOTES); ?>"
-                                                 alt="<?php echo htmlspecialchars($product['name']); ?>">
-                                        </div>
-                                        <div class="product-info-page">
-                                            <h3 class="product-name-page"><?php echo htmlspecialchars($product['name']); ?></h3>
-                                            <div class="product-price-row">
-                                                <p class="product-price-page">NT$ <?php echo number_format($product['price'], 0); ?></p>
-                                                <form action="api/toggle_favorite.php" method="POST" class="product-favorite-inline-form">
-                                                    <input type="hidden" name="product_id" value="<?php echo (int)$product['id']; ?>">
-                                                    <input type="hidden" name="redirect" value="<?php echo htmlspecialchars($_SERVER['REQUEST_URI'] ?? 'products.php'); ?>">
-                                                    <button
-                                                        type="submit"
-                                                        class="favorite-btn favorite-icon-btn <?php echo $is_favorited ? 'active' : ''; ?>"
-                                                        aria-label="<?php echo $is_favorited ? '取消收藏' : '加入收藏'; ?>"
-                                                        title="<?php echo $is_favorited ? '取消收藏' : '加入收藏'; ?>"
-                                                    >
-                                                        <svg class="heart-icon" viewBox="0 0 24 24" aria-hidden="true">
-                                                            <path class="heart-outline" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"></path>
-                                                            <path class="heart-fill" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"></path>
-                                                        </svg>
-                                                    </button>
-                                                </form>
-                                            </div>
-                                            <div class="product-card-actions">
-                                                <a href="product_detail.php?id=<?php echo htmlspecialchars($product['id']); ?>" class="btn-primary product-btn-page">
-                                                    查看詳情
-                                                </a>
-                                            </div>
-                                        </div>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                        <?php endif; ?>
                     </section>
                 <?php endif; ?>
             </div>
@@ -393,14 +299,16 @@ $remaining_products_for_grid = $is_style_collection_page ? array_slice($products
         <div class="products-page-container">
             <div class="products-page-wrapper">
                 <!-- 左側分類列表 -->
-                <aside class="products-sidebar">
-                    <h3 class="sidebar-title">商品分類</h3>
+                <aside class="products-sidebar products-sidebar-panel">
+                    <div class="sidebar-text-nav-header">
+                        <div class="sidebar-title">商品分類</div>
+                    </div>
+
                     <ul class="category-list">
                         <li>
                             <?php
-                                $all_href = ($style_label !== null)
-                                    ? ('products.php?style=' . rawurlencode($style_label))
-                                    : 'products.php?category=全部商品';
+                                // 只負責「商品分類」：點「全部商品」要清掉 category 條件，並且不保留 style 參數
+                                $all_href = 'products.php?category=全部商品';
                                 $all_active = ($category_id === null && ($category_param === '' || $category_param === '全部商品'));
                             ?>
                             <a href="<?php echo htmlspecialchars($all_href); ?>" class="category-link <?php echo $all_active ? 'active' : ''; ?>">
@@ -410,14 +318,12 @@ $remaining_products_for_grid = $is_style_collection_page ? array_slice($products
                         <?php foreach ($categories as $cat): ?>
                             <?php
                                 $cid = (int)$cat['id'];
+                                // 只負責「商品分類」：切分類時不混入 style 條件
                                 $cat_link = 'products.php?category=' . $cid;
-                                if ($style_label !== null) {
-                                    $cat_link .= '&style=' . rawurlencode($style_label);
-                                }
                                 $is_active = ($category_id !== null && (int)$category_id === $cid);
                             ?>
                             <li>
-                                <a href="<?php echo htmlspecialchars($cat_link); ?>" 
+                                <a href="<?php echo htmlspecialchars($cat_link); ?>"
                                    class="category-link <?php echo $is_active ? 'active' : ''; ?>">
                                     <?php echo htmlspecialchars($cat['name']); ?>
                                 </a>

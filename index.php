@@ -27,15 +27,17 @@ try {
 
 // 查詢熱門商品
 try {
-    $stmt = $pdo->query("SELECT p.id, p.name, p.price,
+    $stmt = $pdo->query("SELECT p.id, p.name, p.price, p.style,
             (
                 SELECT pi.image_url
                 FROM product_images pi
                 WHERE pi.product_id = p.id
                 ORDER BY pi.sort_order ASC, pi.id ASC
                 LIMIT 1
-            ) AS primary_image
+            ) AS primary_image,
+            c.name AS category_name
             FROM products p
+            INNER JOIN categories c ON p.category_id = c.id
             WHERE p.status = 'active'
               AND p.is_featured = 1
             ORDER BY p.id ASC
@@ -273,18 +275,55 @@ if (is_array($promo_offers) && !empty($promo_offers)) {
                 </header>
 
                 <?php
-                $product_tags = ['全罩式', '競賽款', '入門款'];
+                // 首頁商品卡兩個 badge 的來源：
+                // 1) 帽型分類：由 categories.name 映射（全罩式/半罩式/3/4罩/配件）
+                // 2) 風格英文：由 products.style 映射（VINTAGE/COMMUTER/RACING/...）
+                $helmet_type_map = [
+                    '全罩式安全帽' => '全罩式',
+                    '半罩式安全帽' => '半罩式',
+                    '3/4罩安全帽' => '3/4罩',
+                    '周邊與配件' => '配件',
+                ];
+
+                $style_english_map = [
+                    '復古' => 'VINTAGE',
+                    '通勤' => 'COMMUTER',
+                    // 資料庫可能使用「競速」或「競賽」
+                    '競賽' => 'RACING',
+                    '競速' => 'RACING',
+                    '街頭' => 'STREET',
+                    '女性' => 'WOMEN',
+                ];
                 ?>
 
                 <?php if (empty($hotProducts)): ?>
                     <div class="empty-message">目前尚未有熱門商品</div>
                 <?php else: ?>
                     <div class="featured-products-grid-home">
-                        <?php foreach ($hotProducts as $idx => $product): ?>
+                        <?php foreach ($hotProducts as $product): ?>
                             <?php
                             $is_favorited = in_array((int)$product['id'], $favorite_ids, true);
                             $card_img_src = resolve_product_card_image_src($product['primary_image'] ?? null);
-                            $tag = $product_tags[$idx % count($product_tags)];
+
+                            $category_name = (string)($product['category_name'] ?? '');
+                            $helmet_badge = $helmet_type_map[$category_name] ?? null;
+                            // fallback：用字串關鍵字判斷（避免資料名稱略有差異）
+                            if ($helmet_badge === null) {
+                                if (strpos($category_name, '全罩式') !== false) {
+                                    $helmet_badge = '全罩式';
+                                } elseif (strpos($category_name, '半罩式') !== false) {
+                                    $helmet_badge = '半罩式';
+                                } elseif (strpos($category_name, '3/4') !== false) {
+                                    $helmet_badge = '3/4罩';
+                                } elseif (strpos($category_name, '配件') !== false || strpos($category_name, '周邊') !== false) {
+                                    $helmet_badge = '配件';
+                                } else {
+                                    $helmet_badge = '配件';
+                                }
+                            }
+
+                            $style_label = (string)($product['style'] ?? '');
+                            $style_english_badge = $style_english_map[$style_label] ?? 'OTHER';
                             ?>
                             <article class="featured-product-card">
                                 <div class="featured-product-media">
@@ -295,7 +334,10 @@ if (is_array($promo_offers) && !empty($promo_offers)) {
 
                                 <div class="featured-product-body">
                                     <div class="featured-product-meta">
-                                        <span class="featured-product-tag"><?php echo htmlspecialchars($tag); ?></span>
+                                        <div class="featured-product-badge-group" aria-label="商品標籤">
+                                            <span class="featured-product-helmet-badge"><?php echo htmlspecialchars($helmet_badge); ?></span>
+                                            <span class="featured-product-style-badge"><?php echo htmlspecialchars($style_english_badge); ?></span>
+                                        </div>
                                         <form action="api/toggle_favorite.php" method="POST" class="product-favorite-inline-form">
                                             <input type="hidden" name="product_id" value="<?php echo (int)$product['id']; ?>">
                                             <input type="hidden" name="redirect" value="index.php">
@@ -340,6 +382,24 @@ if (is_array($promo_offers) && !empty($promo_offers)) {
 
                 <div class="lifestyle-gallery-track">
                     <?php
+                    // 騎乘風格導覽（中文 -> 英文）對應：用 map 方便之後擴充
+                    $style_english_map = [
+                        '復古' => 'VINTAGE',
+                        '通勤' => 'COMMUTER',
+                        '競速' => 'RACING',
+                        '競賽' => 'RACING',
+                        '女性' => 'WOMEN',
+                    ];
+
+                    // 首頁風格卡片導向：直接帶入 products.php 的 style 參數
+                    // 注意：此區塊只改連結目標，不改卡片外觀/hover。
+                    $style_param_map = [
+                        '復古' => 'retro',
+                        '通勤' => 'commuter',
+                        '競速' => 'racing',
+                        '女性' => 'women',
+                    ];
+
                     $home_style_cards = [
                         ['label' => '復古', 'svg_rect' => '%23d8dde3', 'svg_path' => '%23b8c0ca', 'path_d' => 'M0 310L130 220L250 265L360 200L470 250L600 190V380H0Z'],
                         ['label' => '通勤', 'svg_rect' => '%23d9dfe5', 'svg_path' => '%23b7bec8', 'path_d' => 'M0 292L120 210L220 245L340 195L470 255L600 182V380H0Z'],
@@ -347,12 +407,18 @@ if (is_array($promo_offers) && !empty($promo_offers)) {
                         ['label' => '女性', 'svg_rect' => '%23d7dde2', 'svg_path' => '%23b4bcc5', 'path_d' => 'M0 296L128 220L236 258L352 202L462 244L600 187V380H0Z'],
                     ];
                     foreach ($home_style_cards as $sc):
-                        $style_href = 'products.php?style=' . rawurlencode($sc['label']);
+                        $style_cn = (string)($sc['label'] ?? '');
+                        $style_param = $style_param_map[$style_cn] ?? 'retro';
+                        $style_href = 'products.php?style=' . rawurlencode($style_param);
+                        $style_en = $style_english_map[$style_cn] ?? 'OTHER';
                         $svg_src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 380'%3E%3Crect fill='" . $sc['svg_rect'] . "' width='600' height='380'/%3E%3Cpath d='" . $sc['path_d'] . "' fill='" . $sc['svg_path'] . "'/%3E%3C/svg%3E";
                     ?>
                     <a class="lifestyle-gallery-item" href="<?php echo htmlspecialchars($style_href); ?>">
-                        <img class="lifestyle-gallery-image" src="<?php echo htmlspecialchars($svg_src, ENT_QUOTES); ?>" alt="<?php echo htmlspecialchars($sc['label']); ?> 風格">
-                        <h3 class="lifestyle-gallery-title"><?php echo htmlspecialchars($sc['label']); ?></h3>
+                        <img class="lifestyle-gallery-image" src="<?php echo htmlspecialchars($svg_src, ENT_QUOTES); ?>" alt="<?php echo htmlspecialchars($style_cn); ?> 風格">
+                        <h3 class="lifestyle-gallery-title" aria-label="<?php echo htmlspecialchars($style_cn); ?> / <?php echo htmlspecialchars($style_en); ?>">
+                            <span class="lifestyle-style-badge-cn"><?php echo htmlspecialchars($style_cn); ?></span>
+                            <span class="lifestyle-style-badge-en"><?php echo htmlspecialchars($style_en); ?></span>
+                        </h3>
                     </a>
                     <?php endforeach; ?>
                 </div>
