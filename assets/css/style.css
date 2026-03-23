@@ -6098,6 +6098,20 @@ body:not(.home-page):not(.auth-page) .product-detail-container {
     padding-top: var(--navbar-first-content-padding-top) !important;
 }
 
+/* About 頁例外：只保留一次 navbar 高度補償，避免 hero 前出現白色空隙 */
+body.about-page:not(.home-page):not(.auth-page) {
+    padding-top: var(--site-navbar-height) !important;
+}
+
+body.about-page:not(.home-page):not(.auth-page) nav + script + .about-main {
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+}
+
+body.about-page .about-main {
+    padding-top: 0 !important;
+}
+
 /* 商品總覽：避免距離 navbar 過大（只影響 products.php） */
 body.products-overview-page {
     padding-top: calc(var(--site-navbar-height) + 12px) !important; /* 76 + 12 = 88px */
@@ -8392,7 +8406,7 @@ body.products-overview-page .products-sidebar {
     border-bottom: 1px solid rgba(22, 30, 42, 0.09);
 }
 
-.coupon-page-directory .coupon-page-header h1 {
+.coupon-page-directory .page-hero-title {
     margin: 0;
     font-size: clamp(34px, 4.4vw, 44px);
     line-height: 1.08;
@@ -8401,7 +8415,7 @@ body.products-overview-page .products-sidebar {
     font-weight: 760;
 }
 
-.coupon-page-directory .coupon-page-header p {
+.coupon-page-directory .page-hero-subtitle {
     margin: 12px 0 0;
     font-size: 15px;
     line-height: 1.7;
@@ -8617,22 +8631,6 @@ body.products-overview-page .products-sidebar {
     margin-bottom: 18px;
     padding: 0 4px 16px;
     border-bottom: 1px solid rgba(22, 30, 42, 0.09);
-}
-
-.return-policy-page .return-policy-header h1 {
-    margin: 0;
-    font-size: clamp(34px, 4.4vw, 44px);
-    line-height: 1.08;
-    letter-spacing: 0.04em;
-    color: #1f2a36;
-    font-weight: 760;
-}
-
-.return-policy-page .return-policy-header p {
-    margin: 12px 0 0;
-    font-size: 15px;
-    line-height: 1.7;
-    color: #606a76;
 }
 
 .return-policy-page .return-policy-panel {
@@ -9682,21 +9680,34 @@ body.guide-page .guide-hero-inner {
     margin: 0 auto;
 }
 
-body.guide-page .guide-hero-title {
-    margin: 0;
-    font-size: clamp(34px, 4vw, 52px);
-    line-height: 1.08;
-    letter-spacing: 0.06em;
-    font-weight: 900;
-    color: #1f1f1f;
+/* 共用頁面主標（以優惠券專區為基準） */
+.page-hero-header {
+    text-align: center;
+    margin-bottom: 18px;
+    padding: 0 4px 16px;
+    border-bottom: 1px solid rgba(22, 30, 42, 0.09);
 }
 
-body.guide-page .guide-hero-subtitle {
-    margin: 14px auto 0;
-    font-size: 18px;
+.page-hero-title {
+    margin: 0;
+    font-size: clamp(34px, 4.4vw, 44px);
+    line-height: 1.08;
+    letter-spacing: 0.04em;
+    color: #1f2a36;
+    font-weight: 760;
+}
+
+.page-hero-subtitle {
+    margin: 12px 0 0;
+    font-size: 15px;
     line-height: 1.7;
-    color: #5a5a5a;
+    color: #606a76;
+}
+
+body.guide-page .guide-hero-subtitle.page-hero-subtitle {
     max-width: 680px;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 body.guide-page .guide-grid-section {
@@ -9769,21 +9780,6 @@ body.guide-page .guide-card-link:hover .guide-card-arrow {
     color: #111111;
 }
 
-body.guide-page .guide-footnote {
-    padding: 8px 0 52px;
-}
-
-body.guide-page .guide-footnote-inner {
-    border-top: 1px solid #e4e4e1;
-    padding-top: 18px;
-}
-
-body.guide-page .guide-footnote-inner p {
-    margin: 0;
-    font-size: 14px;
-    line-height: 1.8;
-    color: #555555;
-}
 
 @media (max-width: 1024px) {
     body.guide-page .guide-grid {
@@ -9799,17 +9795,6 @@ body.guide-page .guide-footnote-inner p {
 @media (max-width: 768px) {
     body.guide-page .guide-hero {
         padding: 22px 0 6px;
-    }
-
-    body.guide-page .guide-hero-title {
-        font-size: 34px;
-        letter-spacing: 0.04em;
-    }
-
-    body.guide-page .guide-hero-subtitle {
-        margin-top: 10px;
-        font-size: 15px;
-        line-height: 1.65;
     }
 
     body.guide-page .guide-grid-section {
@@ -9835,8 +9820,564 @@ body.guide-page .guide-footnote-inner p {
         font-size: 14px;
     }
 
-    body.guide-page .guide-footnote {
-        padding-bottom: 34px;
+}
+
+/* =========================================
+   Helmet Knowledge Page
+   ========================================= */
+body.knowledge-page {
+    background: #edf1f5;
+}
+
+body.knowledge-page .knowledge-shell {
+    padding: 28px 0 92px;
+}
+
+body.knowledge-page .knowledge-hero {
+    margin-bottom: 20px;
+}
+
+body.knowledge-page .knowledge-content {
+    max-width: 1040px;
+    margin: 0 auto;
+}
+
+body.knowledge-page .knowledge-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+}
+
+body.knowledge-page .knowledge-section,
+body.knowledge-page .knowledge-note-section {
+    background: #ffffff;
+    border: 1px solid #d8dde4;
+    border-radius: 16px;
+    padding: 22px 22px;
+    box-shadow: 0 8px 18px rgba(15, 23, 34, 0.06);
+}
+
+body.knowledge-page .knowledge-note-section {
+    margin-top: 18px;
+}
+
+body.knowledge-page .knowledge-section-title {
+    margin: 0;
+    font-size: 24px;
+    line-height: 1.22;
+    color: #1e2732;
+    font-weight: 740;
+    letter-spacing: 0.02em;
+}
+
+body.knowledge-page .knowledge-section-intro,
+body.knowledge-page .knowledge-section p,
+body.knowledge-page .knowledge-note-section p,
+body.knowledge-page .knowledge-list li,
+body.knowledge-page .knowledge-steps li {
+    margin: 10px 0 0;
+    font-size: 15px;
+    line-height: 1.88;
+    color: #444a53;
+}
+
+body.knowledge-page .knowledge-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 14px;
+    font-size: 14px;
+}
+
+body.knowledge-page .knowledge-table th,
+body.knowledge-page .knowledge-table td {
+    border-bottom: 1px solid #e8ecf1;
+    padding: 10px 8px;
+    text-align: left;
+    color: #3d434a;
+}
+
+body.knowledge-page .knowledge-table th {
+    color: #1f2a36;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.02em;
+}
+
+body.knowledge-page .knowledge-list,
+body.knowledge-page .knowledge-steps {
+    margin: 10px 0 0;
+    padding-left: 20px;
+}
+
+body.knowledge-page .knowledge-highlight {
+    color: #1f2a36;
+    font-weight: 760;
+}
+
+@media (max-width: 1024px) {
+    body.knowledge-page .knowledge-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    body.knowledge-page .knowledge-shell {
+        padding: 22px 0 72px;
+    }
+
+    body.knowledge-page .knowledge-content {
+        max-width: none;
+        width: calc(100% - 30px);
+    }
+
+    body.knowledge-page .knowledge-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    body.knowledge-page .knowledge-section,
+    body.knowledge-page .knowledge-note-section {
+        padding: 18px 16px;
+    }
+
+    body.knowledge-page .knowledge-section-title {
+        font-size: 20px;
+    }
+
+    body.knowledge-page .knowledge-table {
+        font-size: 13px;
+    }
+
+    body.knowledge-page .knowledge-section-intro,
+    body.knowledge-page .knowledge-section p,
+    body.knowledge-page .knowledge-note-section p,
+    body.knowledge-page .knowledge-list li,
+    body.knowledge-page .knowledge-steps li {
+        font-size: 14px;
+        line-height: 1.78;
+    }
+}
+
+/* =========================================
+   Head Measure Page
+   ========================================= */
+body.measure-page {
+    background: #edf1f5;
+}
+
+body.measure-page .measure-shell {
+    padding: 28px 0 92px;
+}
+
+body.measure-page .measure-hero {
+    margin-bottom: 20px;
+}
+
+body.measure-page .measure-content {
+    max-width: 1040px;
+    margin: 0 auto;
+}
+
+body.measure-page .measure-steps-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    margin-bottom: 18px;
+}
+
+body.measure-page .measure-step-card,
+body.measure-page .measure-size-section,
+body.measure-page .measure-tip-section {
+    background: #ffffff;
+    border: 1px solid #d8dde4;
+    border-radius: 16px;
+    padding: 22px;
+    box-shadow: 0 8px 18px rgba(15, 23, 34, 0.06);
+}
+
+body.measure-page .measure-step-card {
+    text-align: center;
+}
+
+body.measure-page .measure-step-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 999px;
+    background: #1f2a36;
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 760;
+    margin-bottom: 12px;
+}
+
+body.measure-page .measure-step-card h3,
+body.measure-page .measure-size-title,
+body.measure-page .measure-tip-section h3 {
+    margin: 0;
+    font-size: 24px;
+    line-height: 1.22;
+    color: #1e2732;
+    font-weight: 740;
+    letter-spacing: 0.02em;
+}
+
+body.measure-page .measure-step-card p,
+body.measure-page .measure-tip-section p,
+body.measure-page .measure-tip-list li {
+    margin: 10px 0 0;
+    font-size: 15px;
+    line-height: 1.88;
+    color: #444a53;
+}
+
+body.measure-page .measure-highlight {
+    color: #1f2a36;
+    font-weight: 760;
+}
+
+body.measure-page .measure-size-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 14px;
+}
+
+body.measure-page .measure-size-table th,
+body.measure-page .measure-size-table td {
+    border-bottom: 1px solid #e8ecf1;
+    padding: 12px 8px;
+    text-align: center;
+    color: #3d434a;
+    font-size: 15px;
+}
+
+body.measure-page .measure-size-table th {
+    color: #1f2a36;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.02em;
+}
+
+body.measure-page .measure-tip-list {
+    margin: 10px 0 0;
+    padding-left: 20px;
+}
+
+body.measure-page .measure-size-section + .measure-tip-section {
+    margin-top: 16px;
+}
+
+@media (max-width: 1024px) {
+    body.measure-page .measure-steps-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    body.measure-page .measure-shell {
+        padding: 22px 0 72px;
+    }
+
+    body.measure-page .measure-content {
+        max-width: none;
+        width: calc(100% - 30px);
+    }
+
+    body.measure-page .measure-steps-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    body.measure-page .measure-step-card,
+    body.measure-page .measure-size-section,
+    body.measure-page .measure-tip-section {
+        padding: 18px 16px;
+    }
+
+    body.measure-page .measure-step-card h3,
+    body.measure-page .measure-size-title,
+    body.measure-page .measure-tip-section h3 {
+        font-size: 20px;
+    }
+
+    body.measure-page .measure-step-card p,
+    body.measure-page .measure-tip-section p,
+    body.measure-page .measure-tip-list li,
+    body.measure-page .measure-size-table th,
+    body.measure-page .measure-size-table td {
+        font-size: 14px;
+        line-height: 1.78;
+    }
+}
+
+/* =========================================
+   Helmet Care Page
+   ========================================= */
+body.helmet-care-page {
+    background: #f6f6f3;
+}
+
+body.helmet-care-page .care-shell {
+    padding: 30px 0 86px;
+}
+
+body.helmet-care-page .care-hero {
+    margin-bottom: 28px;
+}
+
+body.helmet-care-page .care-content {
+    max-width: 1040px;
+    margin: 0 auto;
+    display: grid;
+    gap: 20px;
+}
+
+body.helmet-care-page .care-section {
+    display: block;
+}
+
+body.helmet-care-page .care-card,
+body.helmet-care-page .care-warning-box {
+    background: #ffffff;
+    border: 1px solid #e2e2dd;
+    border-radius: 16px;
+    box-shadow: 0 8px 22px rgba(16, 16, 16, 0.05);
+}
+
+body.helmet-care-page .care-card {
+    padding: 24px 26px;
+}
+
+body.helmet-care-page .care-title {
+    margin: 0 0 14px;
+    color: #1a1a1a;
+    font-size: clamp(1.26rem, 2vw, 1.58rem);
+    font-weight: 730;
+    letter-spacing: 0.01em;
+}
+
+body.helmet-care-page .care-list,
+body.helmet-care-page .care-warning-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+body.helmet-care-page .care-list li,
+body.helmet-care-page .care-warning-list li {
+    position: relative;
+    margin-bottom: 12px;
+    padding-left: 14px;
+    color: #3f3f3f;
+    font-size: 15px;
+    line-height: 1.86;
+}
+
+body.helmet-care-page .care-list li:last-child,
+body.helmet-care-page .care-warning-list li:last-child {
+    margin-bottom: 0;
+}
+
+body.helmet-care-page .care-list li::before,
+body.helmet-care-page .care-warning-list li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.88em;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #a8a8a3;
+}
+
+body.helmet-care-page .care-label {
+    display: block;
+    margin-bottom: 2px;
+    color: #171717;
+    font-weight: 720;
+}
+
+body.helmet-care-page .care-warning-box {
+    padding: 24px 26px;
+}
+
+body.helmet-care-page .care-warning-box h3 {
+    margin: 0 0 12px;
+    color: #161616;
+    font-size: 1.14rem;
+    font-weight: 740;
+    letter-spacing: 0.01em;
+}
+
+@media (max-width: 991px) {
+    body.helmet-care-page .care-shell {
+        padding: 24px 0 70px;
+    }
+
+    body.helmet-care-page .care-section {
+        display: block;
+    }
+}
+
+@media (max-width: 768px) {
+    body.helmet-care-page .care-content {
+        width: calc(100% - 30px);
+        max-width: none;
+    }
+
+    body.helmet-care-page .care-card,
+    body.helmet-care-page .care-warning-box {
+        padding: 18px 16px;
+    }
+
+    body.helmet-care-page .care-title {
+        font-size: 1.18rem;
+    }
+
+    body.helmet-care-page .care-list li,
+    body.helmet-care-page .care-warning-list li {
+        font-size: 14px;
+        line-height: 1.78;
+    }
+}
+
+/* =========================================
+   FAQ Page
+   ========================================= */
+body.faq-page {
+    background: #f7f7f4;
+}
+
+body.faq-page .faq-shell {
+    padding: 30px 0 86px;
+}
+
+body.faq-page .faq-hero {
+    margin-bottom: 26px;
+}
+
+body.faq-page .faq-content {
+    max-width: 980px;
+    margin: 0 auto;
+    display: grid;
+    gap: 22px;
+}
+
+body.faq-page .faq-section {
+    background: #ffffff;
+    border: 1px solid #e2e2de;
+    border-radius: 16px;
+    box-shadow: 0 8px 22px rgba(16, 16, 16, 0.05);
+    padding: 20px 20px 8px;
+}
+
+body.faq-page .faq-section-title {
+    margin: 0 0 14px;
+    color: #181818;
+    font-size: clamp(1.12rem, 1.7vw, 1.32rem);
+    font-weight: 730;
+    letter-spacing: 0.01em;
+}
+
+body.faq-page .faq-item {
+    border: 1px solid #e8e8e4;
+    border-radius: 12px;
+    background: #fcfcfb;
+    margin-bottom: 12px;
+    overflow: hidden;
+}
+
+body.faq-page .faq-item:last-child {
+    margin-bottom: 0;
+}
+
+body.faq-page .faq-question {
+    list-style: none;
+    cursor: pointer;
+    position: relative;
+    padding: 14px 44px 14px 16px;
+    color: #1f1f1f;
+    font-size: 0.98rem;
+    font-weight: 650;
+    line-height: 1.66;
+}
+
+body.faq-page .faq-question::-webkit-details-marker {
+    display: none;
+}
+
+body.faq-page .faq-question::after {
+    content: "+";
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #6a6a6a;
+    font-size: 20px;
+    font-weight: 400;
+    transition: transform 0.2s ease, color 0.2s ease;
+}
+
+body.faq-page .faq-item[open] .faq-question {
+    border-bottom: 1px solid #ecece8;
+    background: #fafaf8;
+}
+
+body.faq-page .faq-item[open] .faq-question::after {
+    content: "−";
+    color: #333333;
+}
+
+body.faq-page .faq-answer {
+    padding: 12px 16px 16px;
+}
+
+body.faq-page .faq-answer p {
+    margin: 0;
+    color: #484848;
+    font-size: 15px;
+    line-height: 1.84;
+}
+
+@media (max-width: 768px) {
+    body.faq-page .faq-shell {
+        padding: 24px 0 70px;
+    }
+
+    body.faq-page .faq-content {
+        width: calc(100% - 30px);
+        max-width: none;
+        gap: 16px;
+    }
+
+    body.faq-page .faq-section {
+        padding: 16px 14px 8px;
+    }
+
+    body.faq-page .faq-section-title {
+        font-size: 1.06rem;
+        margin-bottom: 10px;
+    }
+
+    body.faq-page .faq-question {
+        padding: 12px 40px 12px 12px;
+        font-size: 0.94rem;
+        line-height: 1.62;
+    }
+
+    body.faq-page .faq-question::after {
+        right: 12px;
+    }
+
+    body.faq-page .faq-answer {
+        padding: 10px 12px 12px;
+    }
+
+    body.faq-page .faq-answer p {
+        font-size: 14px;
+        line-height: 1.78;
     }
 }
 

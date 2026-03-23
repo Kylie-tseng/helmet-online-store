@@ -68,9 +68,9 @@ $guide_cards = [
 
     <section class="guide-hero">
         <div class="container">
-            <header class="guide-hero-inner">
-                <h1 class="guide-hero-title">購物指南</h1>
-                <p class="guide-hero-subtitle">從挑選安全帽到日常保養，快速找到你需要的資訊。</p>
+            <header class="guide-hero-inner page-hero-header">
+                <h1 class="guide-hero-title page-hero-title">購物指南</h1>
+                <p class="guide-hero-subtitle page-hero-subtitle">從挑選安全帽到日常保養，快速找到你需要的資訊。</p>
             </header>
         </div>
     </section>
@@ -89,14 +89,6 @@ $guide_cards = [
                         </a>
                     </article>
                 <?php endforeach; ?>
-            </div>
-        </div>
-    </section>
-
-    <section class="guide-footnote">
-        <div class="container">
-            <div class="guide-footnote-inner">
-                <p>第一次選購安全帽，建議先查看頭圍測量與尺寸挑選說明。</p>
             </div>
         </div>
     </section>

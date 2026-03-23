@@ -177,7 +177,7 @@ if (is_array($promo_offers) && !empty($promo_offers)) {
                                     <p class="promo-main-highlight"><?php echo htmlspecialchars($promo_main_offer['highlight'] ?? '優惠進行中'); ?></p>
                                     <p class="promo-main-text"><?php echo htmlspecialchars($promo_main_offer['text'] ?? '精選回饋活動'); ?></p>
                                     <div class="hero-actions">
-                                        <a href="<?php echo htmlspecialchars($promo_main_offer['link'] ?? 'coupons.php'); ?>" class="promo-btn btn-primary">立即選購</a>
+                                        <a href="products.php" class="promo-btn btn-primary">立即選購</a>
                                         <a href="<?php echo htmlspecialchars($promo_main_offer['detail_link'] ?? $promo_main_offer['link'] ?? 'coupon_anniversary.php'); ?>" class="promo-btn btn-secondary">查看活動</a>
                                     </div>
                                 </div>
