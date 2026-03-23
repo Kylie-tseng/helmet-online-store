@@ -2,7 +2,6 @@
 require_once 'config.php';
 require_once 'includes/cart_functions.php';
 require_once 'includes/navbar.php';
-require_once 'includes/checkout_steps.php';
 
 // 檢查是否已登入
 if (!isset($_SESSION['user_id'])) {
@@ -132,14 +131,6 @@ try {
 
     <div class="checkout-container">
         <div class="container">
-            <?php
-            if ($payment_success) {
-                renderCheckoutSteps(3); // 模仿 order_confirm.php 的最後一步
-            } else {
-                renderCheckoutSteps(4, '信用卡繳費');
-            }
-            ?>
-            
             <h1 class="checkout-page-title"><?php echo $payment_success ? '訂單建立成功' : '信用卡繳費'; ?></h1>
             
             <?php if ($payment_success): ?>
@@ -147,6 +138,55 @@ try {
                     <h2>付款成功！訂單已建立!</h2>
                     <p>訂單編號：<?php echo htmlspecialchars($order_id); ?></p>
                     <p>感謝您的購買，我們將盡快為您處理訂單。</p>
+                    
+                    <div class="checkout-summary-panel">
+                        <h3 class="checkout-summary-title">付款明細</h3>
+                        <div class="order-summary">
+                            <div class="summary-row">
+                                <span class="summary-label">訂單編號：</span>
+                                <span class="summary-value">#<?php echo htmlspecialchars($order_id); ?></span>
+                            </div>
+                            <div class="summary-row summary-total">
+                                <span class="summary-label">訂單總金額：</span>
+                                <span class="summary-value summary-total">NT$ <?php echo number_format(get_order_payable_amount($order), 0); ?></span>
+                            </div>
+                        </div>
+
+                        <button
+                            type="button"
+                            class="checkout-summary-items-toggle"
+                            data-checkout-items-toggle="1"
+                            data-checkout-items-target="paymentItemsList"
+                            aria-expanded="false"
+                        >
+                            <span>查看商品清單</span>
+                            <svg class="checkout-summary-items-chevron" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                <path d="M6 9L12 15L18 9" stroke="#333333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
+
+                        <div id="paymentItemsList" class="checkout-summary-items" aria-hidden="true">
+                            <div class="checkout-summary-items-inner">
+                                <?php foreach ($order_items as $oi): 
+                                    $oi_subtotal = isset($oi['subtotal']) ? (float)$oi['subtotal'] : ((float)$oi['unit_price'] * (int)$oi['quantity']);
+                                ?>
+                                    <div class="checkout-summary-items-row">
+                                        <div class="checkout-summary-items-left">
+                                            <div class="checkout-summary-items-name"><?php echo htmlspecialchars($oi['product_name']); ?></div>
+                                            <div class="checkout-summary-items-meta">
+                                                <?php echo htmlspecialchars(formatCartSizeForDisplay($oi['size'] ?? '')); ?>
+                                                &nbsp;|&nbsp; Qty: <?php echo (int)$oi['quantity']; ?>
+                                            </div>
+                                        </div>
+                                        <div class="checkout-summary-items-right">
+                                            <div class="checkout-summary-items-amount">NT$ <?php echo number_format($oi_subtotal, 0); ?></div>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="order-success-actions">
                         <a href="products.php" class="btn-primary">繼續購物</a>
                         <a href="profile.php?tab=orders" class="btn-secondary">查看訂單</a>
@@ -163,6 +203,40 @@ try {
                         <div class="summary-row">
                             <span class="summary-label">訂單總金額：</span>
                             <span class="summary-value summary-total">NT$ <?php echo number_format(get_order_payable_amount($order), 0); ?></span>
+                        </div>
+                    </div>
+
+                    <button
+                        type="button"
+                        class="checkout-summary-items-toggle"
+                        data-checkout-items-toggle="1"
+                        data-checkout-items-target="paymentItemsList"
+                        aria-expanded="false"
+                    >
+                        <span>查看商品清單</span>
+                        <svg class="checkout-summary-items-chevron" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                            <path d="M6 9L12 15L18 9" stroke="#333333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+
+                    <div id="paymentItemsList" class="checkout-summary-items" aria-hidden="true">
+                        <div class="checkout-summary-items-inner">
+                            <?php foreach ($order_items as $oi): 
+                                $oi_subtotal = isset($oi['subtotal']) ? (float)$oi['subtotal'] : ((float)$oi['unit_price'] * (int)$oi['quantity']);
+                            ?>
+                                <div class="checkout-summary-items-row">
+                                    <div class="checkout-summary-items-left">
+                                        <div class="checkout-summary-items-name"><?php echo htmlspecialchars($oi['product_name']); ?></div>
+                                        <div class="checkout-summary-items-meta">
+                                            <?php echo htmlspecialchars(formatCartSizeForDisplay($oi['size'] ?? '')); ?>
+                                            &nbsp;|&nbsp; Qty: <?php echo (int)$oi['quantity']; ?>
+                                        </div>
+                                    </div>
+                                    <div class="checkout-summary-items-right">
+                                        <div class="checkout-summary-items-amount">NT$ <?php echo number_format($oi_subtotal, 0); ?></div>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
                         </div>
                     </div>
                 </div>
@@ -225,6 +299,23 @@ try {
         document.querySelector('input[name="card_cvv"]')?.addEventListener('input', function(e) {
             e.target.value = e.target.value.replace(/\D/g, '');
         });
+
+        // 摘要：查看商品清單（收合/展開）
+        (function () {
+            const toggles = document.querySelectorAll('[data-checkout-items-toggle="1"]');
+            toggles.forEach((btn) => {
+                btn.addEventListener('click', function () {
+                    const targetId = btn.getAttribute('data-checkout-items-target');
+                    const target = document.getElementById(targetId);
+                    if (!target) return;
+
+                    const isOpen = target.classList.toggle('is-open');
+                    btn.classList.toggle('is-open', isOpen);
+                    btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+                    target.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+                });
+            });
+        })();
     </script>
 </body>
 </html>

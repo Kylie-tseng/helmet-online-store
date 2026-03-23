@@ -2,7 +2,6 @@
 require_once 'config.php';
 require_once 'includes/cart_functions.php';
 require_once 'includes/navbar.php';
-require_once 'includes/checkout_steps.php';
 
 // 檢查是否已登入
 if (!isset($_SESSION['user_id'])) {
@@ -231,7 +230,6 @@ $is_logged_in = isset($_SESSION['user_id']);
     <!-- 購物車內容 -->
     <div class="cart-container">
         <div class="container">
-            <?php renderCheckoutSteps(1); ?>
             <h1 class="cart-page-title">購物車</h1>
 
             <!-- 訊息顯示 -->
@@ -255,182 +253,184 @@ $is_logged_in = isset($_SESSION['user_id']);
                     <a href="products.php" class="btn-primary">前往商品總覽</a>
                 </div>
             <?php else: ?>
-                <!-- 購物車項目表格 -->
-                <div class="cart-table-wrapper">
-                    <table class="cart-table">
-                        <thead>
-                            <tr>
-                                <th class="col-product">商品資料</th>
-                                <th class="col-price">單價</th>
-                                <th class="col-quantity">數量</th>
-                                <th class="col-subtotal">小計</th>
-                                <th class="col-action">操作</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($cart_items as $item): 
-                                $subtotal = $item['price'] * $item['quantity'];
-                                $cart_line_img = resolve_product_card_image_src($item['primary_image'] ?? null);
-                            ?>
-                                <tr class="cart-table-row">
-                                    <td class="col-product">
-                                        <div class="cart-product-info">
-                                            <div class="cart-item-image">
-                                                <img src="<?php echo htmlspecialchars($cart_line_img, ENT_QUOTES); ?>"
-                                                     alt="<?php echo htmlspecialchars($item['product_name']); ?>">
-                                            </div>
-                                            <div class="cart-item-info">
-                                                <h3 class="cart-item-name"><?php echo htmlspecialchars($item['product_name']); ?></h3>
-                                                <p class="cart-item-meta">
-                                                    <span class="cart-item-category"><?php echo htmlspecialchars($item['category_name']); ?></span>
-                                                    <span class="cart-item-size">尺寸：<?php echo htmlspecialchars(formatCartSizeForDisplay($item['size'] ?? '')); ?></span>
-                                                </p>
+                <div class="cart-page-layout">
+                    <!-- 左欄：商品清單 + 加價購（約 65%～70%） -->
+                    <div class="cart-main">
+                        <section class="cart-items-section">
+                            <div class="cart-item-list">
+                                <?php foreach ($cart_items as $item): 
+                                    $subtotal = $item['price'] * $item['quantity'];
+                                    $cart_line_img = resolve_product_card_image_src($item['primary_image'] ?? null);
+                                ?>
+                                    <article class="cart-item-card">
+                                        <div class="cart-item-media">
+                                            <img src="<?php echo htmlspecialchars($cart_line_img, ENT_QUOTES); ?>"
+                                                 alt="<?php echo htmlspecialchars($item['product_name']); ?>">
+                                        </div>
+
+                                        <div class="cart-item-body">
+                                            <h3 class="cart-item-name"><?php echo htmlspecialchars($item['product_name']); ?></h3>
+                                            <p class="cart-item-meta">
+                                                <span class="cart-item-category"><?php echo htmlspecialchars($item['category_name']); ?></span>
+                                                <span class="cart-item-size">尺寸：<?php echo htmlspecialchars(formatCartSizeForDisplay($item['size'] ?? '')); ?></span>
+                                            </p>
+                                            <div class="cart-item-unit-row">
+                                                <span class="cart-item-unit-label">單價</span>
+                                                <span class="cart-item-unit-price">NT$ <?php echo number_format($item['price'], 0); ?></span>
                                             </div>
                                         </div>
-                                    </td>
-                                    <td class="col-price">
-                                        NT$ <?php echo number_format($item['price'], 0); ?>
-                                    </td>
-                                    <td class="col-quantity">
-                                        <div class="quantity-controls">
-                                            <button type="button" class="quantity-btn minus" onclick="updateQuantity(<?php echo $item['cart_id']; ?>, -1)">-</button>
-                                            <input type="number" 
-                                                   class="quantity-input" 
-                                                   id="quantity_<?php echo $item['cart_id']; ?>"
-                                                   value="<?php echo htmlspecialchars($item['quantity']); ?>" 
-                                                   min="1"
-                                                   onchange="submitQuantity(<?php echo $item['cart_id']; ?>, this.value)">
-                                            <button type="button" class="quantity-btn plus" onclick="updateQuantity(<?php echo $item['cart_id']; ?>, 1)">+</button>
-                                        </div>
-                                    </td>
-                                    <td class="col-subtotal">
-                                        NT$ <?php echo number_format($subtotal, 0); ?>
-                                    </td>
-                                    <td class="col-action">
-                                        <form method="POST" onsubmit="return confirm('確定要刪除此商品嗎？');" style="display:inline;">
-                                            <input type="hidden" name="action" value="delete_item">
-                                            <input type="hidden" name="cart_id" value="<?php echo htmlspecialchars($item['cart_id']); ?>">
-                                            <button type="submit" class="btn-delete">刪除</button>
-                                        </form>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
 
-                <!-- 2. 加價購商品區塊 -->
-                <?php if (!empty($addon_products)): ?>
-                    <section class="addon-section">
-                        <div class="addon-header">
-                            <h2 class="addon-title">加價購商品</h2>
-                            <p class="addon-hint">🔥 加購享 9 折</p>
-                        </div>
-                        <button type="button" class="addon-nav-btn addon-nav-left" id="addonNavLeft" aria-label="向左滑動">‹</button>
-                        <button type="button" class="addon-nav-btn addon-nav-right" id="addonNavRight" aria-label="向右滑動">›</button>
-                        <div class="addon-scroll" id="addonScroll">
-                            <div class="addon-track">
-                                <?php foreach ($addon_products as $addon): ?>
-                                    <?php
-                                        $addon_original_price = (float)$addon['price'];
-                                        $addon_price = round($addon_original_price * 0.9, 2);
-                                        $addon_img_src = resolve_product_card_image_src($addon['primary_image'] ?? null);
-                                    ?>
-                                    <article class="addon-card" data-product-id="<?php echo (int)$addon['id']; ?>">
-                                        <a href="product_detail.php?id=<?php echo (int)$addon['id']; ?>" class="addon-image-link">
-                                            <div class="addon-image-wrap">
-                                                <img src="<?php echo htmlspecialchars($addon_img_src, ENT_QUOTES); ?>"
-                                                     alt="<?php echo htmlspecialchars($addon['name']); ?>"
-                                                     class="addon-image">
-                                            </div>
-                                        </a>
-                                        <div class="addon-info">
-                                            <a href="product_detail.php?id=<?php echo (int)$addon['id']; ?>" class="addon-name-link">
-                                                <h3 class="addon-name"><?php echo htmlspecialchars($addon['name']); ?></h3>
-                                            </a>
-
-                                            <div class="addon-price-row">
-                                                <span class="addon-original-price">原價 NT$ <?php echo number_format($addon_original_price, 0); ?></span>
-                                                <span class="addon-price">加購價 NT$ <?php echo number_format($addon_price, 0); ?></span>
+                                        <div class="cart-item-controls">
+                                            <div class="quantity-controls">
+                                                <button type="button" class="quantity-btn minus" onclick="updateQuantity(<?php echo $item['cart_id']; ?>, -1)">-</button>
+                                                <input type="number"
+                                                       class="quantity-input"
+                                                       id="quantity_<?php echo $item['cart_id']; ?>"
+                                                       value="<?php echo htmlspecialchars($item['quantity']); ?>"
+                                                       min="1"
+                                                       onchange="submitQuantity(<?php echo $item['cart_id']; ?>, this.value)">
+                                                <button type="button" class="quantity-btn plus" onclick="updateQuantity(<?php echo $item['cart_id']; ?>, 1)">+</button>
                                             </div>
 
-                                            <p class="addon-size-error" id="addonError_<?php echo (int)$addon['id']; ?>"></p>
-                                            <button type="button"
-                                                    class="addon-cta-btn addon-add-btn"
-                                                    data-product-id="<?php echo (int)$addon['id']; ?>">
-                                                加入購物車
-                                            </button>
+                                            <div class="cart-item-subtotal-row">
+                                                <span class="cart-item-subtotal-label">小計</span>
+                                                <span class="cart-item-subtotal-value">NT$ <?php echo number_format($subtotal, 0); ?></span>
+                                            </div>
+
+                                            <form method="POST" onsubmit="return confirm('確定要刪除此商品嗎？');" class="cart-item-delete-form">
+                                                <input type="hidden" name="action" value="delete_item">
+                                                <input type="hidden" name="cart_id" value="<?php echo htmlspecialchars($item['cart_id']); ?>">
+                                                <button type="submit" class="btn-delete">刪除</button>
+                                            </form>
                                         </div>
                                     </article>
                                 <?php endforeach; ?>
                             </div>
-                        </div>
-                    </section>
-                <?php endif; ?>
+                        </section>
 
-                <div class="cart-summary-layout">
-                    <!-- 3. 左欄：優惠券輸入區 -->
-                    <div class="coupon-panel">
-                        <div class="cart-summary-content">
-                            <label class="summary-label coupon-label">Coupon Code：</label>
-                            <div class="coupon-form-row">
-                                <form method="POST" class="coupon-apply-form">
-                                    <input type="hidden" name="action" value="<?php echo !empty($coupon_status['coupon']) ? 'remove_coupon' : 'apply_coupon'; ?>">
-                                    <input type="text" name="coupon_code" class="form-input coupon-input" placeholder="輸入優惠券代碼"
-                                           value="<?php echo !empty($coupon_status['coupon']) ? htmlspecialchars($coupon_status['coupon']['coupon_code']) : ''; ?>">
-                                    <button type="submit" class="<?php echo !empty($coupon_status['coupon']) ? 'btn-secondary' : 'btn-primary'; ?>">
-                                        <?php echo !empty($coupon_status['coupon']) ? '移除優惠券' : '套用優惠券'; ?>
-                                    </button>
-                                </form>
-                            </div>
-                            <?php if (!empty($coupon_panel_message)): ?>
-                                <div class="cart-message <?php echo htmlspecialchars($coupon_panel_message_type); ?>">
-                                    <?php echo htmlspecialchars($coupon_panel_message); ?>
-                                </div>
-                            <?php endif; ?>
-                        </div>
+                        <!-- 加價購：橫向小卡列表（保留 carousel/滑動邏輯） -->
+                        <?php if (!empty($addon_products)): ?>
+                            <section class="cart-addon-section">
+                                <section class="addon-section">
+                                    <div class="addon-header">
+                                        <h2 class="addon-title">推薦加購</h2>
+                                        <p class="addon-hint">加購享 9 折</p>
+                                    </div>
+                                    <button type="button" class="addon-nav-btn addon-nav-left" id="addonNavLeft" aria-label="向左滑動">‹</button>
+                                    <button type="button" class="addon-nav-btn addon-nav-right" id="addonNavRight" aria-label="向右滑動">›</button>
+
+                                    <div class="addon-scroll" id="addonScroll">
+                                        <div class="addon-track">
+                                            <?php foreach ($addon_products as $addon): ?>
+                                                <?php
+                                                    $addon_original_price = (float)$addon['price'];
+                                                    $addon_price = round($addon_original_price * 0.9, 2);
+                                                    $addon_img_src = resolve_product_card_image_src($addon['primary_image'] ?? null);
+                                                ?>
+                                                <article class="addon-card" data-product-id="<?php echo (int)$addon['id']; ?>">
+                                                    <a href="product_detail.php?id=<?php echo (int)$addon['id']; ?>" class="addon-image-link">
+                                                        <div class="addon-image-wrap">
+                                                            <img src="<?php echo htmlspecialchars($addon_img_src, ENT_QUOTES); ?>"
+                                                                 alt="<?php echo htmlspecialchars($addon['name']); ?>"
+                                                                 class="addon-image">
+                                                        </div>
+                                                    </a>
+
+                                                    <div class="addon-info">
+                                                        <a href="product_detail.php?id=<?php echo (int)$addon['id']; ?>" class="addon-name-link">
+                                                            <h3 class="addon-name"><?php echo htmlspecialchars($addon['name']); ?></h3>
+                                                        </a>
+
+                                                        <div class="addon-price-row">
+                                                            <span class="addon-original-price">原價 NT$ <?php echo number_format($addon_original_price, 0); ?></span>
+                                                            <span class="addon-price">加購價 NT$ <?php echo number_format($addon_price, 0); ?></span>
+                                                        </div>
+
+                                                        <p class="addon-size-error" id="addonError_<?php echo (int)$addon['id']; ?>"></p>
+                                                        <button type="button"
+                                                                class="addon-cta-btn addon-add-btn"
+                                                                data-product-id="<?php echo (int)$addon['id']; ?>">
+                                                            加入購物車
+                                                        </button>
+                                                    </div>
+                                                </article>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    </div>
+                                </section>
+                            </section>
+                        <?php endif; ?>
                     </div>
 
-                    <!-- 4. 右欄：結算摘要 -->
-                    <div class="summary-card">
-                        <div class="cart-summary-content">
-                            <div class="summary-row">
-                                <span class="summary-label">商品小計：</span>
-                                <span class="summary-value">NT$ <?php echo number_format($order_summary['subtotal'], 0); ?></span>
-                            </div>
-                            <div class="summary-row">
-                                <span class="summary-label">運費：</span>
-                                <span class="summary-value">
-                                    <?php if ($order_summary['shipping'] == 0): ?>
-                                        免運費
-                                    <?php else: ?>
-                                        NT$ 60
-                                    <?php endif; ?>
-                                </span>
-                            </div>
-                            <?php if ($remaining_for_free_shipping > 0): ?>
-                                <div class="summary-row summary-hint">
-                                    <span class="summary-label">免運提醒：</span>
-                                    <span class="summary-value">再購買 <?php echo number_format($remaining_for_free_shipping, 0); ?> 元即可享免運</span>
+                    <!-- 右欄：優惠券 + 摘要 + 結帳按鈕（約 30%～35%） -->
+                    <aside class="cart-sidebar">
+                        <div class="cart-sidebar-stack">
+                            <section class="cart-coupon-module">
+                                <div class="coupon-panel">
+                                    <div class="cart-summary-content">
+                                        <label class="summary-label coupon-label">Coupon Code：</label>
+                                        <div class="coupon-form-row">
+                                            <form method="POST" class="coupon-apply-form">
+                                                <input type="hidden" name="action" value="<?php echo !empty($coupon_status['coupon']) ? 'remove_coupon' : 'apply_coupon'; ?>">
+                                                <input type="text" name="coupon_code" class="form-input coupon-input" placeholder="輸入優惠券代碼"
+                                                       value="<?php echo !empty($coupon_status['coupon']) ? htmlspecialchars($coupon_status['coupon']['coupon_code']) : ''; ?>">
+                                                <button type="submit" class="<?php echo !empty($coupon_status['coupon']) ? 'btn-secondary' : 'btn-primary'; ?>">
+                                                    <?php echo !empty($coupon_status['coupon']) ? '移除優惠券' : '套用優惠券'; ?>
+                                                </button>
+                                            </form>
+                                        </div>
+                                        <?php if (!empty($coupon_panel_message)): ?>
+                                            <div class="cart-message <?php echo htmlspecialchars($coupon_panel_message_type); ?>">
+                                                <?php echo htmlspecialchars($coupon_panel_message); ?>
+                                            </div>
+                                        <?php endif; ?>
+                                    </div>
                                 </div>
-                            <?php endif; ?>
-                            <div class="summary-row">
-                                <span class="summary-label">優惠券折扣：</span>
-                                <span class="summary-value">- NT$ <?php echo number_format($order_summary['discount'], 0); ?></span>
-                            </div>
-                            <div class="summary-divider"></div>
-                            <div class="summary-row summary-total">
-                                <span class="summary-label">最終總價：</span>
-                                <span class="summary-value">NT$ <?php echo number_format($order_summary['final_total'], 0); ?></span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                            </section>
 
-                <!-- 底部按鈕列 -->
-                <div class="cart-actions cart-actions-bottom">
-                    <a href="products.php" class="btn-secondary">繼續購物</a>
-                    <a href="checkout.php" class="btn-primary">下一步：選擇送貨及付款方式</a>
+                            <section class="cart-summary-module">
+                                <div class="summary-card">
+                                    <div class="cart-summary-content">
+                                        <h3 class="cart-subtotal-breakdown-title">小計明細</h3>
+                                        <div class="summary-row">
+                                            <span class="summary-label">商品小計：</span>
+                                            <span class="summary-value">NT$ <?php echo number_format($order_summary['subtotal'], 0); ?></span>
+                                        </div>
+                                        <div class="summary-row">
+                                            <span class="summary-label">運費：</span>
+                                            <span class="summary-value">
+                                                <?php if ($order_summary['shipping'] == 0): ?>
+                                                    免運費
+                                                <?php else: ?>
+                                                    NT$ 60
+                                                <?php endif; ?>
+                                            </span>
+                                        </div>
+                                        <?php if ($remaining_for_free_shipping > 0): ?>
+                                            <div class="summary-row summary-hint">
+                                                <span class="summary-label">免運提醒：</span>
+                                                <span class="summary-value">再購買 <?php echo number_format($remaining_for_free_shipping, 0); ?> 元即可享免運</span>
+                                            </div>
+                                        <?php endif; ?>
+                                        <div class="summary-row">
+                                            <span class="summary-label">優惠券折扣：</span>
+                                            <span class="summary-value">- NT$ <?php echo number_format($order_summary['discount'], 0); ?></span>
+                                        </div>
+                                        <div class="summary-divider"></div>
+                                        <div class="summary-row summary-total">
+                                            <span class="summary-label">最終總價：</span>
+                                            <span class="summary-value">NT$ <?php echo number_format($order_summary['final_total'], 0); ?></span>
+                                        </div>
+                                    </div>
+
+                                    <div class="cart-checkout-actions">
+                                        <a href="products.php" class="btn-secondary cart-shopping-btn">繼續購物</a>
+                                        <a href="checkout.php" class="btn-primary cart-checkout-btn">前往結帳</a>
+                                    </div>
+                                </div>
+                            </section>
+                        </div>
+                    </aside>
                 </div>
             <?php endif; ?>
         </div>
