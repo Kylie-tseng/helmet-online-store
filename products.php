@@ -4,11 +4,13 @@ require_once 'includes/cart_functions.php';
 require_once 'includes/category_utils.php';
 require_once 'includes/product_style_utils.php';
 require_once 'includes/navbar.php';
+require_once 'includes/product_query_helpers.php';
 
 // 取得 GET 參數（category 可為數字 id 或分類名稱；category_id 為明確 id；style 為風格篩選）
 $category_param = isset($_GET['category']) ? trim((string)$_GET['category']) : '';
 $category_id_get = isset($_GET['category_id']) ? (int)$_GET['category_id'] : 0;
-$search_keyword = isset($_GET['search']) ? trim($_GET['search']) : '';
+$search_keyword = trim($_GET['search'] ?? '');
+$is_search_mode = ($search_keyword !== '');
 $style_param = isset($_GET['style']) ? trim((string)$_GET['style']) : '';
 $style_label = resolve_product_list_style($style_param);
 $style_param_token = strtolower($style_param);
@@ -63,13 +65,7 @@ if ($style_label !== null) {
 // 查詢商品（根據分類和搜尋條件）
 try {
     $sql = "SELECT p.id, p.name, p.description, p.price, p.status,
-                   (
-                       SELECT pi.image_url
-                       FROM product_images pi
-                       WHERE pi.product_id = p.id
-                       ORDER BY pi.sort_order ASC, pi.id ASC
-                       LIMIT 1
-                   ) AS primary_image,
+                   " . primaryImageSubquery('p', 'pi') . " AS primary_image,
                    c.name AS category_name, c.id AS category_id
             FROM products p
             INNER JOIN categories c ON p.category_id = c.id
@@ -90,14 +86,14 @@ try {
     }
 
     // 關鍵字搜尋（商品名稱與描述）
-    if (!empty($search_keyword)) {
+    if ($is_search_mode) {
         $sql .= " AND (p.name LIKE :search_keyword_name OR p.description LIKE :search_keyword_desc)";
         $params[':search_keyword_name'] = '%' . $search_keyword . '%';
         $params[':search_keyword_desc'] = '%' . $search_keyword . '%';
     }
 
     // 排序：全部商品（無分類、無搜尋）依分類固定順序 → 同分類內 id 升冪；單一分類頁依 id 升冪；搜尋維持建立時間新到舊
-    if (!empty($search_keyword)) {
+    if ($is_search_mode) {
         $sql .= " ORDER BY p.created_at DESC";
     } elseif ($category_id) {
         $sql .= " ORDER BY p.id ASC";
@@ -120,7 +116,7 @@ try {
 }
 
 // 更新頁面標題（僅搜尋時）
-if (!empty($search_keyword)) {
+if ($is_search_mode) {
     if ($category_name) {
         $page_title = $category_name . ' - 搜尋：「' . htmlspecialchars($search_keyword) . '」';
     } elseif ($style_label !== null) {
@@ -245,7 +241,7 @@ $style_header_desc = $is_style_collection_page ? ($style_desc_map[$style_label] 
                     <div class="error-message"><?php echo htmlspecialchars($error_message); ?></div>
                 <?php elseif (empty($products_for_grid)): ?>
                     <div class="empty-products-message">
-                        <?php if (!empty($search_keyword)): ?>
+                        <?php if ($is_search_mode): ?>
                             找不到符合「<?php echo htmlspecialchars($search_keyword); ?>」的商品。
                         <?php else: ?>
                             目前此條件下沒有商品。
@@ -350,6 +346,7 @@ $style_header_desc = $is_style_collection_page ? ($style_desc_map[$style_label] 
                                 <input
                                     type="text"
                                     name="search"
+                                    id="productSearchInput"
                                     class="products-search-input"
                                     placeholder="找商品"
                                     value="<?php echo htmlspecialchars($search_keyword); ?>"
@@ -364,7 +361,7 @@ $style_header_desc = $is_style_collection_page ? ($style_desc_map[$style_label] 
                         <div class="error-message"><?php echo htmlspecialchars($error_message); ?></div>
                     <?php elseif (empty($products)): ?>
                         <div class="empty-products-message">
-                            <?php if (!empty($search_keyword)): ?>
+                            <?php if ($is_search_mode): ?>
                                 找不到符合「<?php echo htmlspecialchars($search_keyword); ?>」的商品。
                             <?php else: ?>
                                 目前此條件下沒有商品。
@@ -552,6 +549,32 @@ $style_header_desc = $is_style_collection_page ? ($style_desc_map[$style_label] 
                 });
             } catch (error) {
                 console.error('搜尋框功能錯誤:', error);
+            }
+        })();
+
+        // 商品頁搜尋欄：清空時移除 search 參數並回到原本總覽（保留其他參數）
+        (function() {
+            try {
+                const productSearchInput = document.getElementById('productSearchInput');
+                if (!productSearchInput) return;
+
+                productSearchInput.addEventListener('input', function() {
+                    const currentValue = productSearchInput.value.trim();
+                    if (currentValue !== '') return;
+
+                    const url = new URL(window.location.href);
+                    if (!url.searchParams.has('search')) return;
+
+                    url.searchParams.delete('search');
+                    const nextQuery = url.searchParams.toString();
+                    const nextUrl = url.pathname + (nextQuery ? ('?' + nextQuery) : '') + url.hash;
+
+                    if (nextUrl !== (window.location.pathname + window.location.search + window.location.hash)) {
+                        window.location.assign(nextUrl);
+                    }
+                });
+            } catch (error) {
+                console.error('商品搜尋清空導頁功能錯誤:', error);
             }
         })();
     </script>

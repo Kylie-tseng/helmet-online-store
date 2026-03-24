@@ -2,6 +2,7 @@
 require_once 'config.php';
 require_once 'includes/cart_functions.php';
 require_once 'includes/navbar.php';
+require_once 'includes/product_query_helpers.php';
 
 // 檢查是否已登入
 if (!isset($_SESSION['user_id'])) {
@@ -175,13 +176,7 @@ $addon_products = [];
 if (!empty($cart_items)) {
     try {
         $stmt = $pdo->query("SELECT p.id, p.name, p.price,
-                             (
-                                 SELECT pi.image_url
-                                 FROM product_images pi
-                                 WHERE pi.product_id = p.id
-                                 ORDER BY pi.sort_order ASC, pi.id ASC
-                                 LIMIT 1
-                             ) AS primary_image
+                             " . primaryImageSubquery('p', 'pi') . " AS primary_image
                              FROM products p
                              WHERE p.status = 'active' AND p.is_addon = 1
                              ORDER BY p.created_at DESC

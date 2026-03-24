@@ -86,6 +86,9 @@ function renderNavbar($pdo, $categories, $parts_category_id, $current_page = '')
                         </div>
                     </div>
                 </li>
+                <li class="nav-item daily-pick-nav-item">
+                    <a href="daily_pick.php" class="daily-pick-nav-link">今日命定帽款</a>
+                </li>
             </ul>
             <div class="nav-right home-navbar-right">
                 <?php if ($is_logged_in): ?>

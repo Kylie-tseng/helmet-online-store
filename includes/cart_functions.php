@@ -3,6 +3,7 @@
  * 購物車相關共用函數
  */
 require_once __DIR__ . '/product_card_image.php';
+require_once __DIR__ . '/product_query_helpers.php';
 
 /**
  * 購物車 cart.size：配件／不需選尺寸時固定為 F（須與資料庫 ENUM 一致）
@@ -55,13 +56,7 @@ function getCartItems($pdo, $user_id) {
                        COALESCE(cart.unit_price, p.price) AS price,
                        p.price AS original_price,
                        p.name AS product_name,
-                       (
-                           SELECT pi.image_url
-                           FROM product_images pi
-                           WHERE pi.product_id = p.id
-                           ORDER BY pi.sort_order ASC, pi.id ASC
-                           LIMIT 1
-                       ) AS primary_image,
+                       " . primaryImageSubquery('p', 'pi') . " AS primary_image,
                        cat.name AS category_name
                 FROM cart
                 INNER JOIN products p ON cart.product_id = p.id

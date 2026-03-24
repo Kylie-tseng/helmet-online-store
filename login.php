@@ -53,14 +53,15 @@ if ($notice_message === '') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>登入 - HelmetVRse</title>
-    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo urlencode((string)filemtime(__DIR__ . '/assets/css/style.css')); ?>">
 </head>
 <body class="auth-page auth-login-page">
     <?php renderAuthHeader('歡迎登入 HelmetVRse'); ?>
 
     <!-- 登入表單 -->
-    <div class="login-container">
-        <div class="login-card">
+    <main class="auth-main">
+        <div class="login-container">
+            <div class="login-card">
             <h1 class="login-title">登入</h1>
             <p class="login-subtitle">請輸入您的帳號密碼</p>
 
@@ -127,7 +128,8 @@ if ($notice_message === '') {
             <div class="login-footer">
                 <p>還沒有帳號？ <a href="register.php">立即註冊</a></p>
             </div>
+            </div>
         </div>
-    </div>
+    </main>
 </body>
 </html>

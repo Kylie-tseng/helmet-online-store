@@ -77,8 +77,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <?php renderAuthHeader('歡迎註冊 HelmetVRse'); ?>
 
     <!-- 註冊表單 -->
-    <div class="register-container">
-        <div class="register-card">
+    <main class="auth-main">
+        <div class="register-container">
+            <div class="register-card">
             <h1 class="register-title">註冊</h1>
             <p class="register-subtitle">填寫以下資訊完成註冊</p>
 
@@ -201,8 +202,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="register-footer">
                 <p>已經有帳號？ <a href="login.php">立即登入</a></p>
             </div>
+            </div>
         </div>
-    </div>
+    </main>
 <script>
     (function() {
         const usernameInput = document.getElementById('username');

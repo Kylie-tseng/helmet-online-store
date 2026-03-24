@@ -2,6 +2,7 @@
 require_once 'config.php';
 require_once 'includes/cart_functions.php';
 require_once 'includes/navbar.php';
+require_once 'includes/product_query_helpers.php';
 
 if (!isset($_SESSION['user_id'])) {
     header('Location: login.php?redirect=' . urlencode('favorites.php') . '&notice=favorite');
@@ -32,13 +33,7 @@ try {
 $favorites = [];
 try {
     $sql = "SELECT p.id, p.name, p.price,
-                   (
-                       SELECT pi.image_url
-                       FROM product_images pi
-                       WHERE pi.product_id = p.id
-                       ORDER BY pi.sort_order ASC, pi.id ASC
-                       LIMIT 1
-                   ) AS primary_image,
+                   " . primaryImageSubquery('p', 'pi') . " AS primary_image,
                    c.name AS category_name
             FROM favorites f
             INNER JOIN products p ON f.product_id = p.id

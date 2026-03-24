@@ -2,6 +2,7 @@
 require_once 'config.php';
 require_once 'includes/cart_functions.php';
 require_once 'includes/navbar.php';
+require_once 'includes/product_query_helpers.php';
 
 // 檢查是否已登入
 if (!isset($_SESSION['user_id'])) {
@@ -38,13 +39,7 @@ try {
 // 查詢訂單明細
 try {
     $stmt = $pdo->prepare("SELECT oi.*, p.name AS product_name,
-                          (
-                              SELECT pi.image_url
-                              FROM product_images pi
-                              WHERE pi.product_id = p.id
-                              ORDER BY pi.sort_order ASC, pi.id ASC
-                              LIMIT 1
-                          ) AS primary_image
+                          " . primaryImageSubquery('p', 'pi') . " AS primary_image
                           FROM order_items oi
                           INNER JOIN products p ON oi.product_id = p.id
                           WHERE oi.order_id = :order_id");

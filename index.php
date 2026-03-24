@@ -3,6 +3,7 @@ require_once 'config.php';
 require_once 'includes/cart_functions.php';
 require_once 'includes/category_utils.php';
 require_once 'includes/navbar.php';
+require_once 'includes/product_query_helpers.php';
 
 // 查詢分類資料
 try {
@@ -28,13 +29,7 @@ try {
 // 查詢熱門商品
 try {
     $stmt = $pdo->query("SELECT p.id, p.name, p.price, p.style,
-            (
-                SELECT pi.image_url
-                FROM product_images pi
-                WHERE pi.product_id = p.id
-                ORDER BY pi.sort_order ASC, pi.id ASC
-                LIMIT 1
-            ) AS primary_image,
+            " . primaryImageSubquery('p', 'pi') . " AS primary_image,
             c.name AS category_name
             FROM products p
             INNER JOIN categories c ON p.category_id = c.id
@@ -135,11 +130,7 @@ if (is_array($promo_offers) && !empty($promo_offers)) {
     <section class="hero">
         <div class="hero-slider">
             <div class="slides">
-                <img src="assets/images/index1.jpg" class="slide active" alt="Helmet Banner 1">
-                <img src="assets/images/index2.jpg" class="slide" alt="Helmet Banner 2">
-                <img src="assets/images/index3.jpg" class="slide" alt="Helmet Banner 3">
-                <img src="assets/images/index4.jpg" class="slide" alt="Helmet Banner 4">
-                <img src="assets/images/index5.jpg" class="slide" alt="Helmet Banner 5">
+                <img src="assets/images/index6.jpg" class="slide active" alt="HelmetVRse 主視覺">
             </div>
 
             <div class="hero-overlay">
@@ -147,9 +138,6 @@ if (is_array($promo_offers) && !empty($promo_offers)) {
                 <p class="hero-main-subtitle">沉浸式虛擬商場，重新定義智慧安全帽選購體驗</p>
                 <a href="products.php" class="hero-cta-btn">前往 VR 商場</a>
             </div>
-
-            <div class="slider-arrow left">&#10094;</div>
-            <div class="slider-arrow right">&#10095;</div>
         </div>
     </section>
 
@@ -572,42 +560,6 @@ if (is_array($promo_offers) && !empty($promo_offers)) {
                 });
             } catch (error) {
                 console.error('搜尋框功能錯誤:', error);
-            }
-        })();
-
-        // 首頁 Hero 圖片輪播
-        (function() {
-            try {
-                const slides = document.querySelectorAll('.hero-slider .slide');
-                const nextArrow = document.querySelector('.hero-slider .slider-arrow.right');
-                const prevArrow = document.querySelector('.hero-slider .slider-arrow.left');
-                if (!slides.length || !nextArrow || !prevArrow) return;
-
-                let current = 0;
-
-                function showSlide(index) {
-                    slides.forEach(function(slide) {
-                        slide.classList.remove('active');
-                    });
-                    slides[index].classList.add('active');
-                }
-
-                function nextSlide() {
-                    current = (current + 1) % slides.length;
-                    showSlide(current);
-                }
-
-                function prevSlide() {
-                    current = (current - 1 + slides.length) % slides.length;
-                    showSlide(current);
-                }
-
-                nextArrow.addEventListener('click', nextSlide);
-                prevArrow.addEventListener('click', prevSlide);
-
-                setInterval(nextSlide, 5000);
-            } catch (error) {
-                console.error('Hero 輪播功能錯誤:', error);
             }
         })();
 

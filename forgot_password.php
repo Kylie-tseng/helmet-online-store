@@ -32,8 +32,9 @@ if (isset($_SESSION['forgot_old_email'])) {
 <body class="auth-page auth-forgot-password-page">
     <?php renderAuthHeader('找回您的 HelmetVRse 帳號密碼'); ?>
 
-    <div class="login-container">
-        <div class="login-card">
+    <main class="auth-main">
+        <div class="login-container">
+            <div class="login-card">
             <h1 class="login-title">忘記密碼</h1>
             <p class="login-subtitle">請輸入您註冊時使用的電子郵件，我們將寄送重設密碼連結給您</p>
 
@@ -72,8 +73,9 @@ if (isset($_SESSION['forgot_old_email'])) {
             <div class="login-footer">
                 <p>想起密碼了？ <a href="login.php">返回登入</a></p>
             </div>
+            </div>
         </div>
-    </div>
+    </main>
 
     <script>
         (function() {

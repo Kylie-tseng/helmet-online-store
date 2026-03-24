@@ -60,8 +60,9 @@ if ($submitted) {
 <body class="auth-page auth-reset-password-page">
     <?php renderAuthHeader('設定您的新密碼'); ?>
 
-    <div class="login-container">
-        <div class="login-card">
+    <main class="auth-main">
+        <div class="login-container">
+            <div class="login-card">
             <h1 class="login-title">重設密碼</h1>
             
             <?php if ($success): ?>
@@ -120,8 +121,9 @@ if ($submitted) {
                     <p><a href="login.php">返回登入</a></p>
                 </div>
             <?php endif; ?>
+            </div>
         </div>
-    </div>
+    </main>
 
     <script>
         (function() {

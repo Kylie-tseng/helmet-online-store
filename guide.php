@@ -39,14 +39,14 @@ $guide_cards = [
         'href' => 'helmet_care.php',
     ],
     [
-        'title' => '尺寸挑選建議',
-        'desc' => '依照頭型與配戴感受，選擇合適尺寸。',
-        'href' => 'head_measure.php',
+        'title' => '優惠券專區',
+        'desc' => '查看目前可使用的優惠活動與折扣資訊。',
+        'href' => 'coupons.php',
     ],
     [
-        'title' => '購買流程說明',
-        'desc' => '快速了解選購、加入購物車與結帳流程。',
-        'href' => 'shipping.php',
+        'title' => '退貨政策',
+        'desc' => '了解退貨條件、申請方式與退款流程。',
+        'href' => 'return_policy.php',
     ],
     [
         'title' => '常見問題',

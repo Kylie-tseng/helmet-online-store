@@ -1,88 +1,87 @@
 <?php
 require_once '../config.php';
+require_once __DIR__ . '/includes/staff_layout.php';
 
-// 檢查是否已登入
-if (!isset($_SESSION['user_id'])) {
-    header('Location: ../login.php');
-    exit;
+staffRequireAuth();
+
+$quickStats = [
+    'pending_orders' => 0,
+    'processing_orders' => 0,
+    'inactive_products' => 0,
+    'low_stock_products' => 0,
+];
+
+try {
+    $stmt = $pdo->query("SELECT status, COUNT(*) AS cnt FROM orders GROUP BY status");
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $s = (string)$row['status'];
+        $c = (int)$row['cnt'];
+        if (in_array($s, ['pending', 'pending_payment'], true)) {
+            $quickStats['pending_orders'] += $c;
+        }
+        if (in_array($s, ['paid', 'shipped'], true)) {
+            $quickStats['processing_orders'] += $c;
+        }
+    }
+} catch (Throwable $e) {
 }
 
-// 檢查角色
-if ($_SESSION['role'] !== 'staff' && $_SESSION['role'] !== 'admin') {
-    header('Location: ../index.php');
-    exit;
+try {
+    $stmt = $pdo->query("SELECT COUNT(*) FROM products WHERE status = 'inactive'");
+    $quickStats['inactive_products'] = (int)$stmt->fetchColumn();
+} catch (Throwable $e) {
 }
+
+try {
+    $stmt = $pdo->query("SELECT COUNT(*) FROM (
+                            SELECT p.id, COALESCE(SUM(ps.stock), 0) AS total_stock
+                            FROM products p
+                            LEFT JOIN product_sizes ps ON ps.product_id = p.id
+                            GROUP BY p.id
+                        ) t WHERE t.total_stock <= 5");
+    $quickStats['low_stock_products'] = (int)$stmt->fetchColumn();
+} catch (Throwable $e) {
+}
+
+staffPageStart($pdo, '店員工作入口', 'dashboard');
 ?>
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>員工後台 - HelmetVRse</title>
-    <link rel="stylesheet" href="../assets/css/style.css">
-</head>
-<body>
-<!-- 導覽列 -->
-    <nav class="navbar unified-navbar">
-        <div class="nav-container">
-            <div class="nav-logo">
-                <a href="../index.php">HelmetVRse</a>
-            </div>
-            <div class="nav-right">
-                <a href="../index.php" style="color: #FFFFFF; text-decoration: none; font-size: 14px;">返回首頁</a>
-                <a href="../logout.php" style="color: #FFFFFF; text-decoration: none; font-size: 14px; margin-left: 20px;">登出</a>
-            </div>
-        </div>
-    </nav>
-
-    <!-- Dashboard 內容 -->
-    <div class="dashboard-container">
-        <div class="dashboard-content">
-            <div class="dashboard-header">
-                <h1 class="dashboard-title">Staff Dashboard</h1>
-                <p class="dashboard-subtitle">歡迎，<?php echo htmlspecialchars($_SESSION['user_name']); ?>！</p>
-            </div>
-
-            <div class="dashboard-cards">
-                <div class="dashboard-card">
-                    <h2 class="card-title">訂單管理</h2>
-                    <p class="card-content">處理客戶訂單</p>
-                    <a href="orders.php" class="btn">管理訂單</a>
-                </div>
-
-                <div class="dashboard-card">
-                    <h2 class="card-title">商品管理</h2>
-                    <p class="card-content">管理商品資訊</p>
-                    <a href="products.php" class="btn">管理商品</a>
-                </div>
-
-                <?php if ($_SESSION['role'] === 'admin'): ?>
-                <div class="dashboard-card">
-                    <h2 class="card-title">系統管理</h2>
-                    <p class="card-content">前往完整管理後台</p>
-                    <a href="../admin/dashboard.php" class="btn">管理後台</a>
-                </div>
-                <?php endif; ?>
-            </div>
-        </div>
-    </div>
-
-    <!-- Footer -->
-    <footer class="footer">
-        <div class="container">
-            <div class="footer-content">
-                <div class="footer-column">
-                    <h3 class="footer-title">關於我們</h3>
-                    <ul class="footer-links">
-                        <li><a href="../about.php">公司簡介</a></li>
-                    </ul>
-                </div>
-            </div>
-            <div class="footer-bottom">
-                <p>Powered by HelmetVRse</p>
-            </div>
-        </div>
-    </footer>
-</body>
-</html>
-
+<section class="staff-entry-grid">
+    <a href="orders.php" class="staff-entry-card">
+        <h2>訂單處理</h2>
+        <p>處理待確認、待出貨與訂單狀態更新。</p>
+        <div class="staff-entry-meta">目前待處理：<?php echo number_format($quickStats['pending_orders']); ?></div>
+        <span class="staff-entry-cta">前往功能</span>
+    </a>
+    <a href="products.php" class="staff-entry-card">
+        <h2>商品管理</h2>
+        <p>調整商品內容、上下架、價格與圖片。</p>
+        <div class="staff-entry-meta">未上架商品：<?php echo number_format($quickStats['inactive_products']); ?></div>
+        <span class="staff-entry-cta">前往功能</span>
+    </a>
+    <a href="products.php?filter=low_stock" class="staff-entry-card">
+        <h2>低庫存提醒</h2>
+        <p>即時檢視庫存低於或等於 5 的商品。</p>
+        <div class="staff-entry-meta">低庫存商品：<?php echo number_format($quickStats['low_stock_products']); ?></div>
+        <span class="staff-entry-cta">查看低庫存</span>
+    </a>
+    <a href="returns.php" class="staff-entry-card">
+        <h2>退貨申請</h2>
+        <p>追蹤退貨流程與退款狀態。</p>
+        <div class="staff-entry-meta">以申請清單逐案處理</div>
+        <span class="staff-entry-cta">前往功能</span>
+    </a>
+    <a href="sales_report.php" class="staff-entry-card">
+        <h2>銷售統計</h2>
+        <p>檢視銷售趨勢與熱銷商品。</p>
+        <div class="staff-entry-meta">處理中訂單：<?php echo number_format($quickStats['processing_orders']); ?></div>
+        <span class="staff-entry-cta">前往功能</span>
+    </a>
+    <?php if ((string)($_SESSION['role'] ?? '') === 'admin'): ?>
+        <a href="../admin/dashboard.php" class="staff-entry-card">
+            <h2>管理後台</h2>
+            <p>前往完整管理者系統進行權限級操作。</p>
+            <div class="staff-entry-meta">僅 admin 可見</div>
+        </a>
+    <?php endif; ?>
+</section>
+<?php staffPageEnd(); ?>

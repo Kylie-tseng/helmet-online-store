@@ -36,7 +36,7 @@ try {
     <main class="return-policy-shell">
         <div class="container return-policy-container">
             <header class="return-policy-header page-hero-header">
-                <h1 class="page-hero-title">退換貨政策</h1>
+                <h1 class="page-hero-title">退貨政策</h1>
                 <p class="page-hero-subtitle">為保障您的購物權益，以下為 HelmetVRse 退換貨與退款說明，請於申請前先行閱讀。</p>
             </header>
 
