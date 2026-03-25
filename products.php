@@ -14,10 +14,10 @@ $is_search_mode = ($search_keyword !== '');
 $style_param = isset($_GET['style']) ? trim((string)$_GET['style']) : '';
 $style_label = resolve_product_list_style($style_param);
 $style_param_token = strtolower($style_param);
-$legacy_style_tokens = ['retro', 'commuter', 'racing', 'women'];
+$legacy_style_tokens = ['retro', 'vintage', 'commuter', 'racing', 'women'];
 $use_legacy_style_collection_layout = in_array($style_param_token, $legacy_style_tokens, true);
 $style_label_to_token_map = [
-    '復古' => 'retro',
+    '復古' => 'vintage',
     '通勤' => 'commuter',
     '競速' => 'racing',
     '女性' => 'women',
@@ -25,6 +25,10 @@ $style_label_to_token_map = [
 $active_style_token = $use_legacy_style_collection_layout
     ? $style_param_token
     : (($style_label !== null && isset($style_label_to_token_map[$style_label])) ? $style_label_to_token_map[$style_label] : '');
+// 舊連結 ?style=retro 仍有效；產生分頁／tab 連結時統一用 style=vintage
+if ($active_style_token === 'retro') {
+    $active_style_token = 'vintage';
+}
 
 [$category_id, $category_name] = resolve_product_list_category($pdo, $category_param, $category_id_get);
 

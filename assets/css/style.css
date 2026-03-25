@@ -3,6 +3,71 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+    scrollbar-width: thin;
+    /* Firefox：thumb / track（軌道實心白；thumb 略深以便在白軌上可見） */
+    scrollbar-color: rgba(0, 0, 0, 0.18) #ffffff;
+}
+
+/* WebKit 捲軸：Chrome / Edge / Safari（* 前綴讓所有可捲動區塊含整頁、側欄皆套用） */
+*::-webkit-scrollbar {
+    width: 8px;
+    background-color: #ffffff;
+}
+
+*::-webkit-scrollbar-track {
+    background-color: #ffffff;
+    border-radius: 0;
+}
+
+*::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.16);
+    border-radius: 10px;
+    border: 2px solid #ffffff;
+    background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(0, 0, 0, 0.28);
+    border: 2px solid #ffffff;
+    background-clip: padding-box;
+}
+
+/* 視窗捲軸（Windows 常只吃根元素上的規則） */
+html {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.18) #ffffff;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+    width: 8px;
+    background-color: #ffffff;
+}
+
+html::-webkit-scrollbar-track,
+body::-webkit-scrollbar-track {
+    background-color: #ffffff;
+}
+
+html::-webkit-scrollbar-thumb,
+body::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.16);
+    border-radius: 10px;
+    border: 2px solid #ffffff;
+    background-clip: padding-box;
+}
+
+html::-webkit-scrollbar-thumb:hover,
+body::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(0, 0, 0, 0.28);
+}
+
+/* 側欄專用 scroll container（若使用此 class） */
+.sidebar::-webkit-scrollbar-thumb,
+.sidebar-content::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.16);
+    border: 2px solid #ffffff;
+    background-clip: padding-box;
 }
 
 html,
@@ -348,7 +413,7 @@ body {
     align-items: center;
     justify-content: space-between;
     padding: 0;
-    z-index: 2000;
+    z-index: 9999;
     box-sizing: border-box;
     transition: background 0.3s ease, box-shadow 0.3s ease, color 0.3s ease;
     border-bottom: 0 !important;
@@ -538,6 +603,116 @@ body {
     z-index: 4;
 }
 
+/* 首頁 Hero：滿版 100vh（不露出下一區）；文案幾何置中 */
+.home-page .hero,
+.home-page .hero.hero-section {
+    height: 100vh !important;
+    min-height: 100vh !important;
+}
+
+.home-page .hero-slider,
+.home-page .hero.hero-section > .hero-slider {
+    height: 100% !important;
+    min-height: 100% !important;
+}
+
+.home-page .hero-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    right: auto;
+    bottom: auto;
+    transform: translate(-50%, -50%);
+    width: min(980px, calc(100% - 48px));
+    max-width: min(980px, calc(100% - 48px));
+    display: block;
+    padding: 0 24px;
+    box-sizing: border-box;
+    z-index: 6;
+    text-align: center;
+    color: #ffffff;
+    pointer-events: none;
+}
+
+.home-page .hero-content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    width: 100%;
+    max-width: none;
+    margin: 0 auto;
+    padding: 0;
+    box-sizing: border-box;
+    text-align: center;
+    color: inherit;
+    animation: fadeUp 1s ease forwards;
+    pointer-events: none;
+}
+
+.home-page .hero-cta-btn {
+    margin-top: 24px;
+}
+
+.home-page .hero-main-title {
+    letter-spacing: 4px;
+}
+
+.home-page .hero-main-subtitle {
+    letter-spacing: 1px;
+    line-height: 1.6;
+}
+
+.home-page .hero-scroll-text {
+    margin-top: 20px;
+    font-size: 14px;
+    color: #ffffff;
+    opacity: 0.7;
+    font-weight: 500;
+    line-height: 1.4;
+    pointer-events: none;
+}
+
+.home-page .scroll-indicator {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    z-index: 7;
+    font-size: 18px;
+    color: #ffffff;
+    opacity: 0.7;
+    pointer-events: none;
+    animation: bounce 1.5s infinite;
+}
+
+.home-page .scroll-indicator span {
+    display: block;
+    line-height: 1;
+}
+
+@keyframes fadeUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes bounce {
+    0%,
+    100% {
+        transform: translate(-50%, 0);
+    }
+    50% {
+        transform: translate(-50%, 8px);
+    }
+}
+
 .home-page .hero-overlay,
 .home-page .hero-content {
     margin-bottom: 0 !important;
@@ -633,15 +808,18 @@ body {
     opacity: 1;
 }
 
-/* 首頁 hero：cover 取景改為靠上，保留原圖上方留白；人物仍在右側（僅 index6） */
+/* 首頁 hero：滿版 cover，object-position 見上方 .home-page .hero … img / .slide */
 .home-page .hero-slider .slides {
     background-color: #ffffff;
 }
 
-.home-page .hero .hero-slider img.slide {
+.home-page .hero img,
+.home-page .hero .hero-slider img.slide,
+.home-page .hero .slide {
+    width: 100%;
+    height: 100%;
     object-fit: cover;
-    /* 水平維持偏右（與原圖構圖）；垂直靠上，避免上方留白被 cover 裁掉 */
-    object-position: 76% 0%;
+    object-position: center;
     transition: opacity 0.8s ease;
 }
 
@@ -687,6 +865,36 @@ body {
         width: calc(100% - 32px);
     }
 
+    .home-page .hero,
+    .home-page .hero.hero-section {
+        height: 100vh !important;
+        min-height: 100vh !important;
+    }
+
+    .home-page .hero-overlay {
+        top: 50%;
+        left: 50%;
+        right: auto;
+        bottom: auto;
+        transform: translate(-50%, -50%);
+        width: calc(100% - 32px);
+        max-width: calc(100% - 32px);
+        padding: 0 16px;
+        display: block;
+        box-sizing: border-box;
+    }
+
+    .home-page .hero-content {
+        width: 100%;
+        max-width: none;
+        padding: 0;
+    }
+
+    .home-page .scroll-indicator {
+        bottom: 14px;
+        font-size: 16px;
+    }
+
     .hero-main-subtitle {
         margin-top: 12px;
         max-width: 95%;
@@ -697,6 +905,10 @@ body {
         height: 42px;
         padding: 0 20px;
         font-size: 14px;
+    }
+
+    .home-page .hero-cta-btn {
+        margin-top: 24px;
     }
 }
 
@@ -8331,7 +8543,11 @@ body.staff-page .staff-navbar-logout {
     top: 0 !important;
     left: 0 !important;
     width: 100% !important;
-    z-index: 5000 !important;
+    z-index: 9999 !important;
+}
+
+.home-page.top-with-promo .home-navbar {
+    top: var(--promo-bar-height, 40px) !important;
 }
 
 .home-page .home-navbar:not(.is-scrolled):not(.scrolled) {
@@ -8436,6 +8652,116 @@ body.staff-page .staff-navbar-logout {
 
 .home-page .home-navbar .nav-icon-link .nav-action-badge.is-empty {
     display: none !important;
+}
+
+/* 首頁側欄展開：左 35% / 右 65% 撐寬、右欄 padding 與字級（強化主視覺；僅桌機） */
+@media (min-width: 769px) {
+    .home-page .custom-megamenu.home-sidebar-drawer.expanded {
+        width: min(920px, 96vw) !important;
+        max-width: min(920px, 96vw) !important;
+    }
+
+    .home-page .custom-megamenu.home-sidebar-drawer.expanded .home-sidebar-left {
+        width: 35% !important;
+        flex: 0 0 35% !important;
+    }
+
+    .home-page .custom-megamenu.home-sidebar-drawer.expanded .home-sidebar-right {
+        width: 65% !important;
+        flex: 0 0 65% !important;
+    }
+
+    .home-page .custom-megamenu .home-sidebar-right .home-sidebar-panel {
+        padding: 48px 56px !important;
+    }
+
+    /* 購物指南：右欄不捲動（僅 guide） */
+    .home-page .custom-megamenu .home-sidebar-content-set[data-home-sidebar-content="guide"] .home-sidebar-panel {
+        overflow: hidden !important;
+        overflow-y: hidden !important;
+    }
+
+    .home-page .custom-megamenu .home-sidebar-panel .home-sidebar-panel-title {
+        font-size: 22px !important;
+        font-weight: 600 !important;
+        color: #111 !important;
+        margin: 0 0 20px 0 !important;
+    }
+
+    /* 購物指南區塊標題（單欄；較小字級） */
+    .home-page .custom-megamenu .home-sidebar-panel .home-sidebar-guide-title {
+        font-size: 16px !important;
+        font-weight: 600 !important;
+        color: #111 !important;
+        margin-top: 0 !important;
+        margin-bottom: 12px !important;
+    }
+
+    .home-page .custom-megamenu .home-sidebar-panel .home-sidebar-guide-col:first-child .home-sidebar-guide-title {
+        margin-top: 0 !important;
+    }
+
+    .home-page .custom-megamenu .home-sidebar-panel .home-sidebar-guide-col + .home-sidebar-guide-col .home-sidebar-guide-title {
+        margin-top: 0 !important;
+    }
+
+    .home-page .custom-megamenu .home-sidebar-panel .home-sidebar-panel-link {
+        font-size: 18px !important;
+        font-weight: 500 !important;
+        color: #333 !important;
+        line-height: 2.2 !important;
+        margin: 0 0 14px 0 !important;
+        transition: color 0.2s ease, transform 0.2s ease;
+    }
+
+    .home-page .custom-megamenu .home-sidebar-panel .home-sidebar-panel-link:hover,
+    .home-page .custom-megamenu .home-sidebar-panel .home-sidebar-panel-link:focus-visible {
+        color: #000 !important;
+        opacity: 1 !important;
+        transform: translateX(4px);
+    }
+
+    .home-page .custom-megamenu .home-sidebar-panel-links--helmets-promo .home-sidebar-panel-link {
+        font-size: 18px !important;
+        font-weight: 500 !important;
+        color: #333 !important;
+        line-height: 2.2 !important;
+    }
+
+    .home-page .custom-megamenu .home-sidebar-panel-links--helmets-promo .home-sidebar-panel-link:hover,
+    .home-page .custom-megamenu .home-sidebar-panel-links--helmets-promo .home-sidebar-panel-link:focus-visible {
+        color: #000 !important;
+        transform: translateX(4px);
+    }
+
+    .home-page .custom-megamenu .home-sidebar-panel .home-sidebar-panel-list--guide .home-sidebar-guide-link {
+        font-size: 14px !important;
+        font-weight: 500 !important;
+        color: #777 !important;
+        line-height: 1.8 !important;
+        margin: 5px 0 !important;
+        transition: color 0.2s ease;
+    }
+
+    .home-page .custom-megamenu .home-sidebar-panel .home-sidebar-panel-list--guide .home-sidebar-guide-link:hover,
+    .home-page .custom-megamenu .home-sidebar-panel .home-sidebar-panel-list--guide .home-sidebar-guide-link:focus-visible {
+        color: #111 !important;
+        opacity: 1 !important;
+    }
+
+    .home-page .custom-megamenu .home-sidebar-panel .home-sidebar-panel-item-text {
+        font-size: 18px !important;
+        font-weight: 500 !important;
+        line-height: 1.35 !important;
+    }
+
+    /* 購物指南 / 更多資訊 之間橫線 */
+    .home-page .custom-megamenu .home-sidebar-guide-col + .home-sidebar-guide-col {
+        margin-top: 20px !important;
+        margin-bottom: 0 !important;
+        padding-top: 24px !important;
+        border-top: 1px solid #ddd !important;
+    }
 }
 
 /* =========================================
