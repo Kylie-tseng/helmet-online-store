@@ -121,24 +121,46 @@ if (is_array($promo_offers) && !empty($promo_offers)) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HelmetVRse - 首頁</title>
     <link rel="stylesheet" href="assets/css/style.css?v=<?php echo urlencode((string)@filemtime(__DIR__ . '/assets/css/style.css')); ?>">
+    <link rel="stylesheet" href="assets/css/home-navbar.css?v=<?php echo urlencode((string)@filemtime(__DIR__ . '/assets/css/home-navbar.css')); ?>">
 </head>
-<body class="home-page">
+<body class="home-page top-with-promo">
+    <div class="promo-bar" aria-label="促銷訊息">
+        <div class="promo-track">
+            <div class="promo-content">
+                <span>新會員優惠｜新會員註冊後即可使用優惠券｜滿 500 元折抵 100 元</span>
+                <span>安全帽週年慶｜全館安全帽限時優惠｜全館商品 9 折</span>
+                <span>滿額折扣活動｜購物滿額即可使用優惠券｜滿 2000 元折抵 300 元</span>
+                <span>騎士節活動｜騎士節限定優惠｜全館商品 8 折</span>
+            </div>
+            <div class="promo-content" aria-hidden="true">
+                <span>新會員優惠｜新會員註冊後即可使用優惠券｜滿 500 元折抵 100 元</span>
+                <span>安全帽週年慶｜全館安全帽限時優惠｜全館商品 9 折</span>
+                <span>滿額折扣活動｜購物滿額即可使用優惠券｜滿 2000 元折抵 300 元</span>
+                <span>騎士節活動｜騎士節限定優惠｜全館商品 8 折</span>
+            </div>
+        </div>
+    </div>
+
     <header class="home-header">
         <?php renderNavbar($pdo, $categories, $parts_category_id, 'home'); ?>
     </header>
 
-    <section class="hero">
+    <section class="hero hero-section" aria-label="主視覺">
         <div class="hero-slider">
             <div class="slides">
-                <img src="assets/images/index6.jpg" class="slide active" alt="HelmetVRse 主視覺">
+                <img src="assets/images/index6.jpg?v=<?php echo urlencode((string)@filemtime(__DIR__ . '/assets/images/index6.jpg')); ?>" class="slide active" alt="HelmetVRse 主視覺">
             </div>
 
             <div class="hero-overlay">
-                <h1 class="hero-main-title">ENTER THE VR HELMET MALL</h1>
-                <p class="hero-main-subtitle">沉浸式虛擬商場，重新定義智慧安全帽選購體驗</p>
-                <a href="products.php" class="hero-cta-btn">前往 VR 商場</a>
+                <div class="hero-content">
+                    <h1 class="hero-main-title">ENTER THE VR HELMET MALL</h1>
+                    <p class="hero-main-subtitle">沉浸式虛擬商場，重新定義智慧安全帽選購體驗</p>
+                    <a href="products.php" class="hero-cta-btn">前往 VR 商場</a>
+                    <div class="hero-scroll-text">探索更多安全帽選擇 ↓</div>
+                </div>
             </div>
         </div>
+        <div class="scroll-indicator" aria-hidden="true"><span>↓</span></div>
     </section>
 
     <!-- 精選分類區 -->
@@ -370,35 +392,46 @@ if (is_array($promo_offers) && !empty($promo_offers)) {
 
                 <div class="lifestyle-gallery-track">
                     <?php
-                    // 騎乘風格導覽（中文 -> 英文）對應：用 map 方便之後擴充
-                    $style_english_map = [
-                        '復古' => 'VINTAGE',
-                        '通勤' => 'COMMUTER',
-                        '競速' => 'RACING',
-                        '競賽' => 'RACING',
-                        '女性' => 'WOMEN',
-                    ];
-
-                    // 首頁風格卡片導向：直接帶入 products.php 的 style 參數
-                    // 注意：此區塊只改連結目標，不改卡片外觀/hover。
-                    $style_param_map = [
-                        '復古' => 'retro',
-                        '通勤' => 'commuter',
-                        '競速' => 'racing',
-                        '女性' => 'women',
-                    ];
-
+                    // 騎乘風格導覽：固定四張卡片（slug 對應 products.php?style=...，解析見 includes/product_style_utils.php）
                     $home_style_cards = [
-                        ['label' => '復古', 'svg_rect' => '%23d8dde3', 'svg_path' => '%23b8c0ca', 'path_d' => 'M0 310L130 220L250 265L360 200L470 250L600 190V380H0Z'],
-                        ['label' => '通勤', 'svg_rect' => '%23d9dfe5', 'svg_path' => '%23b7bec8', 'path_d' => 'M0 292L120 210L220 245L340 195L470 255L600 182V380H0Z'],
-                        ['label' => '競速', 'svg_rect' => '%23dce1e6', 'svg_path' => '%23bcc4cd', 'path_d' => 'M0 305L120 228L250 275L370 210L500 258L600 200V380H0Z'],
-                        ['label' => '女性', 'svg_rect' => '%23d7dde2', 'svg_path' => '%23b4bcc5', 'path_d' => 'M0 296L128 220L236 258L352 202L462 244L600 187V380H0Z'],
+                        [
+                            'title_zh' => '復古',
+                            'title_en' => 'VINTAGE',
+                            'slug' => 'vintage',
+                            'svg_rect' => '%23d8dde3',
+                            'svg_path' => '%23b8c0ca',
+                            'path_d' => 'M0 310L130 220L250 265L360 200L470 250L600 190V380H0Z',
+                        ],
+                        [
+                            'title_zh' => '通勤',
+                            'title_en' => 'COMMUTER',
+                            'slug' => 'commuter',
+                            'svg_rect' => '%23d9dfe5',
+                            'svg_path' => '%23b7bec8',
+                            'path_d' => 'M0 292L120 210L220 245L340 195L470 255L600 182V380H0Z',
+                        ],
+                        [
+                            'title_zh' => '競速',
+                            'title_en' => 'RACING',
+                            'slug' => 'racing',
+                            'svg_rect' => '%23dce1e6',
+                            'svg_path' => '%23bcc4cd',
+                            'path_d' => 'M0 305L120 228L250 275L370 210L500 258L600 200V380H0Z',
+                        ],
+                        [
+                            'title_zh' => '女性',
+                            'title_en' => 'WOMEN',
+                            'slug' => 'women',
+                            'svg_rect' => '%23d7dde2',
+                            'svg_path' => '%23b4bcc5',
+                            'path_d' => 'M0 296L128 220L236 258L352 202L462 244L600 187V380H0Z',
+                        ],
                     ];
                     foreach ($home_style_cards as $sc):
-                        $style_cn = (string)($sc['label'] ?? '');
-                        $style_param = $style_param_map[$style_cn] ?? 'retro';
-                        $style_href = 'products.php?style=' . rawurlencode($style_param);
-                        $style_en = $style_english_map[$style_cn] ?? 'OTHER';
+                        $style_cn = (string)($sc['title_zh'] ?? '');
+                        $style_en = (string)($sc['title_en'] ?? '');
+                        $slug = (string)($sc['slug'] ?? '');
+                        $style_href = 'products.php?style=' . rawurlencode($slug);
                         $svg_src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 380'%3E%3Crect fill='" . $sc['svg_rect'] . "' width='600' height='380'/%3E%3Cpath d='" . $sc['path_d'] . "' fill='" . $sc['svg_path'] . "'/%3E%3C/svg%3E";
                     ?>
                     <a class="lifestyle-gallery-item" href="<?php echo htmlspecialchars($style_href); ?>">
