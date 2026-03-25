@@ -1,0 +1,80 @@
+.wheel-page-container {
+    padding: 40px 20px;
+    text-align: center;
+    background: #f8f9fa;
+    min-height: 80vh;
+}
+
+.wheel-game-area {
+    position: relative;
+    width: 350px;
+    margin: 50px auto;
+}
+
+.wheel-outer {
+    width: 100%;
+    border-radius: 50%;
+    border: 8px solid #333;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    overflow: hidden;
+}
+
+/* 🎯 轉盤本體（重點） */
+.wheel {
+    width: 100%;
+    height: 350px;
+    border-radius: 50%;
+    background: conic-gradient(
+        #f1c40f 0deg 60deg,
+        #e67e22 60deg 120deg,
+        #e74c3c 120deg 180deg,
+        #1abc9c 180deg 240deg,
+        #3498db 240deg 300deg,
+        #9b59b6 300deg 360deg
+    );
+    position: relative;
+    transition: transform 4s cubic-bezier(0.15, 0, 0.15, 1);
+}
+
+/* 🎯 文字（簡單版） */
+.wheel::after {
+    content: "9折\n8折\n300折扣\n免運\n100元\n銘謝惠顧";
+    white-space: pre;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-weight: bold;
+    text-align: center;
+}
+
+/* 🎯 指針 */
+.wheel-pointer {
+    position: absolute;
+    top: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0; 
+    height: 0; 
+    border-left: 15px solid transparent;
+    border-right: 15px solid transparent;
+    border-top: 30px solid #e74c3c;
+    z-index: 10;
+}
+
+/* 🎯 按鈕 */
+.spin-main-button {
+    margin-top: 40px;
+    padding: 15px 40px;
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #fff;
+    background: #2c3e50;
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+}
+
+.spin-main-button:disabled {
+    background: #bdc3c7;
+}

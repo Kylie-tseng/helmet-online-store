@@ -117,7 +117,6 @@ try {
                                 <a href="<?php echo htmlspecialchars($activity['detail_url']); ?>" class="coupon-item-btn coupon-item-btn-secondary">查看詳情</a>
                             </div>
                         </div>
-                    </article>
                 <?php endforeach; ?>
             </section>
         </div>
