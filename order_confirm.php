@@ -2,7 +2,6 @@
 require_once 'config.php';
 require_once 'includes/cart_functions.php';
 require_once 'includes/navbar.php';
-require_once 'includes/checkout_steps.php';
 
 // 檢查是否已登入
 if (!isset($_SESSION['user_id'])) {
@@ -58,12 +57,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_order'])) {
             $order_status = 'pending'; // 貨到付款，待出貨
         }
         
+        $order_amounts = build_orders_amount_fields($order_summary);
+        $order_coupon_id = !empty($coupon_status['coupon']['id']) ? (int)$coupon_status['coupon']['id'] : null;
+
         // 建立訂單
-        $stmt = $pdo->prepare("INSERT INTO orders (user_id, total_amount, status, payment_method, shipping_method, shipping_address, pickup_store) 
-                               VALUES (:user_id, :total_amount, :status, :payment_method, :shipping_method, :shipping_address, :pickup_store)");
+        $stmt = $pdo->prepare("INSERT INTO orders (user_id, coupon_id, total_amount, discount_amount, final_amount, status, payment_method, shipping_method, shipping_address, pickup_store) 
+                               VALUES (:user_id, :coupon_id, :total_amount, :discount_amount, :final_amount, :status, :payment_method, :shipping_method, :shipping_address, :pickup_store)");
         $stmt->execute([
             ':user_id' => $user_id,
-            ':total_amount' => $order_summary['final_total'],
+            ':coupon_id' => $order_coupon_id,
+            ':total_amount' => $order_amounts['total_amount'],
+            ':discount_amount' => $order_amounts['discount_amount'],
+            ':final_amount' => $order_amounts['final_amount'],
             ':status' => $order_status,
             ':payment_method' => $payment_method,
             ':shipping_method' => $shipping_method,
@@ -76,12 +81,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_order'])) {
         // 建立訂單明細
         foreach ($cart_items as $item) {
             $subtotal = $item['price'] * $item['quantity'];
+            $cs = (string)($item['size'] ?? '');
+            $order_item_size = ($cs === '' || $cs === getCartSizeNoneValue() || $cs === 'N') ? null : $item['size'];
             $stmt = $pdo->prepare("INSERT INTO order_items (order_id, product_id, size, quantity, unit_price, subtotal) 
                                  VALUES (:order_id, :product_id, :size, :quantity, :unit_price, :subtotal)");
             $stmt->execute([
                 ':order_id' => $order_id,
                 ':product_id' => $item['product_id'],
-                ':size' => $item['size'],
+                ':size' => $order_item_size,
                 ':quantity' => $item['quantity'],
                 ':unit_price' => $item['price'],
                 ':subtotal' => $subtotal
@@ -158,7 +165,6 @@ $shipping_method_names = [
     <!-- 訂單確認內容 -->
     <div class="checkout-container">
         <div class="container">
-            <?php renderCheckoutSteps(3); ?>
             <h1 class="checkout-page-title">訂單建立成功</h1>
             
             <?php if (isset($error_message)): ?>
@@ -170,6 +176,55 @@ $shipping_method_names = [
                     <h2>訂單建立成功！</h2>
                     <p>訂單編號：<?php echo htmlspecialchars($order_id); ?></p>
                     <p>感謝您的購買，我們將盡快為您處理訂單。</p>
+
+                    <div class="checkout-summary-panel">
+                        <h3 class="checkout-summary-title">付款明細</h3>
+                        <div class="order-summary">
+                            <div class="summary-row">
+                                <span class="summary-label">訂單編號：</span>
+                                <span class="summary-value">#<?php echo htmlspecialchars($order_id); ?></span>
+                            </div>
+                            <div class="summary-row summary-total">
+                                <span class="summary-label">最終總價：</span>
+                                <span class="summary-value summary-total">NT$ <?php echo number_format($order_summary['final_total'], 0); ?></span>
+                            </div>
+                        </div>
+
+                        <button
+                            type="button"
+                            class="checkout-summary-items-toggle"
+                            data-checkout-items-toggle="1"
+                            data-checkout-items-target="orderConfirmItemsList"
+                            aria-expanded="false"
+                        >
+                            <span>查看商品清單</span>
+                            <svg class="checkout-summary-items-chevron" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                <path d="M6 9L12 15L18 9" stroke="#333333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
+
+                        <div id="orderConfirmItemsList" class="checkout-summary-items" aria-hidden="true">
+                            <div class="checkout-summary-items-inner">
+                                <?php foreach ($cart_items as $item): 
+                                    $subtotal = (float)$item['price'] * (int)$item['quantity'];
+                                ?>
+                                    <div class="checkout-summary-items-row">
+                                        <div class="checkout-summary-items-left">
+                                            <div class="checkout-summary-items-name"><?php echo htmlspecialchars($item['product_name']); ?></div>
+                                            <div class="checkout-summary-items-meta">
+                                                <?php echo htmlspecialchars(formatCartSizeForDisplay($item['size'] ?? '')); ?>
+                                                &nbsp;|&nbsp; Qty: <?php echo (int)$item['quantity']; ?>
+                                            </div>
+                                        </div>
+                                        <div class="checkout-summary-items-right">
+                                            <div class="checkout-summary-items-amount">NT$ <?php echo number_format($subtotal, 0); ?></div>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="order-success-actions">
                         <a href="products.php" class="btn-primary">繼續購物</a>
                         <a href="profile.php" class="btn-secondary">查看訂單</a>
@@ -181,61 +236,39 @@ $shipping_method_names = [
                     <!-- 商品列表 -->
                     <div class="order-section">
                         <h2 class="section-title">訂單商品</h2>
-                        <div class="cart-table-wrapper">
-                            <table class="cart-table">
-                                <thead>
-                                    <tr>
-                                        <th class="col-product">商品資料</th>
-                                        <th class="col-price">單價</th>
-                                        <th class="col-quantity">數量</th>
-                                        <th class="col-subtotal">小計</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ($cart_items as $item): 
-                                        $subtotal = $item['price'] * $item['quantity'];
-                                        $has_image = !empty($item['image_url']) && trim($item['image_url']) !== '';
-                                    ?>
-                                        <tr class="cart-table-row">
-                                            <td class="col-product">
-                                                <div class="cart-product-info">
-                                                    <div class="cart-item-image">
-                                                        <?php if ($has_image): ?>
-                                                            <img src="<?php echo htmlspecialchars($item['image_url'], ENT_QUOTES); ?>" 
-                                                                 alt="<?php echo htmlspecialchars($item['product_name']); ?>">
-                                                        <?php else: ?>
-                                                            <div class="product-image-placeholder">
-                                                                <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#9A9A9A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                                                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                                                                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                                                                    <polyline points="21 15 16 10 5 21"></polyline>
-                                                                </svg>
-                                                                <span>無圖片</span>
-                                                            </div>
-                                                        <?php endif; ?>
-                                                    </div>
-                                                    <div class="cart-item-info">
-                                                        <h3 class="cart-item-name"><?php echo htmlspecialchars($item['product_name']); ?></h3>
-                                                        <p class="cart-item-meta">
-                                                            <span class="cart-item-category"><?php echo htmlspecialchars($item['category_name']); ?></span>
-                                                            <span class="cart-item-size">尺寸：<?php echo htmlspecialchars($item['size']); ?></span>
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td class="col-price">
-                                                NT$ <?php echo number_format($item['price'], 0); ?>
-                                            </td>
-                                            <td class="col-quantity">
-                                                <?php echo htmlspecialchars($item['quantity']); ?>
-                                            </td>
-                                            <td class="col-subtotal">
-                                                NT$ <?php echo number_format($subtotal, 0); ?>
-                                            </td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
+                        <button
+                            type="button"
+                            class="checkout-summary-items-toggle"
+                            data-checkout-items-toggle="1"
+                            data-checkout-items-target="orderConfirmItemsList"
+                            aria-expanded="false"
+                        >
+                            <span>查看商品清單</span>
+                            <svg class="checkout-summary-items-chevron" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                <path d="M6 9L12 15L18 9" stroke="#333333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
+
+                        <div id="orderConfirmItemsList" class="checkout-summary-items" aria-hidden="true">
+                            <div class="checkout-summary-items-inner">
+                                <?php foreach ($cart_items as $item): 
+                                    $subtotal = (float)$item['price'] * (int)$item['quantity'];
+                                ?>
+                                    <div class="checkout-summary-items-row">
+                                        <div class="checkout-summary-items-left">
+                                            <div class="checkout-summary-items-name"><?php echo htmlspecialchars($item['product_name']); ?></div>
+                                            <div class="checkout-summary-items-meta">
+                                                <?php echo htmlspecialchars($item['category_name']); ?>
+                                                &nbsp;|&nbsp; 尺寸：<?php echo htmlspecialchars(formatCartSizeForDisplay($item['size'] ?? '')); ?>
+                                                &nbsp;|&nbsp; Qty: <?php echo (int)$item['quantity']; ?>
+                                            </div>
+                                        </div>
+                                        <div class="checkout-summary-items-right">
+                                            <div class="checkout-summary-items-amount">NT$ <?php echo number_format($subtotal, 0); ?></div>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
                         </div>
                     </div>
 
@@ -349,6 +382,25 @@ $shipping_method_names = [
             </div>
         </div>
     </footer>
+
+    <script>
+        // 摘要：查看商品清單（收合/展開）
+        (function () {
+            const toggles = document.querySelectorAll('[data-checkout-items-toggle="1"]');
+            toggles.forEach((btn) => {
+                btn.addEventListener('click', function () {
+                    const targetId = btn.getAttribute('data-checkout-items-target');
+                    const target = document.getElementById(targetId);
+                    if (!target) return;
+
+                    const isOpen = target.classList.toggle('is-open');
+                    btn.classList.toggle('is-open', isOpen);
+                    btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+                    target.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+                });
+            });
+        })();
+    </script>
 </body>
 </html>
 

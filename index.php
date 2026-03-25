@@ -1,7 +1,9 @@
 <?php
 require_once 'config.php';
 require_once 'includes/cart_functions.php';
+require_once 'includes/category_utils.php';
 require_once 'includes/navbar.php';
+require_once 'includes/product_query_helpers.php';
 
 // 查詢分類資料
 try {
@@ -26,7 +28,15 @@ try {
 
 // 查詢熱門商品
 try {
-    $stmt = $pdo->query("SELECT id, name, price, image_url FROM products WHERE status = 'active' ORDER BY created_at DESC LIMIT 6");
+    $stmt = $pdo->query("SELECT p.id, p.name, p.price, p.style,
+            " . primaryImageSubquery('p', 'pi') . " AS primary_image,
+            c.name AS category_name
+            FROM products p
+            INNER JOIN categories c ON p.category_id = c.id
+            WHERE p.status = 'active'
+              AND p.is_featured = 1
+            ORDER BY p.id ASC
+            LIMIT 6");
     $hotProducts = $stmt->fetchAll();
 } catch (PDOException $e) {
     $hotProducts = [];
@@ -44,35 +54,40 @@ $promo_offers = [
         'text' => '新會員註冊後即可使用優惠券',
         'coupon' => 'NEW100',
         'highlight' => '滿 500 元折抵 100 元',
-        'link' => 'coupon_new_member.php'
+        'link' => 'coupon_new_member.php',
+        'detail_link' => 'coupon_new_member.php'
     ],
     [
         'title' => '安全帽週年慶',
         'text' => '全館安全帽限時優惠',
         'coupon' => 'HELMET10',
         'highlight' => '全館商品 9 折',
-        'link' => 'coupon_anniversary.php'
+        'link' => 'coupon_anniversary.php',
+        'detail_link' => 'coupon_anniversary.php'
     ],
     [
         'title' => '滿額折扣活動',
         'text' => '購物滿額即可使用優惠券',
         'coupon' => 'SAVE300',
         'highlight' => '滿 2000 元折抵 300 元',
-        'link' => 'coupon_discount.php'
+        'link' => 'coupon_discount.php',
+        'detail_link' => 'coupon_discount.php'
     ],
     [
         'title' => '騎士節活動',
         'text' => '騎士節限定優惠',
         'coupon' => 'RIDER20',
         'highlight' => '全館商品 8 折',
-        'link' => 'coupon_rider_day.php'
+        'link' => 'coupon_rider_day.php',
+        'detail_link' => 'coupon_rider_day.php'
     ],
     [
         'title' => '滿三千免運',
         'text' => '全站購物滿額即可享免運優惠',
         'coupon' => '',
         'highlight' => '全站滿 3000 元免運',
-        'link' => 'coupon_free_shipping.php'
+        'link' => 'coupon_free_shipping.php',
+        'detail_link' => 'coupon_free_shipping.php'
     ],
 ];
 
@@ -115,11 +130,7 @@ if (is_array($promo_offers) && !empty($promo_offers)) {
     <section class="hero">
         <div class="hero-slider">
             <div class="slides">
-                <img src="assets/images/index1.jpg" class="slide active" alt="Helmet Banner 1">
-                <img src="assets/images/index2.jpg" class="slide" alt="Helmet Banner 2">
-                <img src="assets/images/index3.jpg" class="slide" alt="Helmet Banner 3">
-                <img src="assets/images/index4.jpg" class="slide" alt="Helmet Banner 4">
-                <img src="assets/images/index5.jpg" class="slide" alt="Helmet Banner 5">
+                <img src="assets/images/index6.jpg" class="slide active" alt="HelmetVRse 主視覺">
             </div>
 
             <div class="hero-overlay">
@@ -127,9 +138,6 @@ if (is_array($promo_offers) && !empty($promo_offers)) {
                 <p class="hero-main-subtitle">沉浸式虛擬商場，重新定義智慧安全帽選購體驗</p>
                 <a href="products.php" class="hero-cta-btn">前往 VR 商場</a>
             </div>
-
-            <div class="slider-arrow left">&#10094;</div>
-            <div class="slider-arrow right">&#10095;</div>
         </div>
     </section>
 
@@ -156,7 +164,10 @@ if (is_array($promo_offers) && !empty($promo_offers)) {
                                     <h3 class="promo-main-title"><?php echo htmlspecialchars($promo_main_offer['title'] ?? '限時優惠'); ?></h3>
                                     <p class="promo-main-highlight"><?php echo htmlspecialchars($promo_main_offer['highlight'] ?? '優惠進行中'); ?></p>
                                     <p class="promo-main-text"><?php echo htmlspecialchars($promo_main_offer['text'] ?? '精選回饋活動'); ?></p>
-                                    <a href="<?php echo htmlspecialchars($promo_main_offer['link'] ?? 'coupons.php'); ?>" class="promo-btn">立即選購</a>
+                                    <div class="hero-actions">
+                                        <a href="products.php" class="promo-btn btn-primary">立即選購</a>
+                                        <a href="<?php echo htmlspecialchars($promo_main_offer['detail_link'] ?? $promo_main_offer['link'] ?? 'coupon_anniversary.php'); ?>" class="promo-btn btn-secondary">查看活動</a>
+                                    </div>
                                 </div>
                             </article>
                         <?php endif; ?>
@@ -190,6 +201,10 @@ if (is_array($promo_offers) && !empty($promo_offers)) {
                         continue;
                     }
                     $split_category_lookup[$name] = $category;
+                    $norm = normalize_product_category_label($name);
+                    if ($norm !== '' && !isset($split_category_lookup[$norm])) {
+                        $split_category_lookup[$norm] = $category;
+                    }
                 }
 
                 $split_categories = [
@@ -220,10 +235,11 @@ if (is_array($promo_offers) && !empty($promo_offers)) {
                     <?php foreach ($split_categories as $item): ?>
                         <?php
                         $name = $item['name'];
-                        $resolved = $split_category_lookup[$name] ?? null;
+                        $norm = normalize_product_category_label($name);
+                        $resolved = $split_category_lookup[$name] ?? $split_category_lookup[$norm] ?? null;
                         $target = $resolved
-                            ? 'products.php?category=' . urlencode((string)$resolved['id'])
-                            : 'products.php?category=' . urlencode($name);
+                            ? 'products.php?category=' . (int)$resolved['id']
+                            : 'products.php?category=' . rawurlencode($name);
                         ?>
                         <div class="split-category-item">
                             <h3 class="split-category-title"><?php echo htmlspecialchars($name); ?></h3>
@@ -246,46 +262,70 @@ if (is_array($promo_offers) && !empty($promo_offers)) {
                     <p class="featured-section-subtitle">精選推薦，為不同騎乘風格而設計</p>
                 </header>
 
-                <?php if (!empty($_SESSION['favorite_message'])): ?>
-                    <div class="success-message"><?php echo htmlspecialchars($_SESSION['favorite_message']); ?></div>
-                    <?php unset($_SESSION['favorite_message']); ?>
-                <?php endif; ?>
-
                 <?php
-                $product_tags = ['全罩式', '競賽款', '入門款'];
+                // 首頁商品卡兩個 badge 的來源：
+                // 1) 帽型分類：由 categories.name 映射（全罩式/半罩式/3/4罩/配件）
+                // 2) 風格英文：由 products.style 映射（VINTAGE/COMMUTER/RACING/...）
+                $helmet_type_map = [
+                    '全罩式安全帽' => '全罩式',
+                    '半罩式安全帽' => '半罩式',
+                    '3/4罩安全帽' => '3/4罩',
+                    '周邊與配件' => '配件',
+                ];
+
+                $style_english_map = [
+                    '復古' => 'VINTAGE',
+                    '通勤' => 'COMMUTER',
+                    // 資料庫可能使用「競速」或「競賽」
+                    '競賽' => 'RACING',
+                    '競速' => 'RACING',
+                    '街頭' => 'STREET',
+                    '女性' => 'WOMEN',
+                ];
                 ?>
 
                 <?php if (empty($hotProducts)): ?>
                     <div class="empty-message">目前尚未有熱門商品</div>
                 <?php else: ?>
                     <div class="featured-products-grid-home">
-                        <?php foreach ($hotProducts as $idx => $product): ?>
+                        <?php foreach ($hotProducts as $product): ?>
                             <?php
                             $is_favorited = in_array((int)$product['id'], $favorite_ids, true);
-                            $has_image = !empty($product['image_url']) && trim($product['image_url']) !== '';
-                            $tag = $product_tags[$idx % count($product_tags)];
+                            $card_img_src = resolve_product_card_image_src($product['primary_image'] ?? null);
+
+                            $category_name = (string)($product['category_name'] ?? '');
+                            $helmet_badge = $helmet_type_map[$category_name] ?? null;
+                            // fallback：用字串關鍵字判斷（避免資料名稱略有差異）
+                            if ($helmet_badge === null) {
+                                if (strpos($category_name, '全罩式') !== false) {
+                                    $helmet_badge = '全罩式';
+                                } elseif (strpos($category_name, '半罩式') !== false) {
+                                    $helmet_badge = '半罩式';
+                                } elseif (strpos($category_name, '3/4') !== false) {
+                                    $helmet_badge = '3/4罩';
+                                } elseif (strpos($category_name, '配件') !== false || strpos($category_name, '周邊') !== false) {
+                                    $helmet_badge = '配件';
+                                } else {
+                                    $helmet_badge = '配件';
+                                }
+                            }
+
+                            $style_label = (string)($product['style'] ?? '');
+                            $style_english_badge = $style_english_map[$style_label] ?? 'OTHER';
                             ?>
                             <article class="featured-product-card">
                                 <div class="featured-product-media">
                                     <div class="featured-product-frame">
-                                        <?php if ($has_image): ?>
-                                            <img class="featured-product-image" src="<?php echo htmlspecialchars($product['image_url'], ENT_QUOTES); ?>" alt="<?php echo htmlspecialchars($product['name']); ?>">
-                                        <?php else: ?>
-                                            <div class="featured-product-placeholder">
-                                                <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#9A9A9A" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
-                                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                                                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                                                    <polyline points="21 15 16 10 5 21"></polyline>
-                                                </svg>
-                                                <span>無圖片</span>
-                                            </div>
-                                        <?php endif; ?>
+                                        <img class="featured-product-image" src="<?php echo htmlspecialchars($card_img_src, ENT_QUOTES); ?>" alt="<?php echo htmlspecialchars($product['name']); ?>">
                                     </div>
                                 </div>
 
                                 <div class="featured-product-body">
                                     <div class="featured-product-meta">
-                                        <span class="featured-product-tag"><?php echo htmlspecialchars($tag); ?></span>
+                                        <div class="featured-product-badge-group" aria-label="商品標籤">
+                                            <span class="featured-product-helmet-badge"><?php echo htmlspecialchars($helmet_badge); ?></span>
+                                            <span class="featured-product-style-badge"><?php echo htmlspecialchars($style_english_badge); ?></span>
+                                        </div>
                                         <form action="api/toggle_favorite.php" method="POST" class="product-favorite-inline-form">
                                             <input type="hidden" name="product_id" value="<?php echo (int)$product['id']; ?>">
                                             <input type="hidden" name="redirect" value="index.php">
@@ -329,34 +369,46 @@ if (is_array($promo_offers) && !empty($promo_offers)) {
                 </header>
 
                 <div class="lifestyle-gallery-track">
-                    <article class="lifestyle-gallery-item">
-                        <img class="lifestyle-gallery-image" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 380'%3E%3Crect fill='%23d8dde3' width='600' height='380'/%3E%3Cpath d='M0 310L130 220L250 265L360 200L470 250L600 190V380H0Z' fill='%23b8c0ca'/%3E%3C/svg%3E" alt="通勤騎乘">
-                        <h3 class="lifestyle-gallery-title">通勤騎乘</h3>
-                    </article>
-                    <article class="lifestyle-gallery-item">
-                        <img class="lifestyle-gallery-image" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 380'%3E%3Crect fill='%23d9dfe5' width='600' height='380'/%3E%3Cpath d='M0 292L120 210L220 245L340 195L470 255L600 182V380H0Z' fill='%23b7bec8'/%3E%3C/svg%3E" alt="長途旅行">
-                        <h3 class="lifestyle-gallery-title">長途旅行</h3>
-                    </article>
-                    <article class="lifestyle-gallery-item">
-                        <img class="lifestyle-gallery-image" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 380'%3E%3Crect fill='%23d6dce2' width='600' height='380'/%3E%3Cpath d='M0 300L90 240L210 270L325 205L460 248L600 190V380H0Z' fill='%23b1bbc5'/%3E%3C/svg%3E" alt="城市風格">
-                        <h3 class="lifestyle-gallery-title">城市風格</h3>
-                    </article>
-                    <article class="lifestyle-gallery-item">
-                        <img class="lifestyle-gallery-image" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 380'%3E%3Crect fill='%23dce1e6' width='600' height='380'/%3E%3Cpath d='M0 305L120 228L250 275L370 210L500 258L600 200V380H0Z' fill='%23bcc4cd'/%3E%3C/svg%3E" alt="競速性能">
-                        <h3 class="lifestyle-gallery-title">競速性能</h3>
-                    </article>
-                    <article class="lifestyle-gallery-item">
-                        <img class="lifestyle-gallery-image" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 380'%3E%3Crect fill='%23d7dde2' width='600' height='380'/%3E%3Cpath d='M0 296L128 220L236 258L352 202L462 244L600 187V380H0Z' fill='%23b4bcc5'/%3E%3C/svg%3E" alt="女性精選">
-                        <h3 class="lifestyle-gallery-title">女性精選</h3>
-                    </article>
-                    <article class="lifestyle-gallery-item">
-                        <img class="lifestyle-gallery-image" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 380'%3E%3Crect fill='%23d4dae0' width='600' height='380'/%3E%3Cpath d='M0 302L112 226L234 266L350 204L472 256L600 194V380H0Z' fill='%23adb6bf'/%3E%3C/svg%3E" alt="周邊配件">
-                        <h3 class="lifestyle-gallery-title">周邊配件</h3>
-                    </article>
-                    <article class="lifestyle-gallery-item">
-                        <img class="lifestyle-gallery-image" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 380'%3E%3Crect fill='%23d8dde1' width='600' height='380'/%3E%3Cpath d='M0 299L122 222L246 268L362 208L478 252L600 196V380H0Z' fill='%23b3bcc4'/%3E%3C/svg%3E" alt="禮物推薦">
-                        <h3 class="lifestyle-gallery-title">禮物推薦</h3>
-                    </article>
+                    <?php
+                    // 騎乘風格導覽（中文 -> 英文）對應：用 map 方便之後擴充
+                    $style_english_map = [
+                        '復古' => 'VINTAGE',
+                        '通勤' => 'COMMUTER',
+                        '競速' => 'RACING',
+                        '競賽' => 'RACING',
+                        '女性' => 'WOMEN',
+                    ];
+
+                    // 首頁風格卡片導向：直接帶入 products.php 的 style 參數
+                    // 注意：此區塊只改連結目標，不改卡片外觀/hover。
+                    $style_param_map = [
+                        '復古' => 'retro',
+                        '通勤' => 'commuter',
+                        '競速' => 'racing',
+                        '女性' => 'women',
+                    ];
+
+                    $home_style_cards = [
+                        ['label' => '復古', 'svg_rect' => '%23d8dde3', 'svg_path' => '%23b8c0ca', 'path_d' => 'M0 310L130 220L250 265L360 200L470 250L600 190V380H0Z'],
+                        ['label' => '通勤', 'svg_rect' => '%23d9dfe5', 'svg_path' => '%23b7bec8', 'path_d' => 'M0 292L120 210L220 245L340 195L470 255L600 182V380H0Z'],
+                        ['label' => '競速', 'svg_rect' => '%23dce1e6', 'svg_path' => '%23bcc4cd', 'path_d' => 'M0 305L120 228L250 275L370 210L500 258L600 200V380H0Z'],
+                        ['label' => '女性', 'svg_rect' => '%23d7dde2', 'svg_path' => '%23b4bcc5', 'path_d' => 'M0 296L128 220L236 258L352 202L462 244L600 187V380H0Z'],
+                    ];
+                    foreach ($home_style_cards as $sc):
+                        $style_cn = (string)($sc['label'] ?? '');
+                        $style_param = $style_param_map[$style_cn] ?? 'retro';
+                        $style_href = 'products.php?style=' . rawurlencode($style_param);
+                        $style_en = $style_english_map[$style_cn] ?? 'OTHER';
+                        $svg_src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 380'%3E%3Crect fill='" . $sc['svg_rect'] . "' width='600' height='380'/%3E%3Cpath d='" . $sc['path_d'] . "' fill='" . $sc['svg_path'] . "'/%3E%3C/svg%3E";
+                    ?>
+                    <a class="lifestyle-gallery-item" href="<?php echo htmlspecialchars($style_href); ?>">
+                        <img class="lifestyle-gallery-image" src="<?php echo htmlspecialchars($svg_src, ENT_QUOTES); ?>" alt="<?php echo htmlspecialchars($style_cn); ?> 風格">
+                        <h3 class="lifestyle-gallery-title" aria-label="<?php echo htmlspecialchars($style_cn); ?> / <?php echo htmlspecialchars($style_en); ?>">
+                            <span class="lifestyle-style-badge-cn"><?php echo htmlspecialchars($style_cn); ?></span>
+                            <span class="lifestyle-style-badge-en"><?php echo htmlspecialchars($style_en); ?></span>
+                        </h3>
+                    </a>
+                    <?php endforeach; ?>
                 </div>
             </div>
         </div>
@@ -508,42 +560,6 @@ if (is_array($promo_offers) && !empty($promo_offers)) {
                 });
             } catch (error) {
                 console.error('搜尋框功能錯誤:', error);
-            }
-        })();
-
-        // 首頁 Hero 圖片輪播
-        (function() {
-            try {
-                const slides = document.querySelectorAll('.hero-slider .slide');
-                const nextArrow = document.querySelector('.hero-slider .slider-arrow.right');
-                const prevArrow = document.querySelector('.hero-slider .slider-arrow.left');
-                if (!slides.length || !nextArrow || !prevArrow) return;
-
-                let current = 0;
-
-                function showSlide(index) {
-                    slides.forEach(function(slide) {
-                        slide.classList.remove('active');
-                    });
-                    slides[index].classList.add('active');
-                }
-
-                function nextSlide() {
-                    current = (current + 1) % slides.length;
-                    showSlide(current);
-                }
-
-                function prevSlide() {
-                    current = (current - 1 + slides.length) % slides.length;
-                    showSlide(current);
-                }
-
-                nextArrow.addEventListener('click', nextSlide);
-                prevArrow.addEventListener('click', prevSlide);
-
-                setInterval(nextSlide, 5000);
-            } catch (error) {
-                console.error('Hero 輪播功能錯誤:', error);
             }
         })();
 

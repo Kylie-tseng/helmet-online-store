@@ -84,9 +84,9 @@ try {
 
     <main class="coupon-page-shell">
         <div class="container coupon-page-container">
-            <section class="coupon-page-header">
-                <h1>優惠券專區</h1>
-                <p>一次掌握目前所有活動優惠與折扣資訊</p>
+            <section class="coupon-page-header page-hero-header">
+                <h1 class="page-hero-title">優惠券專區</h1>
+                <p class="page-hero-subtitle">一次掌握目前所有活動優惠與折扣資訊</p>
             </section>
 
             <section class="coupon-list-panel" aria-label="優惠券總覽列表">

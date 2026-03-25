@@ -1,0 +1,2 @@
+-- 【已過時】專案已改為使用 F 代表配件／不分尺寸，請改執行 migration_cart_size_N_to_F.sql
+-- 若資料庫仍為舊版 ENUM，請依 db/migration_cart_size_N_to_F.sql 說明更新。

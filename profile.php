@@ -2,6 +2,7 @@
 require_once 'config.php';
 require_once 'includes/cart_functions.php';
 require_once 'includes/navbar.php';
+require_once 'includes/order_status_helpers.php';
 
 // 檢查是否已登入
 if (!isset($_SESSION['user_id'])) {
@@ -84,12 +85,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 $order_items = $stmt->fetchAll();
                 
                 foreach ($order_items as $item) {
+                    $sz = $item['size'] ?? null;
+                    if ($sz === null || $sz === '' || $sz === getCartSizeNoneValue() || $sz === 'N') {
+                        continue;
+                    }
                     $stmt = $pdo->prepare("UPDATE product_sizes SET stock = stock + :quantity, updated_at = NOW() 
                                          WHERE product_id = :product_id AND size = :size");
                     $stmt->execute([
                         ':quantity' => $item['quantity'],
                         ':product_id' => $item['product_id'],
-                        ':size' => $item['size']
+                        ':size' => $sz
                     ]);
                 }
                 
@@ -174,7 +179,7 @@ try {
 $orders = [];
 if ($active_tab === 'orders') {
     try {
-        $stmt = $pdo->prepare("SELECT id, total_amount, status, payment_method, shipping_method, shipping_address, pickup_store, created_at, updated_at 
+        $stmt = $pdo->prepare("SELECT id, coupon_id, total_amount, discount_amount, final_amount, status, payment_method, shipping_method, shipping_address, pickup_store, created_at, updated_at 
                               FROM orders 
                               WHERE user_id = :user_id 
                               ORDER BY created_at DESC");
@@ -189,6 +194,18 @@ if ($active_tab === 'orders') {
                                    WHERE oi.order_id = :order_id");
             $stmt->execute([':order_id' => $order['id']]);
             $order['items'] = $stmt->fetchAll();
+            $order['return_requests'] = [];
+
+            try {
+                $returnStmt = $pdo->prepare("SELECT id, status, refund_status, reason, created_at, updated_at
+                                             FROM return_requests
+                                             WHERE order_id = :order_id
+                                             ORDER BY created_at DESC");
+                $returnStmt->execute([':order_id' => $order['id']]);
+                $order['return_requests'] = $returnStmt->fetchAll();
+            } catch (PDOException $e) {
+                $order['return_requests'] = [];
+            }
         }
         unset($order);
     } catch (PDOException $e) {
@@ -211,16 +228,6 @@ if ($active_tab === 'coupons') {
         $error = '讀取優惠券資料時發生錯誤：' . $e->getMessage();
     }
 }
-
-// 訂單狀態中文對照
-$status_map = [
-    'pending' => '未出貨',
-    'pending_payment' => '待信用卡付款',
-    'paid' => '已付款',
-    'shipped' => '已出貨',
-    'completed' => '已完成',
-    'cancelled' => '已取消'
-];
 
 // 付款方式顯示名稱
 $payment_method_names = [
@@ -431,9 +438,9 @@ try {
                                             </div>
                                             <div class="order-status-wrapper">
                                                 <span class="order-status status-<?php echo htmlspecialchars($order['status']); ?>">
-                                                    <?php echo htmlspecialchars($status_map[$order['status']] ?? $order['status']); ?>
+                                                    <?php echo htmlspecialchars(appOrderStatusLabel((string)$order['status'])); ?>
                                                 </span>
-                                                <span class="order-amount">NT$ <?php echo number_format($order['total_amount'], 0); ?></span>
+                                                <span class="order-amount">NT$ <?php echo number_format(get_order_payable_amount($order), 0); ?></span>
                                                 <?php if (in_array($order['status'], ['pending', 'pending_payment', 'paid'])): ?>
                                                     <form method="POST" style="display:inline;" onsubmit="return confirm('確定要取消此訂單嗎？');">
                                                         <input type="hidden" name="action" value="cancel_order">
@@ -474,7 +481,7 @@ try {
                                                         <?php foreach ($order['items'] as $item): ?>
                                                             <tr>
                                                                 <td><?php echo htmlspecialchars($item['product_name']); ?></td>
-                                                                <td><?php echo htmlspecialchars($item['size'] ?? '-'); ?></td>
+                                                                <td><?php echo htmlspecialchars(formatCartSizeForDisplay($item['size'] ?? '')); ?></td>
                                                                 <td><?php echo htmlspecialchars($item['quantity']); ?></td>
                                                                 <td>NT$ <?php echo number_format($item['unit_price'], 0); ?></td>
                                                                 <td>NT$ <?php echo number_format($item['subtotal'], 0); ?></td>
@@ -484,10 +491,29 @@ try {
                                                     <tfoot>
                                                         <tr>
                                                             <td colspan="4" class="text-right"><strong>總計：</strong></td>
-                                                            <td><strong>NT$ <?php echo number_format($order['total_amount'], 0); ?></strong></td>
+                                                            <td><strong>NT$ <?php echo number_format(get_order_payable_amount($order), 0); ?></strong></td>
                                                         </tr>
                                                     </tfoot>
                                                 </table>
+
+                                                <?php if (!empty($order['return_requests'])): ?>
+                                                    <div class="order-meta" style="margin-top: 14px;">
+                                                        <p><strong>退貨/退款進度：</strong></p>
+                                                        <?php foreach ($order['return_requests'] as $request): ?>
+                                                            <p>
+                                                                申請 #<?php echo (int)$request['id']; ?>｜
+                                                                退貨狀態：<?php echo htmlspecialchars(appOrderStatusLabel((string)($request['status'] ?? 'pending'))); ?>｜
+                                                                退款狀態：<?php echo htmlspecialchars(appRefundStatusLabel((string)($request['refund_status'] ?? 'pending_refund'))); ?>
+                                                                <?php if (!empty($request['updated_at'])): ?>
+                                                                    ｜更新時間：<?php echo htmlspecialchars(date('Y-m-d H:i', strtotime((string)$request['updated_at']))); ?>
+                                                                <?php endif; ?>
+                                                            </p>
+                                                            <?php if (!empty($request['reason'])): ?>
+                                                                <p>原因：<?php echo htmlspecialchars((string)$request['reason']); ?></p>
+                                                            <?php endif; ?>
+                                                        <?php endforeach; ?>
+                                                    </div>
+                                                <?php endif; ?>
                                             </div>
                                         </div>
                                     </div>

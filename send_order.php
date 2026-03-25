@@ -3,6 +3,8 @@
  * 訂單通知信發送腳本 (自動識別來源變數)
  */
 
+require_once __DIR__ . '/includes/cart_functions.php';
+
 // 1. 變數兼容性處理 (重要：解決不同頁面引入時的變數命名差異)
 $mail_order_id = $order_id ?? ($order['id'] ?? 'N/A');
 $mail_payment_method = $payment_method ?? ($order['payment_method'] ?? 'unknown');
@@ -11,8 +13,8 @@ $mail_payment_method = $payment_method ?? ($order['payment_method'] ?? 'unknown'
 $mail_items = !empty($cart_items) ? $cart_items : ($order_items ?? []);
 
 // 決定金額 (優先從 $order_summary 拿，沒有則從資料庫 $order 拿)
-$mail_discount = $order_summary['discount'] ?? 0;
-$mail_total = $order_summary['final_total'] ?? ($order['total_amount'] ?? 0);
+$mail_discount = $order_summary['discount'] ?? ((isset($order) && is_array($order)) ? (float)($order['discount_amount'] ?? 0) : 0);
+$mail_total = $order_summary['final_total'] ?? ((isset($order) && is_array($order)) ? get_order_payable_amount($order) : 0);
 
 $payment_method_names = [
     'credit_card' => '信用卡',
@@ -63,9 +65,10 @@ if (!empty($customer_email) && !empty($mail_items)) {
             // 這裡自動處理 $item['price'] (購物車) 或 $item['unit_price'] (訂單明細)
             $unit_p = $item['price'] ?? ($item['unit_price'] ?? 0);
             $sub = number_format($unit_p * $item['quantity']);
+            $size_label = formatCartSizeForDisplay($item['size'] ?? '');
             $item_rows .= "
                 <tr>
-                    <td style='border:1px solid #ddd; padding:8px;'>{$item['product_name']} ({$item['size']})</td>
+                    <td style='border:1px solid #ddd; padding:8px;'>{$item['product_name']}（尺寸：{$size_label}）</td>
                     <td style='border:1px solid #ddd; padding:8px; text-align:center;'>{$item['quantity']}</td>
                     <td style='border:1px solid #ddd; padding:8px; text-align:right;'>NT$ $sub</td>
                 </tr>";

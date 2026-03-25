@@ -50,12 +50,15 @@ CREATE TABLE IF NOT EXISTS `products` (
   `description` text DEFAULT NULL,
   `price` decimal(10,2) NOT NULL,
   `status` enum('active','inactive') NOT NULL DEFAULT 'active',
-  `is_addon_product` tinyint(1) NOT NULL DEFAULT 0,
+  `is_addon` tinyint(1) NOT NULL DEFAULT 0,
+  `style` varchar(32) DEFAULT NULL COMMENT '商品風格：復古、通勤、競速、女性等',
+  `is_featured` tinyint(1) NOT NULL DEFAULT 0 COMMENT '首頁熱門區精選：1 顯示',
   `image_url` varchar(255) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `fk_products_category` (`category_id`),
+  KEY `idx_products_style` (`style`),
   CONSTRAINT `fk_products_category` FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`) ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
@@ -114,7 +117,7 @@ CREATE TABLE IF NOT EXISTS `cart` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `user_id` int(11) NOT NULL,
   `product_id` int(11) NOT NULL,
-  `size` enum('S','M','L','XL') NOT NULL DEFAULT 'M',
+  `size` enum('S','M','L','XL','F') NOT NULL DEFAULT 'M',
   `quantity` int(11) NOT NULL DEFAULT 1,
   `unit_price` decimal(10,2) NOT NULL,
   `added_at` timestamp NOT NULL DEFAULT current_timestamp(),

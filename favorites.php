@@ -2,6 +2,7 @@
 require_once 'config.php';
 require_once 'includes/cart_functions.php';
 require_once 'includes/navbar.php';
+require_once 'includes/product_query_helpers.php';
 
 if (!isset($_SESSION['user_id'])) {
     header('Location: login.php?redirect=' . urlencode('favorites.php') . '&notice=favorite');
@@ -31,7 +32,9 @@ try {
 
 $favorites = [];
 try {
-    $sql = "SELECT p.id, p.name, p.price, p.image_url, c.name AS category_name
+    $sql = "SELECT p.id, p.name, p.price,
+                   " . primaryImageSubquery('p', 'pi') . " AS primary_image,
+                   c.name AS category_name
             FROM favorites f
             INNER JOIN products p ON f.product_id = p.id
             INNER JOIN categories c ON p.category_id = c.id
@@ -69,13 +72,10 @@ try {
                     <?php foreach ($favorites as $item): ?>
                         <div class="product-card">
                             <div class="product-image">
-                                <?php if (!empty($item['image_url'])): ?>
-                                    <img src="<?php echo htmlspecialchars($item['image_url'], ENT_QUOTES); ?>" alt="<?php echo htmlspecialchars($item['name']); ?>">
-                                <?php else: ?>
-                                    <div class="product-image-placeholder">
-                                        <span>無圖片</span>
-                                    </div>
-                                <?php endif; ?>
+                                <?php
+                                $fav_img = resolve_product_card_image_src($item['primary_image'] ?? null);
+                                ?>
+                                <img src="<?php echo htmlspecialchars($fav_img, ENT_QUOTES); ?>" alt="<?php echo htmlspecialchars($item['name']); ?>">
                             </div>
                             <div class="product-info">
                                 <p class="product-category"><?php echo htmlspecialchars($item['category_name']); ?></p>
