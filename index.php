@@ -121,46 +121,87 @@ if (is_array($promo_offers) && !empty($promo_offers)) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HelmetVRse - 首頁</title>
     <link rel="stylesheet" href="assets/css/style.css?v=<?php echo urlencode((string)@filemtime(__DIR__ . '/assets/css/style.css')); ?>">
-    <link rel="stylesheet" href="assets/css/home-navbar.css?v=<?php echo urlencode((string)@filemtime(__DIR__ . '/assets/css/home-navbar.css')); ?>">
 </head>
-<body class="home-page top-with-promo">
-    <div class="promo-bar" aria-label="促銷訊息">
-        <div class="promo-track">
-            <div class="promo-content">
-                <span>新會員優惠｜新會員註冊後即可使用優惠券｜滿 500 元折抵 100 元</span>
-                <span>安全帽週年慶｜全館安全帽限時優惠｜全館商品 9 折</span>
-                <span>滿額折扣活動｜購物滿額即可使用優惠券｜滿 2000 元折抵 300 元</span>
-                <span>騎士節活動｜騎士節限定優惠｜全館商品 8 折</span>
-            </div>
-            <div class="promo-content" aria-hidden="true">
-                <span>新會員優惠｜新會員註冊後即可使用優惠券｜滿 500 元折抵 100 元</span>
-                <span>安全帽週年慶｜全館安全帽限時優惠｜全館商品 9 折</span>
-                <span>滿額折扣活動｜購物滿額即可使用優惠券｜滿 2000 元折抵 300 元</span>
-                <span>騎士節活動｜騎士節限定優惠｜全館商品 8 折</span>
-            </div>
-        </div>
-    </div>
-
+<body class="home-page">
     <header class="home-header">
-        <?php renderNavbar($pdo, $categories, $parts_category_id, 'home'); ?>
-    </header>
-
-    <section class="hero hero-section" aria-label="主視覺">
-        <div class="hero-slider">
-            <div class="slides">
-                <img src="assets/images/index6.jpg?v=<?php echo urlencode((string)@filemtime(__DIR__ . '/assets/images/index6.jpg')); ?>" class="slide active" alt="HelmetVRse 主視覺">
-            </div>
-
-            <div class="hero-overlay">
-                <div class="hero-content">
-                    <h1 class="hero-main-title">ENTER THE VR HELMET MALL</h1>
-                    <p class="hero-main-subtitle">沉浸式虛擬商場，重新定義智慧安全帽選購體驗</p>
-                    <a href="products.php" class="hero-cta-btn">前往 VR 商場</a>
-                    <div class="hero-scroll-text">探索更多安全帽選擇 ↓</div>
+        <div class="top-marquee" aria-label="最新優惠跑馬燈">
+            <div class="top-marquee-track">
+                <div class="top-marquee-group" aria-hidden="false">
+                    <span class="top-marquee-item">搭配成套組購買，最高可享 8 折優惠｜立即選購</span>
+                    <span class="top-marquee-item">全館滿 3000 免運｜限時活動中</span>
+                    <span class="top-marquee-item">新會員註冊送 100 元折扣</span>
+                    <span class="top-marquee-item">騎士節限定優惠｜指定商品 9 折</span>
+                </div>
+                <div class="top-marquee-group" aria-hidden="true">
+                    <span class="top-marquee-item">搭配成套組購買，最高可享 8 折優惠｜立即選購</span>
+                    <span class="top-marquee-item">全館滿 3000 免運｜限時活動中</span>
+                    <span class="top-marquee-item">新會員註冊送 100 元折扣</span>
+                    <span class="top-marquee-item">騎士節限定優惠｜指定商品 9 折</span>
                 </div>
             </div>
         </div>
-        <div class="scroll-indicator" aria-hidden="true"><span>↓</span></div>
+        <?php renderNavbar($pdo, $categories, $parts_category_id, 'home'); ?>
+    </header>
+
+    <section class="hero">
+        <div class="hero-slider hero-carousel" id="heroCarousel">
+            <div class="hero-slides">
+                <article class="hero-slide active" data-category="VR Experience">
+                    <img src="assets/images/index1.jpg?v=2" alt="VR Experience 主視覺" class="hero-slide-image">
+                    <div class="hero-slide-overlay"></div>
+                    <div class="hero-slide-content">
+                        <h1 class="hero-slide-title">ENTER THE VR HELMET MALL</h1>
+                        <p class="hero-slide-subtitle">沉浸式虛擬商場，重新定義智慧安全帽選購體驗</p>
+                        <a href="vr.php" class="hero-slide-btn">前往 VR 商場</a>
+                    </div>
+                </article>
+
+                <article class="hero-slide" data-category="Products">
+                    <img src="assets/images/index2.jpg?v=2" alt="Products 主視覺" class="hero-slide-image">
+                    <div class="hero-slide-overlay"></div>
+                    <div class="hero-slide-content">
+                        <h2 class="hero-slide-title">RIDE WITH STYLE</h2>
+                        <p class="hero-slide-subtitle">安全帽不只是保護，更是你風格的一部分</p>
+                        <a href="products.php" class="hero-slide-btn">查看款式</a>
+                    </div>
+                </article>
+
+                <article class="hero-slide" data-category="Exploration">
+                    <img src="assets/images/index3.jpg?v=2" alt="Exploration 主視覺" class="hero-slide-image">
+                    <div class="hero-slide-overlay"></div>
+                    <div class="hero-slide-content">
+                        <h2 class="hero-slide-title">THIS MONTH ONLY</h2>
+                        <p class="hero-slide-subtitle">安全帽周年慶限時開跑，精選人氣款式與熱銷配件享有專屬優惠，現在入手更划算，為你的每一次騎行提前準備</p>
+                        <a href="products.php" class="hero-slide-btn">馬上選購</a>
+                    </div>
+                </article>
+
+                <article class="hero-slide" data-category="Promotion">
+                    <img src="assets/images/index4.jpg?v=3" alt="Promotion 主視覺" class="hero-slide-image">
+                    <div class="hero-slide-overlay"></div>
+                    <div class="hero-slide-content">
+                        <h2 class="hero-slide-title">LIMITED OFFERS</h2>
+                        <p class="hero-slide-subtitle">本月人氣優惠與會員折扣活動一次掌握</p>
+                        <a href="coupons.php" class="hero-slide-btn">查看優惠</a>
+                    </div>
+                </article>
+
+                <article class="hero-slide" data-category="Guide">
+                    <img src="assets/images/index5.jpg?v=2" alt="Guide 主視覺" class="hero-slide-image">
+                    <div class="hero-slide-overlay"></div>
+                    <div class="hero-slide-content">
+                        <h2 class="hero-slide-title">RIDE SMART,<br>RIDE SAFE</h2>
+                        <p class="hero-slide-subtitle">尺寸挑選與安全帽知識，輕鬆上手</p>
+                        <a href="guide.php" class="hero-slide-btn">閱讀購物指南</a>
+                    </div>
+                </article>
+            </div>
+
+            <div class="hero-carousel-footer">
+                <p class="hero-carousel-meta" id="heroCarouselMeta">VR Experience</p>
+                <div class="hero-carousel-dots" id="heroCarouselDots" aria-label="Hero 輪播頁籤"></div>
+            </div>
+        </div>
     </section>
 
     <!-- 精選分類區 -->
@@ -392,46 +433,35 @@ if (is_array($promo_offers) && !empty($promo_offers)) {
 
                 <div class="lifestyle-gallery-track">
                     <?php
-                    // 騎乘風格導覽：固定四張卡片（slug 對應 products.php?style=...，解析見 includes/product_style_utils.php）
+                    // 騎乘風格導覽（中文 -> 英文）對應：用 map 方便之後擴充
+                    $style_english_map = [
+                        '復古' => 'VINTAGE',
+                        '通勤' => 'COMMUTER',
+                        '競速' => 'RACING',
+                        '競賽' => 'RACING',
+                        '女性' => 'WOMEN',
+                    ];
+
+                    // 首頁風格卡片導向：直接帶入 products.php 的 style 參數
+                    // 注意：此區塊只改連結目標，不改卡片外觀/hover。
+                    $style_param_map = [
+                        '復古' => 'retro',
+                        '通勤' => 'commuter',
+                        '競速' => 'racing',
+                        '女性' => 'women',
+                    ];
+
                     $home_style_cards = [
-                        [
-                            'title_zh' => '復古',
-                            'title_en' => 'VINTAGE',
-                            'slug' => 'vintage',
-                            'svg_rect' => '%23d8dde3',
-                            'svg_path' => '%23b8c0ca',
-                            'path_d' => 'M0 310L130 220L250 265L360 200L470 250L600 190V380H0Z',
-                        ],
-                        [
-                            'title_zh' => '通勤',
-                            'title_en' => 'COMMUTER',
-                            'slug' => 'commuter',
-                            'svg_rect' => '%23d9dfe5',
-                            'svg_path' => '%23b7bec8',
-                            'path_d' => 'M0 292L120 210L220 245L340 195L470 255L600 182V380H0Z',
-                        ],
-                        [
-                            'title_zh' => '競速',
-                            'title_en' => 'RACING',
-                            'slug' => 'racing',
-                            'svg_rect' => '%23dce1e6',
-                            'svg_path' => '%23bcc4cd',
-                            'path_d' => 'M0 305L120 228L250 275L370 210L500 258L600 200V380H0Z',
-                        ],
-                        [
-                            'title_zh' => '女性',
-                            'title_en' => 'WOMEN',
-                            'slug' => 'women',
-                            'svg_rect' => '%23d7dde2',
-                            'svg_path' => '%23b4bcc5',
-                            'path_d' => 'M0 296L128 220L236 258L352 202L462 244L600 187V380H0Z',
-                        ],
+                        ['label' => '復古', 'svg_rect' => '%23d8dde3', 'svg_path' => '%23b8c0ca', 'path_d' => 'M0 310L130 220L250 265L360 200L470 250L600 190V380H0Z'],
+                        ['label' => '通勤', 'svg_rect' => '%23d9dfe5', 'svg_path' => '%23b7bec8', 'path_d' => 'M0 292L120 210L220 245L340 195L470 255L600 182V380H0Z'],
+                        ['label' => '競速', 'svg_rect' => '%23dce1e6', 'svg_path' => '%23bcc4cd', 'path_d' => 'M0 305L120 228L250 275L370 210L500 258L600 200V380H0Z'],
+                        ['label' => '女性', 'svg_rect' => '%23d7dde2', 'svg_path' => '%23b4bcc5', 'path_d' => 'M0 296L128 220L236 258L352 202L462 244L600 187V380H0Z'],
                     ];
                     foreach ($home_style_cards as $sc):
-                        $style_cn = (string)($sc['title_zh'] ?? '');
-                        $style_en = (string)($sc['title_en'] ?? '');
-                        $slug = (string)($sc['slug'] ?? '');
-                        $style_href = 'products.php?style=' . rawurlencode($slug);
+                        $style_cn = (string)($sc['label'] ?? '');
+                        $style_param = $style_param_map[$style_cn] ?? 'retro';
+                        $style_href = 'products.php?style=' . rawurlencode($style_param);
+                        $style_en = $style_english_map[$style_cn] ?? 'OTHER';
                         $svg_src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 380'%3E%3Crect fill='" . $sc['svg_rect'] . "' width='600' height='380'/%3E%3Cpath d='" . $sc['path_d'] . "' fill='" . $sc['svg_path'] . "'/%3E%3C/svg%3E";
                     ?>
                     <a class="lifestyle-gallery-item" href="<?php echo htmlspecialchars($style_href); ?>">
@@ -492,6 +522,113 @@ if (is_array($promo_offers) && !empty($promo_offers)) {
 
     <script>
 // 安全帽側邊欄互動功能
+        (function() {
+            try {
+                const carousel = document.getElementById('heroCarousel');
+                if (!carousel) return;
+
+                const slides = Array.from(carousel.querySelectorAll('.hero-slide'));
+                const dotsWrap = document.getElementById('heroCarouselDots');
+                const meta = document.getElementById('heroCarouselMeta');
+                if (!slides.length || !dotsWrap || !meta) return;
+
+                let current = 0;
+                let timer = null;
+                const intervalMs = 5000;
+                const transitionMs = 1050;
+                let transitionLock = false;
+                let pendingIndex = null;
+
+                const dots = slides.map(function(_, idx) {
+                    const dot = document.createElement('button');
+                    dot.type = 'button';
+                    dot.className = 'hero-dot' + (idx === 0 ? ' is-active' : '');
+                    dot.setAttribute('aria-label', '切換至第 ' + (idx + 1) + ' 張');
+                    dot.addEventListener('click', function() {
+                        goToSlide(idx);
+                        restartAutoPlay();
+                    });
+                    dotsWrap.appendChild(dot);
+                    return dot;
+                });
+
+                const render = function(index, prevIndex) {
+                    slides.forEach(function(slide, idx) {
+                        if (idx !== prevIndex) {
+                            slide.classList.remove('is-leaving');
+                        }
+                        slide.classList.remove('is-entering');
+                        slide.classList.toggle('active', idx === index);
+                    });
+                    if (typeof prevIndex === 'number' && prevIndex !== index) {
+                        slides[prevIndex].classList.add('is-leaving');
+                    }
+                    dots.forEach(function(dot, idx) {
+                        dot.classList.toggle('is-active', idx === index);
+                    });
+                    meta.textContent = slides[index].dataset.category || '';
+                };
+
+                const goToSlide = function(index) {
+                    const target = (index + slides.length) % slides.length;
+                    if (target === current) return;
+
+                    if (transitionLock) {
+                        pendingIndex = target;
+                        return;
+                    }
+
+                    const prev = current;
+                    current = target;
+                    transitionLock = true;
+                    slides[target].classList.add('is-entering');
+                    render(current, prev);
+
+                    window.setTimeout(function() {
+                        slides[prev].classList.remove('is-leaving');
+                        slides[current].classList.remove('is-entering');
+                        transitionLock = false;
+                        if (pendingIndex !== null && pendingIndex !== current) {
+                            const queued = pendingIndex;
+                            pendingIndex = null;
+                            goToSlide(queued);
+                        } else {
+                            pendingIndex = null;
+                        }
+                    }, transitionMs);
+                };
+
+                const nextSlide = function() {
+                    goToSlide(current + 1);
+                };
+
+                const startAutoPlay = function() {
+                    if (timer) return;
+                    timer = window.setInterval(nextSlide, intervalMs);
+                };
+
+                const stopAutoPlay = function() {
+                    if (timer) {
+                        window.clearInterval(timer);
+                        timer = null;
+                    }
+                };
+
+                const restartAutoPlay = function() {
+                    stopAutoPlay();
+                    startAutoPlay();
+                };
+
+                render(current);
+                startAutoPlay();
+
+                carousel.addEventListener('mouseenter', stopAutoPlay);
+                carousel.addEventListener('mouseleave', startAutoPlay);
+            } catch (error) {
+                console.error('Hero 輪播功能錯誤:', error);
+            }
+        })();
+
         (function() {
             try {
                 const helmetMenu = document.querySelector('.helmet-menu');
