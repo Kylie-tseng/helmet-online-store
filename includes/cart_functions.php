@@ -100,7 +100,27 @@ function calculateOrderAmount($cart_items, $shipping_method = 'pickup') {
  * 免運門檻
  */
 function getFreeShippingThreshold() {
-    return 3000;
+    $default = 3000;
+    try {
+        global $pdo;
+        if ($pdo instanceof PDO) {
+            $check = $pdo->query("SHOW TABLES LIKE 'settings'");
+            if ($check && $check->fetchColumn()) {
+                $stmt = $pdo->prepare("SELECT setting_value FROM settings WHERE setting_key = :k LIMIT 1");
+                $stmt->execute([':k' => 'free_shipping_threshold']);
+                $val = $stmt->fetchColumn();
+                if ($val !== false && is_numeric((string)$val)) {
+                    $num = (float)$val;
+                    if ($num >= 0) {
+                        return $num;
+                    }
+                }
+            }
+        }
+    } catch (Throwable $e) {
+        // fallback to default
+    }
+    return $default;
 }
 
 /**

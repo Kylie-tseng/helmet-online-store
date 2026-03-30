@@ -1,6 +1,7 @@
 <?php
 require_once '../config.php';
 require_once __DIR__ . '/includes/staff_layout.php';
+require_once __DIR__ . '/../includes/cart_functions.php';
 
 staffRequireAuth();
 
@@ -12,6 +13,8 @@ $allowedStatuses = ['pending', 'pending_payment', 'paid', 'shipped', 'completed'
 if ($status !== '' && !in_array($status, $allowedStatuses, true)) {
     $status = '';
 }
+
+$cancelableOrderStatuses = ['pending', 'pending_payment', 'paid'];
 
 $hasStaffNoteColumn = false;
 try {
@@ -28,15 +31,108 @@ try {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = trim($_POST['action'] ?? '');
-    if ($action === 'update_status') {
+    if ($action === 'cancel_order') {
+        $orderId = (int)($_POST['order_id'] ?? 0);
+        if ($orderId > 0) {
+            try {
+                $stmt = $pdo->prepare("SELECT id, status FROM orders WHERE id = :id LIMIT 1");
+                $stmt->execute([':id' => $orderId]);
+                $order = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                if (!$order) {
+                    $flashMessage = '找不到此訂單';
+                } elseif (!in_array((string)($order['status'] ?? ''), $cancelableOrderStatuses, true)) {
+                    $flashMessage = '此訂單已出貨，無法取消';
+                } else {
+                    $pdo->beginTransaction();
+
+                    $stmt = $pdo->prepare("UPDATE orders SET status = 'cancelled', updated_at = NOW() WHERE id = :order_id");
+                    $stmt->execute([':order_id' => $orderId]);
+
+                    $stmt = $pdo->prepare("SELECT product_id, size, quantity FROM order_items WHERE order_id = :order_id");
+                    $stmt->execute([':order_id' => $orderId]);
+                    $order_items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                    foreach ($order_items as $item) {
+                        $sz = $item['size'] ?? null;
+                        if ($sz === null || $sz === '' || $sz === getCartSizeNoneValue() || $sz === 'N') {
+                            continue;
+                        }
+
+                        $stmt = $pdo->prepare("UPDATE product_sizes
+                                               SET stock = stock + :quantity, updated_at = NOW()
+                                               WHERE product_id = :product_id AND size = :size");
+                        $stmt->execute([
+                            ':quantity' => (int)($item['quantity'] ?? 0),
+                            ':product_id' => (int)($item['product_id'] ?? 0),
+                            ':size' => (string)$sz
+                        ]);
+                    }
+
+                    $pdo->commit();
+                    $flashMessage = '訂單已成功取消。';
+                }
+            } catch (Throwable $e) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                $flashMessage = '取消失敗，請稍後再試。';
+            }
+        }
+    } elseif ($action === 'update_status') {
         $orderId = (int)($_POST['order_id'] ?? 0);
         $newStatus = trim($_POST['new_status'] ?? '');
         if ($orderId > 0 && in_array($newStatus, $allowedStatuses, true)) {
             try {
+                // 若要取消，先檢查是否符合「未出貨才可取消」
+                if ($newStatus === 'cancelled') {
+                    $stmt = $pdo->prepare("SELECT status FROM orders WHERE id = :id LIMIT 1");
+                    $stmt->execute([':id' => $orderId]);
+                    $current = $stmt->fetch(PDO::FETCH_ASSOC);
+                    $currentStatus = (string)($current['status'] ?? '');
+
+                    if (!in_array($currentStatus, $cancelableOrderStatuses, true)) {
+                        $flashMessage = '此訂單已出貨，無法取消';
+                        goto update_status_end;
+                    }
+
+                    // 取消訂單（含庫存回復）
+                    $pdo->beginTransaction();
+                    $stmt = $pdo->prepare("UPDATE orders SET status = 'cancelled', updated_at = NOW() WHERE id = :order_id");
+                    $stmt->execute([':order_id' => $orderId]);
+
+                    $stmt = $pdo->prepare("SELECT product_id, size, quantity FROM order_items WHERE order_id = :order_id");
+                    $stmt->execute([':order_id' => $orderId]);
+                    $order_items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                    foreach ($order_items as $item) {
+                        $sz = $item['size'] ?? null;
+                        if ($sz === null || $sz === '' || $sz === getCartSizeNoneValue() || $sz === 'N') {
+                            continue;
+                        }
+
+                        $stmt = $pdo->prepare("UPDATE product_sizes
+                                               SET stock = stock + :quantity, updated_at = NOW()
+                                               WHERE product_id = :product_id AND size = :size");
+                        $stmt->execute([
+                            ':quantity' => (int)($item['quantity'] ?? 0),
+                            ':product_id' => (int)($item['product_id'] ?? 0),
+                            ':size' => (string)$sz
+                        ]);
+                    }
+
+                    $pdo->commit();
+                    $flashMessage = '訂單已成功取消。';
+                    goto update_status_end;
+                }
+
                 $stmt = $pdo->prepare("UPDATE orders SET status = :status, updated_at = NOW() WHERE id = :id");
                 $stmt->execute([':status' => $newStatus, ':id' => $orderId]);
                 $flashMessage = '訂單狀態已更新。';
             } catch (Throwable $e) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
                 $flashMessage = '更新失敗，請稍後再試。';
             }
         }
@@ -54,6 +150,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 }
+
+update_status_end:
 
 $orders = [];
 try {
@@ -125,7 +223,8 @@ staffPageStart($pdo, '訂單管理', 'orders');
                         <td colspan="7">目前沒有符合條件的訂單。</td>
                     </tr>
                 <?php else: ?>
-                    <?php foreach ($orders as $order): ?>
+                        <?php foreach ($orders as $order): ?>
+                            <?php $isCancelable = in_array((string)($order['status'] ?? ''), $cancelableOrderStatuses, true); ?>
                         <tr>
                             <td>#<?php echo (int)$order['id']; ?></td>
                             <td><?php echo htmlspecialchars((string)($order['user_name'] ?? '訪客')); ?></td>
@@ -147,18 +246,35 @@ staffPageStart($pdo, '訂單管理', 'orders');
                             </td>
                             <td><?php echo htmlspecialchars(date('Y-m-d H:i', strtotime((string)$order['created_at']))); ?></td>
                             <td>
-                                <form method="POST" class="staff-inline-form">
-                                    <input type="hidden" name="action" value="update_status">
-                                    <input type="hidden" name="order_id" value="<?php echo (int)$order['id']; ?>">
-                                    <select name="new_status" class="staff-select staff-select-mini">
-                                        <?php foreach ($allowedStatuses as $item): ?>
-                                            <option value="<?php echo htmlspecialchars($item); ?>" <?php echo ((string)$order['status'] === $item) ? 'selected' : ''; ?>>
-                                                <?php echo htmlspecialchars(staffStatusLabel($item)); ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                    <button type="submit" class="staff-action-btn staff-action-btn-primary">更新</button>
-                                </form>
+                                    <div class="staff-order-actions">
+                                        <?php if ($isCancelable): ?>
+                                            <form method="POST" class="staff-inline-form">
+                                                <input type="hidden" name="action" value="cancel_order">
+                                                <input type="hidden" name="order_id" value="<?php echo (int)$order['id']; ?>">
+                                                <button type="submit" class="staff-action-btn staff-action-btn-danger">取消訂單</button>
+                                            </form>
+                                        <?php endif; ?>
+
+                                        <form method="POST" class="staff-inline-form">
+                                            <input type="hidden" name="action" value="update_status">
+                                            <input type="hidden" name="order_id" value="<?php echo (int)$order['id']; ?>">
+                                            <select name="new_status" class="staff-select staff-select-mini">
+                                                <?php foreach ($allowedStatuses as $item): ?>
+                                                    <?php
+                                                        $disabledCancel = ($item === 'cancelled' && !$isCancelable);
+                                                    ?>
+                                                    <option
+                                                        value="<?php echo htmlspecialchars($item); ?>"
+                                                        <?php echo ((string)$order['status'] === $item) ? 'selected' : ''; ?>
+                                                        <?php echo $disabledCancel ? 'disabled' : ''; ?>
+                                                    >
+                                                        <?php echo htmlspecialchars(staffStatusLabel($item)); ?>
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                            <button type="submit" class="staff-action-btn staff-action-btn-primary">更新</button>
+                                        </form>
+                                    </div>
                             </td>
                         </tr>
                     <?php endforeach; ?>

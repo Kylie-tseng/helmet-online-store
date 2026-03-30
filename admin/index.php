@@ -12,6 +12,9 @@ if ($_SESSION['role'] !== 'admin') {
     header('Location: ../index.php');
     exit;
 }
+// 入口統一導向管理者後台首頁
+header('Location: dashboard.php');
+exit;
 ?>
 <!DOCTYPE html>
 <html lang="zh-TW">

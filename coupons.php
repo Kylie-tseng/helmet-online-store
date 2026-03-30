@@ -83,7 +83,7 @@ try {
 <?php renderNavbar($pdo, $categories, $parts_category_id); ?>
 
     <main class="coupon-page-shell">
-        <div class="container coupon-page-container">
+        <div class="page-container coupon-page-container">
             <section class="coupon-page-header page-hero-header">
                 <h1 class="page-hero-title">優惠券專區</h1>
                 <p class="page-hero-subtitle">一次掌握目前所有活動優惠與折扣資訊</p>
@@ -91,32 +91,43 @@ try {
 
             <section class="coupon-list-panel" aria-label="優惠券總覽列表">
                 <?php foreach ($coupon_activities as $activity): ?>
-                    <article class="coupon-list-item">
-                        <div class="coupon-item-content">
-                            <p class="coupon-item-tag"><?php echo htmlspecialchars($activity['tag']); ?></p>
-                            <h2 class="coupon-item-title"><?php echo htmlspecialchars($activity['title']); ?></h2>
-                            <p class="coupon-item-benefit"><?php echo htmlspecialchars($activity['benefit']); ?></p>
+                    <article class="coupon-card">
+                        <div class="coupon-card__inner">
+                            <div class="coupon-card__content">
+                                <div class="coupon-badge">
+                                    <?php echo htmlspecialchars($activity['tag']); ?>
+                                </div>
 
-                            <div class="coupon-item-meta">
-                                <p>
-                                    <span class="coupon-meta-label">優惠碼</span>
-                                    <span class="coupon-meta-value">
-                                        <?php echo htmlspecialchars($activity['code'] ?? '免輸入，系統自動套用'); ?>
-                                    </span>
+                                <h2 class="coupon-title">
+                                    <?php echo htmlspecialchars($activity['title']); ?>
+                                </h2>
+
+                                <p class="coupon-subtitle">
+                                    <?php echo htmlspecialchars($activity['benefit']); ?>
                                 </p>
-                                <p>
-                                    <span class="coupon-meta-label">有效期限</span>
-                                    <span class="coupon-meta-value"><?php echo htmlspecialchars($activity['validity']); ?></span>
-                                </p>
+
+                                <div class="coupon-meta">
+                                    <div class="coupon-meta-item">
+                                        <div class="coupon-meta-label">優惠碼</div>
+                                        <div class="coupon-meta-value">
+                                            <?php echo htmlspecialchars($activity['code'] ?? '免輸入，系統自動套用'); ?>
+                                        </div>
+                                    </div>
+                                    <div class="coupon-meta-item">
+                                        <div class="coupon-meta-label">有效期限</div>
+                                        <div class="coupon-meta-value">
+                                            <?php echo htmlspecialchars($activity['validity']); ?>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
 
-                        <div class="coupon-item-action">
-                            <div class="coupon-item-actions">
+                            <div class="coupon-card__actions">
                                 <a href="<?php echo htmlspecialchars($activity['claim_url']); ?>" class="coupon-item-btn coupon-item-btn-primary">立即領取優惠</a>
                                 <a href="<?php echo htmlspecialchars($activity['detail_url']); ?>" class="coupon-item-btn coupon-item-btn-secondary">查看詳情</a>
                             </div>
                         </div>
+                    </article>
                 <?php endforeach; ?>
             </section>
         </div>

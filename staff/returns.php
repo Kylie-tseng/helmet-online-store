@@ -11,6 +11,7 @@ $refundStatus = trim($_GET['refund_status'] ?? '');
 $returns = [];
 $returnsTableName = 'return_requests';
 $returnsTableExists = false;
+$allowedReturnStatuses = ['pending', 'pending_payment', 'paid', 'shipped', 'completed', 'cancelled'];
 try {
     $check = $pdo->query("SHOW TABLES LIKE 'return_requests'");
     $returnsTableExists = (bool)$check->fetchColumn();
@@ -20,7 +21,21 @@ try {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $returnsTableExists) {
     $action = trim($_POST['action'] ?? '');
-    if ($action === 'update_refund_status') {
+    if ($action === 'update_status') {
+        $returnId = (int)($_POST['return_id'] ?? 0);
+        $newStatus = trim($_POST['new_status'] ?? '');
+        if ($returnId > 0 && in_array($newStatus, $allowedReturnStatuses, true)) {
+            try {
+                $stmt = $pdo->prepare("UPDATE return_requests
+                                       SET status = :status,
+                                           updated_at = NOW()
+                                       WHERE id = :id");
+                $stmt->execute([':status' => $newStatus, ':id' => $returnId]);
+            } catch (Throwable $e) {
+                // ignore update error
+            }
+        }
+    } elseif ($action === 'update_refund_status') {
         $returnId = (int)($_POST['return_id'] ?? 0);
         $newRefundStatus = trim($_POST['new_refund_status'] ?? '');
         if ($returnId > 0 && in_array($newRefundStatus, ['pending_refund', 'refunded'], true)) {
@@ -117,7 +132,9 @@ staffPageStart($pdo, '退貨申請', 'returns');
                 <tbody>
                     <?php if (empty($returns)): ?>
                         <tr>
-                            <td colspan="8">目前沒有符合條件的退貨申請。</td>
+                            <td colspan="8">
+                                目前沒有符合條件的退貨申請。
+                            </td>
                         </tr>
                     <?php else: ?>
                         <?php foreach ($returns as $item): ?>
@@ -134,15 +151,30 @@ staffPageStart($pdo, '退貨申請', 'returns');
                                 </td>
                                 <td><?php echo htmlspecialchars(date('Y-m-d', strtotime((string)($item['updated_at'] ?: $item['created_at'])))); ?></td>
                                 <td>
-                                    <form method="POST" class="staff-inline-form">
-                                        <input type="hidden" name="action" value="update_refund_status">
-                                        <input type="hidden" name="return_id" value="<?php echo (int)$item['id']; ?>">
-                                        <select name="new_refund_status" class="staff-select staff-select-mini">
-                                            <option value="pending_refund" <?php echo ((string)($item['refund_status'] ?? '') === 'pending_refund') ? 'selected' : ''; ?>>待退款</option>
-                                            <option value="refunded" <?php echo ((string)($item['refund_status'] ?? '') === 'refunded') ? 'selected' : ''; ?>>已退款</option>
-                                        </select>
-                                        <button type="submit" class="staff-action-btn staff-action-btn-primary">更新</button>
-                                    </form>
+                                    <div class="staff-return-actions">
+                                        <form method="POST" class="staff-inline-form">
+                                            <input type="hidden" name="action" value="update_status">
+                                            <input type="hidden" name="return_id" value="<?php echo (int)$item['id']; ?>">
+                                            <select name="new_status" class="staff-select staff-select-mini">
+                                                <?php foreach ($allowedReturnStatuses as $st): ?>
+                                                    <option value="<?php echo htmlspecialchars($st); ?>" <?php echo ((string)($item['status'] ?? '') === $st) ? 'selected' : ''; ?>>
+                                                        <?php echo htmlspecialchars(staffStatusLabel($st)); ?>
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                            <button type="submit" class="staff-action-btn staff-action-btn-primary">更新狀態</button>
+                                        </form>
+
+                                        <form method="POST" class="staff-inline-form">
+                                            <input type="hidden" name="action" value="update_refund_status">
+                                            <input type="hidden" name="return_id" value="<?php echo (int)$item['id']; ?>">
+                                            <select name="new_refund_status" class="staff-select staff-select-mini">
+                                                <option value="pending_refund" <?php echo ((string)($item['refund_status'] ?? '') === 'pending_refund') ? 'selected' : ''; ?>>待退款</option>
+                                                <option value="refunded" <?php echo ((string)($item['refund_status'] ?? '') === 'refunded') ? 'selected' : ''; ?>>已退款</option>
+                                            </select>
+                                            <button type="submit" class="staff-action-btn staff-action-btn-muted">更新退款</button>
+                                        </form>
+                                    </div>
                                 </td>
                             </tr>
                         <?php endforeach; ?>

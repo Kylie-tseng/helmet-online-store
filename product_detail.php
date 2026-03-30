@@ -2,6 +2,7 @@
 require_once 'config.php';
 require_once 'includes/cart_functions.php';
 require_once 'includes/navbar.php';
+require_once __DIR__ . '/includes/reviews_init.php';
 require_once 'includes/product_query_helpers.php';
 
 // 取得商品 ID
@@ -113,6 +114,70 @@ if ($product) {
     if (empty($product_gallery_urls)) {
         $product_gallery_urls[] = $gallery_default;
     }
+}
+
+// 商品評價（只顯示未被隱藏的評論）
+$reviewsSummary = [
+    'total' => 0,
+    'avg' => 0.0,
+    'list' => [],
+];
+$reviewsHiddenColumnName = '';
+$reviewsTableReady = false;
+
+try {
+    $reviewsEnsure = reviewsEnsureTable($pdo);
+    $reviewsHiddenColumnName = (string)($reviewsEnsure['hidden_column'] ?? '');
+    $reviewsTableReady = (bool)($reviewsEnsure['table_exists'] ?? false);
+} catch (Throwable $e) {
+    $reviewsTableReady = false;
+}
+
+if ($product && $reviewsTableReady) {
+    try {
+        $whereHidden = '';
+        if ($reviewsHiddenColumnName !== '') {
+            $whereHidden = " AND r.{$reviewsHiddenColumnName} = 0";
+        }
+
+        $sql = "SELECT
+                        COUNT(*) AS total,
+                        COALESCE(AVG(r.rating), 0) AS avg_rating
+                FROM reviews r
+                WHERE r.product_id = :product_id
+                      {$whereHidden}";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([':product_id' => $product_id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $reviewsSummary['total'] = (int)($row['total'] ?? 0);
+        $reviewsSummary['avg'] = (float)($row['avg_rating'] ?? 0);
+
+        $sql2 = "SELECT r.id, r.rating, r.comment, r.created_at, u.name AS user_name
+                 FROM reviews r
+                 LEFT JOIN users u ON u.id = r.user_id
+                 WHERE r.product_id = :product_id
+                       {$whereHidden}
+                 ORDER BY r.created_at DESC
+                 LIMIT 20";
+        $stmt2 = $pdo->prepare($sql2);
+        $stmt2->execute([':product_id' => $product_id]);
+        $reviewsSummary['list'] = $stmt2->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        // keep defaults
+    }
+}
+
+function mask_username(?string $name): string
+{
+    $name = (string)($name ?? '');
+    $name = trim($name);
+    if ($name === '') return '匿名';
+    if (mb_strlen($name, 'UTF-8') <= 2) {
+        return mb_substr($name, 0, 1, 'UTF-8') . '*';
+    }
+    $first = mb_substr($name, 0, 1, 'UTF-8');
+    $last = mb_substr($name, -1, null, 'UTF-8');
+    return $first . '***' . $last;
 }
 ?>
 <!DOCTYPE html>
@@ -363,6 +428,47 @@ if ($product) {
                                         前往登入
                                     </a>
                                 </div>
+                            <?php endif; ?>
+                            
+                            <?php if ($reviewsTableReady): ?>
+                                <section class="product-reviews-section">
+                                    <div class="product-reviews-summary">
+                                        <div class="product-reviews-avg">
+                                            <span class="product-reviews-avg-value"><?php echo number_format((float)$reviewsSummary['avg'], 1); ?></span>
+                                            <span class="product-reviews-avg-suffix">/ 5</span>
+                                        </div>
+                                        <div class="product-reviews-count">
+                                            (<?php echo (int)$reviewsSummary['total']; ?> 則評論)
+                                        </div>
+                                    </div>
+
+                                    <?php if ((int)$reviewsSummary['total'] <= 0): ?>
+                                        <div class="product-reviews-empty">目前尚無評價</div>
+                                    <?php else: ?>
+                                        <div class="product-reviews-list">
+                                            <?php foreach ($reviewsSummary['list'] as $rv): ?>
+                                                <article class="product-review-card">
+                                                    <div class="product-review-top">
+                                                        <div class="product-review-stars">
+                                                            <?php
+                                                                $rt = (int)($rv['rating'] ?? 0);
+                                                                echo str_repeat('★', max(0, min(5, $rt))) . str_repeat('☆', max(0, 5 - min(5, $rt)));
+                                                            ?>
+                                                        </div>
+                                                        <div class="product-review-meta">
+                                                            <span class="product-review-user"><?php echo htmlspecialchars(mask_username((string)($rv['user_name'] ?? ''))); ?></span>
+                                                            <span class="product-review-date"><?php echo htmlspecialchars(date('Y-m-d', strtotime((string)($rv['created_at'] ?? '')))); ?></span>
+                                                        </div>
+                                                    </div>
+
+                                                    <?php if (!empty($rv['comment'])): ?>
+                                                        <div class="product-review-comment"><?php echo nl2br(htmlspecialchars((string)$rv['comment'])); ?></div>
+                                                    <?php endif; ?>
+                                                </article>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    <?php endif; ?>
+                                </section>
                             <?php endif; ?>
                         </div>
                     </div>

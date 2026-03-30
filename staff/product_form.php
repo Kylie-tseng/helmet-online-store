@@ -303,7 +303,11 @@ staffPageStart($pdo, $isEdit ? '編輯商品' : '新增商品', 'products');
 
         <div class="staff-form-actions staff-field-wide">
             <button type="submit" class="staff-btn">儲存商品</button>
-            <a href="products.php" class="staff-btn staff-btn-soft">返回商品管理</a>
+            <?php
+                $role = (string)($_SESSION['role'] ?? 'staff');
+                $backToProductsHref = $role === 'admin' ? '../admin/products.php' : 'products.php';
+            ?>
+            <a href="<?php echo htmlspecialchars($backToProductsHref); ?>" class="staff-btn staff-btn-soft">返回商品管理</a>
         </div>
     </form>
 </section>
@@ -323,7 +327,7 @@ staffPageStart($pdo, $isEdit ? '編輯商品' : '新增商品', 'products');
         <div class="staff-image-grid">
             <?php foreach ($images as $img): ?>
                 <article class="staff-image-card">
-                    <img src="../assets/images/products/<?php echo htmlspecialchars((string)$img['image_url']); ?>" alt="" class="staff-image-thumb">
+                    <img src="../assets/images/products/<?php echo htmlspecialchars((string)$img['image_url']); ?>" alt="" class="staff-image-thumb" onerror="this.style.display='none'">
                     <div class="staff-image-actions">
                         <?php if ((int)$img['is_primary'] === 1): ?>
                             <span class="staff-badge done">主圖</span>

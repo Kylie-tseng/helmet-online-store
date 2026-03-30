@@ -11,6 +11,368 @@ if ($_SESSION['role'] !== 'admin') {
     exit;
 }
 
+require_once __DIR__ . '/../staff/includes/staff_layout.php';
+staffRequireAuth();
+
+$q = trim($_GET['q'] ?? '');
+$statusFilter = trim($_GET['status'] ?? 'all');
+$allowedStatus = ['all', 'active', 'disabled', 'expired'];
+if (!in_array($statusFilter, $allowedStatus, true)) {
+    $statusFilter = 'all';
+}
+
+$message = '';
+$message_type = '';
+$edit_coupon = null;
+
+$now = date('Y-m-d');
+
+// --- POST：刪除 / 啟停 / 新增編輯 ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    $action = trim((string)($_POST['action'] ?? ''));
+
+    if ($action === 'delete_coupon') {
+        $coupon_id = isset($_POST['coupon_id']) ? (int)$_POST['coupon_id'] : 0;
+        if ($coupon_id > 0) {
+            try {
+                $stmt = $pdo->prepare("DELETE FROM coupons WHERE id = :id");
+                $stmt->execute([':id' => $coupon_id]);
+                $message = '優惠券已刪除';
+                $message_type = 'success';
+            } catch (Throwable $e) {
+                $message = '刪除失敗，請稍後再試';
+                $message_type = 'error';
+            }
+        }
+    } elseif ($action === 'toggle_coupon') {
+        $coupon_id = isset($_POST['coupon_id']) ? (int)$_POST['coupon_id'] : 0;
+        $is_active = isset($_POST['is_active']) ? (int)$_POST['is_active'] : 0;
+        if ($coupon_id > 0) {
+            try {
+                $stmt = $pdo->prepare("UPDATE coupons SET is_active = :is_active WHERE id = :id");
+                $stmt->execute([
+                    ':is_active' => $is_active === 1 ? 0 : 1,
+                    ':id' => $coupon_id
+                ]);
+                $message = '優惠券狀態已更新';
+                $message_type = 'success';
+            } catch (Throwable $e) {
+                $message = '更新狀態失敗，請稍後再試';
+                $message_type = 'error';
+            }
+        }
+    } elseif ($action === 'save_coupon') {
+        $coupon_id = isset($_POST['coupon_id']) ? (int)$_POST['coupon_id'] : 0;
+        $coupon_code = strtoupper(trim((string)($_POST['coupon_code'] ?? '')));
+        $discount_type = trim((string)($_POST['discount_type'] ?? ''));
+        $discount_value = isset($_POST['discount_value']) ? (float)$_POST['discount_value'] : 0;
+        $minimum_amount = isset($_POST['minimum_amount']) ? (float)$_POST['minimum_amount'] : 0;
+        $start_date = trim((string)($_POST['start_date'] ?? ''));
+        $expire_date = trim((string)($_POST['expire_date'] ?? ''));
+        $is_active = isset($_POST['is_active']) ? 1 : 0;
+
+        $errors = [];
+        if ($coupon_code === '') {
+            $errors[] = '請輸入 coupon code';
+        }
+        if (!in_array($discount_type, ['percent', 'fixed'], true)) {
+            $errors[] = '折扣類型錯誤';
+        }
+        if ($discount_value <= 0) {
+            $errors[] = '折扣數值需大於 0';
+        }
+        if ($discount_type === 'percent' && $discount_value > 100) {
+            $errors[] = '百分比折扣不可超過 100';
+        }
+        if ($minimum_amount < 0) {
+            $errors[] = '最低消費不可小於 0';
+        }
+        if ($start_date === '' || $expire_date === '') {
+            $errors[] = '請填寫有效期限';
+        }
+        if ($start_date !== '' && $expire_date !== '' && $start_date > $expire_date) {
+            $errors[] = '開始日期不可晚於到期日期';
+        }
+
+        if (empty($errors)) {
+            try {
+                if ($coupon_id > 0) {
+                    $stmt = $pdo->prepare("UPDATE coupons
+                                           SET coupon_code = :coupon_code,
+                                               discount_type = :discount_type,
+                                               discount_value = :discount_value,
+                                               minimum_amount = :minimum_amount,
+                                               start_date = :start_date,
+                                               expire_date = :expire_date,
+                                               is_active = :is_active
+                                           WHERE id = :id");
+                    $stmt->execute([
+                        ':coupon_code' => $coupon_code,
+                        ':discount_type' => $discount_type,
+                        ':discount_value' => $discount_value,
+                        ':minimum_amount' => $minimum_amount,
+                        ':start_date' => $start_date,
+                        ':expire_date' => $expire_date,
+                        ':is_active' => $is_active,
+                        ':id' => $coupon_id
+                    ]);
+                    $message = '優惠券已更新';
+                } else {
+                    $stmt = $pdo->prepare("INSERT INTO coupons
+                                           (coupon_code, discount_type, discount_value, minimum_amount, start_date, expire_date, is_active)
+                                           VALUES
+                                           (:coupon_code, :discount_type, :discount_value, :minimum_amount, :start_date, :expire_date, :is_active)");
+                    $stmt->execute([
+                        ':coupon_code' => $coupon_code,
+                        ':discount_type' => $discount_type,
+                        ':discount_value' => $discount_value,
+                        ':minimum_amount' => $minimum_amount,
+                        ':start_date' => $start_date,
+                        ':expire_date' => $expire_date,
+                        ':is_active' => $is_active
+                    ]);
+                    $message = '優惠券已新增';
+                }
+                $message_type = 'success';
+            } catch (Throwable $e) {
+                $message = '儲存失敗，coupon code 可能重複';
+                $message_type = 'error';
+            }
+        } else {
+            $message = implode('、', $errors);
+            $message_type = 'error';
+        }
+    }
+}
+
+// --- GET：編輯 ---
+if (isset($_GET['edit'])) {
+    $edit_id = (int)$_GET['edit'];
+    if ($edit_id > 0) {
+        try {
+            $stmt = $pdo->prepare("SELECT * FROM coupons WHERE id = :id");
+            $stmt->execute([':id' => $edit_id]);
+            $edit_coupon = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+        } catch (Throwable $e) {
+            $edit_coupon = null;
+        }
+    }
+}
+
+// --- 讀取清單（依搜尋/狀態篩選） ---
+$coupons = [];
+try {
+    $where = [];
+    $params = [];
+
+    if ($q !== '') {
+        $where[] = "coupon_code LIKE :q";
+        $params[':q'] = '%' . $q . '%';
+    }
+
+    if ($statusFilter !== 'all') {
+        if ($statusFilter === 'active') {
+            $where[] = "is_active = 1 AND expire_date >= CURDATE()";
+        } elseif ($statusFilter === 'disabled') {
+            $where[] = "is_active = 0 AND expire_date >= CURDATE()";
+        } elseif ($statusFilter === 'expired') {
+            $where[] = "expire_date < CURDATE()";
+        }
+    }
+
+    $whereSql = $where ? (' WHERE ' . implode(' AND ', $where)) : '';
+    $stmt = $pdo->prepare("SELECT * FROM coupons{$whereSql} ORDER BY created_at DESC, id DESC");
+    $stmt->execute($params);
+    $coupons = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Throwable $e) {
+    $coupons = [];
+    if ($message === '') {
+        $message = '讀取優惠券列表失敗';
+        $message_type = 'error';
+    }
+}
+
+function couponStateBadge(array $coupon): array
+{
+    $expire = (string)($coupon['expire_date'] ?? '');
+    $is_active = (int)($coupon['is_active'] ?? 0);
+    $is_expired = $expire !== '' && $expire < date('Y-m-d');
+    if ($is_expired) {
+        return ['class' => 'danger', 'label' => '過期'];
+    }
+    if ($is_active === 1) {
+        return ['class' => 'done', 'label' => '啟用'];
+    }
+    return ['class' => 'pending', 'label' => '停用'];
+}
+
+staffPageStart($pdo, '優惠活動', 'coupons');
+?>
+<section class="staff-panel">
+    <?php if ($message !== ''): ?>
+        <div class="staff-notice <?php echo $message_type === 'success' ? '' : 'error'; ?>">
+            <?php echo htmlspecialchars($message); ?>
+        </div>
+    <?php endif; ?>
+
+    <form method="GET" class="staff-toolbar">
+        <input
+            type="text"
+            name="q"
+            class="staff-input"
+            placeholder="搜尋優惠碼"
+            value="<?php echo htmlspecialchars($q); ?>"
+        >
+        <select name="status" class="staff-select">
+            <option value="all" <?php echo $statusFilter === 'all' ? 'selected' : ''; ?>>全部狀態</option>
+            <option value="active" <?php echo $statusFilter === 'active' ? 'selected' : ''; ?>>啟用中</option>
+            <option value="disabled" <?php echo $statusFilter === 'disabled' ? 'selected' : ''; ?>>停用中</option>
+            <option value="expired" <?php echo $statusFilter === 'expired' ? 'selected' : ''; ?>>已過期</option>
+        </select>
+        <button type="submit" class="staff-btn">套用篩選</button>
+    </form>
+</section>
+
+<section class="staff-panel">
+    <div class="staff-panel-head">
+        <h2><?php echo $edit_coupon ? '修改優惠券' : '新增優惠券'; ?></h2>
+        <p class="staff-panel-subtitle">管理名稱/代碼、折扣與有效期限</p>
+    </div>
+
+    <form method="POST" class="staff-form" style="margin-top: 10px;">
+        <input type="hidden" name="action" value="save_coupon">
+        <input type="hidden" name="coupon_id" value="<?php echo $edit_coupon ? (int)$edit_coupon['id'] : 0; ?>">
+
+        <div class="staff-form-grid">
+            <label class="staff-field">
+                <span>Coupon Code</span>
+                <input type="text" name="coupon_code" class="staff-input" required
+                    value="<?php echo htmlspecialchars((string)($edit_coupon['coupon_code'] ?? '')); ?>">
+            </label>
+
+            <label class="staff-field">
+                <span>折扣類型</span>
+                <select name="discount_type" class="staff-select" required>
+                    <option value="percent" <?php echo (($edit_coupon['discount_type'] ?? '') === 'percent') ? 'selected' : ''; ?>>percent</option>
+                    <option value="fixed" <?php echo (($edit_coupon['discount_type'] ?? '') === 'fixed') ? 'selected' : ''; ?>>fixed</option>
+                </select>
+            </label>
+
+            <label class="staff-field">
+                <span>折扣數值</span>
+                <input type="number" step="0.01" min="0.01" name="discount_value" class="staff-input" required
+                    value="<?php echo htmlspecialchars((string)($edit_coupon['discount_value'] ?? '')); ?>">
+            </label>
+
+            <label class="staff-field">
+                <span>最低消費</span>
+                <input type="number" step="0.01" min="0" name="minimum_amount" class="staff-input" required
+                    value="<?php echo htmlspecialchars((string)($edit_coupon['minimum_amount'] ?? '0')); ?>">
+            </label>
+
+            <label class="staff-field">
+                <span>開始日期</span>
+                <input type="date" name="start_date" class="staff-input" required
+                    value="<?php echo htmlspecialchars((string)($edit_coupon['start_date'] ?? '')); ?>">
+            </label>
+
+            <label class="staff-field">
+                <span>到期日期</span>
+                <input type="date" name="expire_date" class="staff-input" required
+                    value="<?php echo htmlspecialchars((string)($edit_coupon['expire_date'] ?? '')); ?>">
+            </label>
+
+            <div class="staff-field staff-field-wide">
+                <label style="display:flex;align-items:center;gap:10px;">
+                    <input type="checkbox" name="is_active" value="1" <?php echo (!$edit_coupon || (int)($edit_coupon['is_active'] ?? 0) === 1) ? 'checked' : ''; ?>>
+                    啟用優惠券
+                </label>
+            </div>
+
+            <div class="staff-form-actions staff-field-wide" style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;">
+                <button type="submit" class="staff-btn"><?php echo $edit_coupon ? '更新優惠券' : '新增優惠券'; ?></button>
+                <?php if ($edit_coupon): ?>
+                    <a href="coupons.php" class="staff-btn staff-btn-soft">取消編輯</a>
+                <?php endif; ?>
+            </div>
+        </div>
+    </form>
+</section>
+
+<section class="staff-panel">
+    <div class="staff-panel-head">
+        <h2>優惠券列表</h2>
+        <p class="staff-panel-subtitle">啟用/停用/刪除</p>
+    </div>
+
+    <div class="staff-table-wrap" style="margin-top: 12px;">
+        <table class="staff-table">
+            <thead>
+                <tr>
+                    <th>優惠碼</th>
+                    <th>折扣</th>
+                    <th>最低消費</th>
+                    <th>有效期限</th>
+                    <th>狀態</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (empty($coupons)): ?>
+                    <tr><td colspan="6">目前沒有優惠券資料。</td></tr>
+                <?php else: ?>
+                    <?php foreach ($coupons as $coupon): ?>
+                        <?php $badge = couponStateBadge($coupon); ?>
+                        <tr>
+                            <td><?php echo htmlspecialchars((string)($coupon['coupon_code'] ?? '')); ?></td>
+                            <td>
+                                <?php
+                                $dtype = (string)($coupon['discount_type'] ?? '');
+                                $dvalue = (float)($coupon['discount_value'] ?? 0);
+                                if ($dtype === 'percent'): ?>
+                                    <?php echo htmlspecialchars(rtrim(rtrim(number_format($dvalue, 2, '.', ''), '0'), '.')) . '%'; ?>
+                                <?php else: ?>
+                                    NT$ <?php echo htmlspecialchars(number_format($dvalue, 0)); ?>
+                                <?php endif; ?>
+                            </td>
+                            <td>NT$ <?php echo htmlspecialchars(number_format((float)($coupon['minimum_amount'] ?? 0), 0)); ?></td>
+                            <td><?php echo htmlspecialchars((string)($coupon['start_date'] ?? '')); ?> ~ <?php echo htmlspecialchars((string)($coupon['expire_date'] ?? '')); ?></td>
+                            <td>
+                                <span class="staff-badge <?php echo htmlspecialchars($badge['class']); ?>">
+                                    <?php echo htmlspecialchars($badge['label']); ?>
+                                </span>
+                            </td>
+                            <td>
+                                <div class="staff-return-actions">
+                                    <a href="coupons.php?edit=<?php echo (int)($coupon['id'] ?? 0); ?>" class="staff-action-btn staff-action-btn-muted">修改</a>
+
+                                    <form method="POST" class="staff-inline-form" onsubmit="return confirm('確定要切換此優惠券狀態嗎？');" >
+                                        <input type="hidden" name="action" value="toggle_coupon">
+                                        <input type="hidden" name="coupon_id" value="<?php echo (int)($coupon['id'] ?? 0); ?>">
+                                        <input type="hidden" name="is_active" value="<?php echo (int)($coupon['is_active'] ?? 0); ?>">
+                                        <button type="submit" class="staff-action-btn staff-action-btn-primary" style="margin-top: 6px;">
+                                            <?php echo (int)($coupon['is_active'] ?? 0) === 1 ? '停用' : '啟用'; ?>
+                                        </button>
+                                    </form>
+
+                                    <form method="POST" class="staff-inline-form" onsubmit="return confirm('確定要刪除此優惠券嗎？');">
+                                        <input type="hidden" name="action" value="delete_coupon">
+                                        <input type="hidden" name="coupon_id" value="<?php echo (int)($coupon['id'] ?? 0); ?>">
+                                        <button type="submit" class="staff-action-btn staff-action-btn-danger" style="margin-top: 6px;">刪除</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<?php staffPageEnd(); ?>
+<?php exit; ?>
+
 $message = '';
 $message_type = '';
 $edit_coupon = null;

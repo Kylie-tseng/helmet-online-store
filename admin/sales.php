@@ -1,8 +1,13 @@
 <?php
 require_once '../config.php';
-require_once __DIR__ . '/includes/staff_layout.php';
+require_once __DIR__ . '/../staff/includes/staff_layout.php';
 
 staffRequireAuth();
+
+if (($_SESSION['role'] ?? '') !== 'admin') {
+    header('Location: ../index.php');
+    exit;
+}
 
 $validStatuses = ['paid', 'shipped', 'completed'];
 $range = trim($_GET['range'] ?? 'month');
@@ -132,16 +137,42 @@ try {
     $trendRows = [];
 }
 
-staffPageStart($pdo, '銷售統計', 'sales_report');
+// 退貨摘要（簡單版）
+$returnsSummary = [
+    'total' => 0,
+    'pending' => 0,
+];
+try {
+    $check = $pdo->query("SHOW TABLES LIKE 'return_requests'");
+    if ($check->fetchColumn()) {
+        $rangeClause = '';
+        if ($range === 'today') {
+            $rangeClause = ' AND DATE(r.created_at) = CURDATE()';
+        } elseif ($range === 'month') {
+            $rangeClause = " AND DATE_FORMAT(r.created_at, '%Y-%m') = DATE_FORMAT(CURDATE(), '%Y-%m')";
+        }
+        $stmt = $pdo->query("SELECT COUNT(*) AS total_count,
+                                     SUM(CASE WHEN r.status IN ('pending','pending_payment') THEN 1 ELSE 0 END) AS pending_count
+                              FROM return_requests r
+                              WHERE 1=1 {$rangeClause}");
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $returnsSummary['total'] = (int)($row['total_count'] ?? 0);
+        $returnsSummary['pending'] = (int)($row['pending_count'] ?? 0);
+    }
+} catch (Throwable $e) {
+    // ignore
+}
+
+staffPageStart($pdo, '銷售統計', 'sales');
 ?>
 <section class="staff-panel">
     <div class="staff-panel-head">
         <h2>時間篩選</h2>
     </div>
     <div class="staff-range-tabs">
-        <a href="sales_report.php?range=today" class="staff-range-tab <?php echo $range === 'today' ? 'active' : ''; ?>">今日</a>
-        <a href="sales_report.php?range=month" class="staff-range-tab <?php echo $range === 'month' ? 'active' : ''; ?>">本月</a>
-        <a href="sales_report.php?range=all" class="staff-range-tab <?php echo $range === 'all' ? 'active' : ''; ?>">全部</a>
+        <a href="sales.php?range=today" class="staff-range-tab <?php echo $range === 'today' ? 'active' : ''; ?>">今日</a>
+        <a href="sales.php?range=month" class="staff-range-tab <?php echo $range === 'month' ? 'active' : ''; ?>">本月</a>
+        <a href="sales.php?range=all" class="staff-range-tab <?php echo $range === 'all' ? 'active' : ''; ?>">全部</a>
     </div>
 </section>
 
@@ -166,6 +197,29 @@ staffPageStart($pdo, '銷售統計', 'sales_report');
         <div class="staff-stat-value"><?php echo number_format($summary['units_sold']); ?></div>
         <div class="staff-stat-note">依訂單明細累計</div>
     </article>
+</section>
+
+<section class="staff-panel">
+    <div class="staff-panel-head">
+        <h2>退貨摘要（簡單版）</h2>
+    </div>
+    <div class="staff-stats-grid" style="margin-top: 10px;">
+        <article class="staff-stat-card">
+            <div class="staff-stat-label">退貨申請數</div>
+            <div class="staff-stat-value"><?php echo number_format((int)$returnsSummary['total']); ?></div>
+            <div class="staff-stat-note"><?php echo htmlspecialchars($rangeLabel); ?>範圍統計</div>
+        </article>
+        <article class="staff-stat-card">
+            <div class="staff-stat-label">待處理退貨</div>
+            <div class="staff-stat-value"><?php echo number_format((int)$returnsSummary['pending']); ?></div>
+            <div class="staff-stat-note">
+                <?php
+                $rate = $returnsSummary['total'] > 0 ? ($returnsSummary['pending'] / $returnsSummary['total']) * 100 : 0;
+                echo htmlspecialchars(number_format($rate, 1)) . '%';
+                ?>
+            </div>
+        </article>
+    </div>
 </section>
 
 <section class="staff-panel">
@@ -257,8 +311,8 @@ staffPageStart($pdo, '銷售統計', 'sales_report');
                                 <td>#<?php echo (int)$o['id']; ?></td>
                                 <td><?php echo htmlspecialchars((string)($o['user_name'] ?? '訪客')); ?></td>
                                 <td><?php echo htmlspecialchars(staffCurrency((float)$o['final_amount'])); ?></td>
-                                <td><span class="staff-badge <?php echo staffStatusBadgeClass((string)$o['status']); ?>"><?php echo htmlspecialchars(staffStatusLabel((string)$o['status'])); ?></span></td>
-                                <td><?php echo htmlspecialchars(date('Y-m-d', strtotime((string)$o['created_at']))); ?></td>
+                                <td><span class="staff-badge <?php echo staffStatusBadgeClass((string)($o['status'] ?? '')); ?>"><?php echo htmlspecialchars(staffStatusLabel((string)($o['status'] ?? ''))); ?></span></td>
+                                <td><?php echo htmlspecialchars(date('Y-m-d', strtotime((string)($o['created_at'] ?? '')))); ?></td>
                             </tr>
                         <?php endforeach; ?>
                     <?php endif; ?>
@@ -267,5 +321,6 @@ staffPageStart($pdo, '銷售統計', 'sales_report');
         </div>
     </article>
 </section>
+
 <?php staffPageEnd(); ?>
 

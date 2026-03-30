@@ -6,9 +6,12 @@ staffRequireAuth();
 
 $quickStats = [
     'pending_orders' => 0,
-    'processing_orders' => 0,
     'inactive_products' => 0,
     'low_stock_products' => 0,
+    'pending_returns' => 0,
+    'today_orders' => 0,
+    'today_sales' => 0.0,
+    'hidden_reviews_count' => 0,
 ];
 
 try {
@@ -19,10 +22,79 @@ try {
         if (in_array($s, ['pending', 'pending_payment'], true)) {
             $quickStats['pending_orders'] += $c;
         }
-        if (in_array($s, ['paid', 'shipped'], true)) {
-            $quickStats['processing_orders'] += $c;
+    }
+} catch (Throwable $e) {
+}
+
+// 已隱藏的評價數（供評價管理入口使用）
+try {
+    $stmt = $pdo->query("SHOW TABLES LIKE 'reviews'");
+    $hasReviewsTable = (bool)$stmt->fetchColumn();
+    if ($hasReviewsTable) {
+        $cols = $pdo->query("SHOW COLUMNS FROM reviews")->fetchAll(PDO::FETCH_ASSOC);
+        $hiddenCol = '';
+        foreach ($cols as $c) {
+            $field = (string)($c['Field'] ?? '');
+            if ($field === 'is_hidden') {
+                $hiddenCol = 'is_hidden';
+                break;
+            }
+            if ($field === 'hidden') {
+                $hiddenCol = 'hidden';
+                break;
+            }
+        }
+        if ($hiddenCol !== '') {
+            $stmt2 = $pdo->prepare("SELECT COUNT(*) FROM reviews WHERE {$hiddenCol} = 1");
+            $stmt2->execute();
+            $quickStats['hidden_reviews_count'] = (int)$stmt2->fetchColumn();
         }
     }
+} catch (Throwable $e) {
+}
+
+// 待處理退貨數
+try {
+    $stmt = $pdo->query("SHOW TABLES LIKE 'return_requests'");
+    $hasReturnRequests = (bool)$stmt->fetchColumn();
+    if ($hasReturnRequests) {
+        $hasRefundStatusColumn = false;
+        try {
+            $cols = $pdo->query("SHOW COLUMNS FROM return_requests");
+            foreach ($cols->fetchAll(PDO::FETCH_ASSOC) as $c) {
+                if ((string)($c['Field'] ?? '') === 'refund_status') {
+                    $hasRefundStatusColumn = true;
+                    break;
+                }
+            }
+        } catch (Throwable $e) {
+            $hasRefundStatusColumn = false;
+        }
+
+        if ($hasRefundStatusColumn) {
+            // 與退貨申請/退款狀態一致：未退款前視為「待處理退貨」
+            $stmt = $pdo->query("SELECT COUNT(*) FROM return_requests WHERE refund_status = 'pending_refund'");
+            $quickStats['pending_returns'] = (int)$stmt->fetchColumn();
+        } else {
+            // 後備：若資料表沒有 refund_status，才用 status 判斷 pending
+            $stmt = $pdo->query("SELECT COUNT(*) FROM return_requests WHERE status IN ('pending','pending_payment')");
+            $quickStats['pending_returns'] = (int)$stmt->fetchColumn();
+        }
+    }
+} catch (Throwable $e) {
+}
+
+// 今日訂單數 / 今日營收（店員基本統計）
+try {
+    $stmt = $pdo->query("SELECT
+                            COUNT(*) AS cnt,
+                            COALESCE(SUM(final_amount), 0) AS sales
+                        FROM orders
+                        WHERE status IN ('paid','shipped','completed')
+                          AND DATE(created_at) = CURDATE()");
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    $quickStats['today_orders'] = (int)($row['cnt'] ?? 0);
+    $quickStats['today_sales'] = (float)($row['sales'] ?? 0);
 } catch (Throwable $e) {
 }
 
@@ -49,7 +121,9 @@ staffPageStart($pdo, '店員工作入口', 'dashboard');
     <a href="orders.php" class="staff-entry-card">
         <h2>訂單處理</h2>
         <p>處理待確認、待出貨與訂單狀態更新。</p>
-        <div class="staff-entry-meta">目前待處理：<?php echo number_format($quickStats['pending_orders']); ?></div>
+        <div class="staff-entry-meta">
+            待處理訂單：<?php echo number_format($quickStats['pending_orders']); ?>
+        </div>
         <span class="staff-entry-cta">前往功能</span>
     </a>
     <a href="products.php" class="staff-entry-card">
@@ -67,21 +141,24 @@ staffPageStart($pdo, '店員工作入口', 'dashboard');
     <a href="returns.php" class="staff-entry-card">
         <h2>退貨申請</h2>
         <p>追蹤退貨流程與退款狀態。</p>
-        <div class="staff-entry-meta">以申請清單逐案處理</div>
+        <div class="staff-entry-meta">待處理退貨：<?php echo number_format($quickStats['pending_returns']); ?></div>
         <span class="staff-entry-cta">前往功能</span>
     </a>
     <a href="sales_report.php" class="staff-entry-card">
-        <h2>銷售統計</h2>
-        <p>檢視銷售趨勢與熱銷商品。</p>
-        <div class="staff-entry-meta">處理中訂單：<?php echo number_format($quickStats['processing_orders']); ?></div>
+        <h2>今日營運</h2>
+        <p>快速查看今日營收與訂單概況。</p>
+        <div class="staff-entry-meta">
+            今日營收：<?php echo htmlspecialchars(staffCurrency((float)$quickStats['today_sales'])); ?>
+            ｜今日訂單：<?php echo number_format($quickStats['today_orders']); ?>
+        </div>
         <span class="staff-entry-cta">前往功能</span>
     </a>
-    <?php if ((string)($_SESSION['role'] ?? '') === 'admin'): ?>
-        <a href="../admin/dashboard.php" class="staff-entry-card">
-            <h2>管理後台</h2>
-            <p>前往完整管理者系統進行權限級操作。</p>
-            <div class="staff-entry-meta">僅 admin 可見</div>
-        </a>
-    <?php endif; ?>
+
+    <a href="reviews.php" class="staff-entry-card">
+        <h2>評價管理</h2>
+        <p>管理商品評價、隱藏或移除不當內容。</p>
+        <div class="staff-entry-meta">已隱藏評論：<?php echo number_format($quickStats['hidden_reviews_count']); ?></div>
+        <span class="staff-entry-cta">前往功能</span>
+    </a>
 </section>
 <?php staffPageEnd(); ?>
