@@ -3,71 +3,6 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-    scrollbar-width: thin;
-    /* Firefox：thumb / track（軌道實心白；thumb 略深以便在白軌上可見） */
-    scrollbar-color: rgba(0, 0, 0, 0.18) #ffffff;
-}
-
-/* WebKit 捲軸：Chrome / Edge / Safari（* 前綴讓所有可捲動區塊含整頁、側欄皆套用） */
-*::-webkit-scrollbar {
-    width: 8px;
-    background-color: #ffffff;
-}
-
-*::-webkit-scrollbar-track {
-    background-color: #ffffff;
-    border-radius: 0;
-}
-
-*::-webkit-scrollbar-thumb {
-    background-color: rgba(0, 0, 0, 0.16);
-    border-radius: 10px;
-    border: 2px solid #ffffff;
-    background-clip: padding-box;
-}
-
-*::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(0, 0, 0, 0.28);
-    border: 2px solid #ffffff;
-    background-clip: padding-box;
-}
-
-/* 視窗捲軸（Windows 常只吃根元素上的規則） */
-html {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(0, 0, 0, 0.18) #ffffff;
-}
-
-html::-webkit-scrollbar,
-body::-webkit-scrollbar {
-    width: 8px;
-    background-color: #ffffff;
-}
-
-html::-webkit-scrollbar-track,
-body::-webkit-scrollbar-track {
-    background-color: #ffffff;
-}
-
-html::-webkit-scrollbar-thumb,
-body::-webkit-scrollbar-thumb {
-    background-color: rgba(0, 0, 0, 0.16);
-    border-radius: 10px;
-    border: 2px solid #ffffff;
-    background-clip: padding-box;
-}
-
-html::-webkit-scrollbar-thumb:hover,
-body::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(0, 0, 0, 0.28);
-}
-
-/* 側欄專用 scroll container（若使用此 class） */
-.sidebar::-webkit-scrollbar-thumb,
-.sidebar-content::-webkit-scrollbar-thumb {
-    background-color: rgba(0, 0, 0, 0.16);
-    border: 2px solid #ffffff;
-    background-clip: padding-box;
 }
 
 html,
@@ -401,19 +336,76 @@ body {
    ========================================= */
 .home-page .home-header {
     position: relative;
+    top: auto;
+    left: 0;
+    z-index: 2100;
+    display: flex;
+    flex-direction: column;
+}
+
+.top-marquee {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    height: 40px;
+    background: #000000;
+    color: #FFFFFF;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+}
+
+.top-marquee-track {
+    display: flex;
+    align-items: center;
+    width: max-content;
+    min-width: 100%;
+    animation: topMarqueeScroll 20s linear infinite;
+    will-change: transform;
+}
+
+.top-marquee:hover .top-marquee-track {
+    animation-play-state: paused;
+}
+
+.top-marquee-group {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.top-marquee-item {
+    display: inline-flex;
+    align-items: center;
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+    opacity: 0.96;
+    margin-right: 52px;
+}
+
+@keyframes topMarqueeScroll {
+    0% {
+        transform: translateX(0);
+    }
+    100% {
+        transform: translateX(-50%);
+    }
 }
 
 .home-page .home-navbar {
     position: fixed !important;
-    top: 0;
+    top: 40px;
     left: 0;
+    right: 0;
     width: 100%;
     background: transparent !important;
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 0;
-    z-index: 9999;
+    z-index: 2;
     box-sizing: border-box;
     transition: background 0.3s ease, box-shadow 0.3s ease, color 0.3s ease;
     border-bottom: 0 !important;
@@ -421,9 +413,12 @@ body {
 }
 
 .home-page .home-navbar.scrolled {
-    background: rgba(245, 245, 247, 0.95) !important;
-    backdrop-filter: blur(12px);
-    box-shadow: 0 1px 10px rgba(0, 0, 0, 0.06) !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    border-bottom: 0 !important;
+    box-shadow: none !important;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
 }
 
 .home-page .home-navbar .nav-container {
@@ -580,6 +575,7 @@ body {
     position: relative;
     width: 100%;
     height: 100vh;
+    min-height: max(560px, 100svh);
     padding-bottom: 0 !important;
     overflow: hidden;
 }
@@ -591,126 +587,15 @@ body {
     left: 0;
     right: 0;
     bottom: 0;
-    height: 20px !important;
+    height: 4px !important;
     background: linear-gradient(
         180deg,
         rgba(230, 230, 230, 0) 0%,
-        rgba(230, 230, 230, 0.18) 52%,
-        rgba(230, 230, 230, 0.42) 82%,
-        #E6E6E6 100%
+        rgba(230, 230, 230, 0.06) 64%,
+        rgba(230, 230, 230, 0.14) 100%
     );
     pointer-events: none;
     z-index: 4;
-}
-
-/* 首頁 Hero：滿版 100vh（不露出下一區）；文案幾何置中 */
-.home-page .hero,
-.home-page .hero.hero-section {
-    height: 100vh !important;
-    min-height: 100vh !important;
-}
-
-.home-page .hero-slider,
-.home-page .hero.hero-section > .hero-slider {
-    height: 100% !important;
-    min-height: 100% !important;
-}
-
-.home-page .hero-overlay {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    right: auto;
-    bottom: auto;
-    transform: translate(-50%, -50%);
-    width: min(980px, calc(100% - 48px));
-    max-width: min(980px, calc(100% - 48px));
-    display: block;
-    padding: 0 24px;
-    box-sizing: border-box;
-    z-index: 6;
-    text-align: center;
-    color: #ffffff;
-    pointer-events: none;
-}
-
-.home-page .hero-content {
-    position: relative;
-    z-index: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
-    width: 100%;
-    max-width: none;
-    margin: 0 auto;
-    padding: 0;
-    box-sizing: border-box;
-    text-align: center;
-    color: inherit;
-    animation: fadeUp 1s ease forwards;
-    pointer-events: none;
-}
-
-.home-page .hero-cta-btn {
-    margin-top: 24px;
-}
-
-.home-page .hero-main-title {
-    letter-spacing: 4px;
-}
-
-.home-page .hero-main-subtitle {
-    letter-spacing: 1px;
-    line-height: 1.6;
-}
-
-.home-page .hero-scroll-text {
-    margin-top: 20px;
-    font-size: 14px;
-    color: #ffffff;
-    opacity: 0.7;
-    font-weight: 500;
-    line-height: 1.4;
-    pointer-events: none;
-}
-
-.home-page .scroll-indicator {
-    position: absolute;
-    bottom: 20px;
-    left: 50%;
-    z-index: 7;
-    font-size: 18px;
-    color: #ffffff;
-    opacity: 0.7;
-    pointer-events: none;
-    animation: bounce 1.5s infinite;
-}
-
-.home-page .scroll-indicator span {
-    display: block;
-    line-height: 1;
-}
-
-@keyframes fadeUp {
-    from {
-        opacity: 0;
-        transform: translateY(30px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-@keyframes bounce {
-    0%,
-    100% {
-        transform: translate(-50%, 0);
-    }
-    50% {
-        transform: translate(-50%, 8px);
-    }
 }
 
 .home-page .hero-overlay,
@@ -728,99 +613,200 @@ body {
 .hero-slider {
     position: relative;
     width: 100%;
-    height: 100vh;
+    height: 100%;
+    min-height: 100%;
     overflow: hidden;
 }
 
-.slides {
+.hero-slides {
+    position: relative;
     width: 100%;
     height: 100%;
 }
 
-.hero-overlay {
+.hero-slide {
     position: absolute;
-    left: 50%;
-    top: 58%;
-    transform: translate(-50%, -50%);
-    z-index: 6;
-    width: min(980px, calc(100% - 48px));
-    text-align: center;
-    color: #FFFFFF;
+    inset: 0;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateZ(0);
+    transition: opacity 1.05s cubic-bezier(0.22, 1, 0.36, 1), visibility 1.05s step-end;
+    z-index: 1;
+    pointer-events: none;
+    will-change: opacity;
+}
+
+.hero-slide.active {
+    opacity: 1;
+    visibility: visible;
+    z-index: 2;
+    pointer-events: auto;
+    transition: opacity 1.05s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s step-start;
+}
+
+.hero-slide.is-leaving {
+    opacity: 0;
+    visibility: visible;
+    z-index: 3;
     pointer-events: none;
 }
 
-.hero-main-title {
+.hero-slide-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 70% center;
+    display: block;
+    transform: none !important;
+    animation: none !important;
+    transition: none !important;
+}
+
+.hero-slide[data-category="VR Experience"] {
+    background-color: #f5f5f5;
+}
+
+.hero-slide[data-category="VR Experience"] .hero-slide-image {
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+}
+
+.hero-slide-overlay {
+    display: none;
+}
+
+.hero-slide-content {
+    position: absolute;
+    left: clamp(24px, 7vw, 108px);
+    bottom: clamp(74px, 10vh, 132px);
+    transform: none;
+    z-index: 3;
+    width: min(620px, calc(100% - 64px));
+    text-align: left;
+    color: #FFFFFF;
+    opacity: 0;
+    transform: translate3d(26px, 0, 0);
+    transition: opacity 0.58s ease, transform 0.66s cubic-bezier(0.2, 0.7, 0.2, 1);
+    will-change: opacity, transform;
+}
+
+.hero-slide.active .hero-slide-content {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+    transition-delay: 0.16s;
+}
+
+.hero-slide.is-leaving .hero-slide-content {
+    opacity: 0;
+    transform: translate3d(-26px, 0, 0);
+    transition-delay: 0s;
+}
+
+.hero-slide-title {
     margin: 0;
-    font-size: clamp(40px, 7vw, 88px);
+    font-size: clamp(28px, 4.6vw, 60px);
     font-weight: 800;
-    line-height: 1.02;
+    line-height: 1.08;
     letter-spacing: 0.02em;
     text-transform: uppercase;
-    text-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+    text-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
 }
 
-.hero-main-subtitle {
-    margin: 16px auto 0;
-    max-width: 760px;
-    font-size: clamp(15px, 2vw, 22px);
+.hero-slide-subtitle {
+    margin: 16px 0 0;
+    max-width: 500px;
+    font-size: clamp(14px, 1.35vw, 18px);
     font-weight: 500;
-    line-height: 1.45;
+    line-height: 1.52;
     color: rgba(255, 255, 255, 0.92);
-    text-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
 }
 
-.hero-cta-btn {
+.hero-slide-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     margin-top: 24px;
-    min-width: 168px;
-    height: 46px;
-    padding: 0 24px;
+    min-width: 142px;
+    height: 40px;
+    padding: 0 18px;
     border-radius: 999px;
-    background: #FFFFFF;
-    color: #111111 !important;
-    font-size: 15px;
+    background: rgba(16, 16, 16, 0.76);
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    color: #FFFFFF !important;
+    font-size: 13px;
     font-weight: 700;
     text-decoration: none !important;
-    letter-spacing: 0.01em;
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
-    transition: transform 0.25s ease, box-shadow 0.25s ease, background-color 0.25s ease;
-    pointer-events: auto;
+    transition: transform 0.22s ease, background-color 0.22s ease, box-shadow 0.22s ease;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
 }
 
-.hero-cta-btn:hover {
+.hero-slide-btn:hover {
     transform: translateY(-2px);
-    background: #F3F4F6;
-    box-shadow: 0 14px 26px rgba(0, 0, 0, 0.24);
+    background: rgba(28, 28, 28, 0.82);
+    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.3);
 }
 
-.slide {
+.hero-carousel-footer {
     position: absolute;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    opacity: 0;
-    transition: opacity 0.8s ease;
+    left: clamp(24px, 7vw, 108px);
+    bottom: 28px;
+    z-index: 5;
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 22px;
+    width: auto;
 }
 
-.slide.active {
-    opacity: 1;
+.hero-carousel-meta {
+    margin: 0;
+    color: rgba(255, 255, 255, 0.95);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    text-shadow: 0 3px 16px rgba(0, 0, 0, 0.38);
 }
 
-/* 首頁 hero：滿版 cover，object-position 見上方 .home-page .hero … img / .slide */
-.home-page .hero-slider .slides {
-    background-color: #ffffff;
+.hero-carousel-dots {
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
-.home-page .hero img,
-.home-page .hero .hero-slider img.slide,
-.home-page .hero .slide {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    object-position: center;
-    transition: opacity 0.8s ease;
+.hero-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    background: rgba(255, 255, 255, 0.48);
+    padding: 0;
+    cursor: pointer;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+    transition: transform 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.hero-dot:hover {
+    transform: scale(1.12);
+    background: rgba(255, 255, 255, 0.82);
+    border-color: #FFFFFF;
+}
+
+.hero-dot.is-active {
+    background: #FFFFFF;
+    border-color: #FFFFFF;
+    width: 34px;
+    transform: none;
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18), 0 6px 16px rgba(0, 0, 0, 0.3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hero-slide,
+    .hero-slide-content,
+    .hero-dot {
+        transition: none !important;
+    }
 }
 
 .slider-arrow {
@@ -860,59 +846,57 @@ body {
 }
 
 @media (max-width: 768px) {
-    .hero-overlay {
-        top: 60%;
-        width: calc(100% - 32px);
+    .hero,
+    .hero-slider {
+        height: 100vh;
+        min-height: max(500px, 100svh);
     }
 
-    .home-page .hero,
-    .home-page .hero.hero-section {
-        height: 100vh !important;
-        min-height: 100vh !important;
+    .hero-slide-content {
+        left: 16px;
+        right: 16px;
+        bottom: 88px;
+        width: auto;
     }
 
-    .home-page .hero-overlay {
-        top: 50%;
-        left: 50%;
-        right: auto;
-        bottom: auto;
-        transform: translate(-50%, -50%);
-        width: calc(100% - 32px);
-        max-width: calc(100% - 32px);
-        padding: 0 16px;
-        display: block;
-        box-sizing: border-box;
-    }
-
-    .home-page .hero-content {
-        width: 100%;
-        max-width: none;
-        padding: 0;
-    }
-
-    .home-page .scroll-indicator {
-        bottom: 14px;
-        font-size: 16px;
-    }
-
-    .hero-main-subtitle {
+    .hero-slide-subtitle {
         margin-top: 12px;
-        max-width: 95%;
+        max-width: 92%;
     }
 
-    .hero-cta-btn {
-        margin-top: 18px;
-        height: 42px;
-        padding: 0 20px;
-        font-size: 14px;
+    .hero-slide-btn {
+        margin-top: 20px;
+        min-width: 138px;
+        height: 40px;
+        font-size: 13px;
     }
 
-    .home-page .hero-cta-btn {
-        margin-top: 24px;
+    .hero-carousel-footer {
+        left: 16px;
+        right: 16px;
+        bottom: 18px;
+        gap: 14px;
+    }
+
+    .hero-carousel-meta {
+        font-size: 11px;
     }
 }
 
 @media (max-width: 1024px) {
+    .top-marquee {
+        height: 36px;
+    }
+
+    .top-marquee-item {
+        font-size: 12px;
+        margin-right: 42px;
+    }
+
+    .home-page .home-navbar {
+        top: 36px;
+    }
+
     .home-page .home-navbar .nav-container {
         padding: 14px 18px;
         gap: 14px;
@@ -2802,9 +2786,7 @@ body {
 
 /* Navbar 全站白底黑字 */
 body:not(.home-page) .navbar,
-body:not(.home-page) .unified-navbar,
-.home-page .home-navbar.is-scrolled,
-.home-page .home-navbar.scrolled {
+body:not(.home-page) .unified-navbar {
     background: #FFFFFF !important;
     color: #111111 !important;
     border-bottom: 1px solid #D5D5D5 !important;
@@ -5849,10 +5831,8 @@ body:not(.home-page) .unified-navbar {
     border-bottom: 1px solid #E5E7EB !important;
 }
 
-.navbar.is-scrolled,
-.unified-navbar.is-scrolled,
-.home-page .home-navbar.is-scrolled,
-.home-page .home-navbar.scrolled.is-scrolled {
+body:not(.home-page) .navbar.is-scrolled,
+body:not(.home-page) .unified-navbar.is-scrolled {
     background: #FFFFFF !important;
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
@@ -6260,13 +6240,12 @@ body:not(.home-page) .unified-navbar {
 
 /* 所有主導覽列固定在最上方 */
 .navbar,
-.unified-navbar,
-.home-page .home-navbar {
+.unified-navbar {
     position: fixed !important;
     top: 0 !important;
     left: 0 !important;
     right: 0 !important;
-    width: 100% !important;
+    width: auto !important;
     z-index: 5000 !important;
 }
 
@@ -8540,14 +8519,11 @@ body.staff-page .staff-navbar-logout {
 /* 首頁 navbar 還原：透明疊圖，捲動後白底 */
 .home-page .home-navbar {
     position: fixed !important;
-    top: 0 !important;
+    top: 40px !important;
     left: 0 !important;
+    right: 0 !important;
     width: 100% !important;
-    z-index: 9999 !important;
-}
-
-.home-page.top-with-promo .home-navbar {
-    top: var(--promo-bar-height, 40px) !important;
+    z-index: 5000 !important;
 }
 
 .home-page .home-navbar:not(.is-scrolled):not(.scrolled) {
@@ -8587,9 +8563,13 @@ body.staff-page .staff-navbar-logout {
 
 .home-page .home-navbar.is-scrolled,
 .home-page .home-navbar.scrolled {
-    background: #FFFFFF !important;
-    border-bottom: 1px solid #E5E7EB !important;
-    box-shadow: 0 1px 10px rgba(0, 0, 0, 0.08) !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    top: 0 !important;
+    border-bottom: 0 !important;
+    box-shadow: none !important;
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
 }
 
 .home-page .home-navbar.is-scrolled .nav-logo a,
@@ -8654,116 +8634,6 @@ body.staff-page .staff-navbar-logout {
     display: none !important;
 }
 
-/* 首頁側欄展開：左 35% / 右 65% 撐寬、右欄 padding 與字級（強化主視覺；僅桌機） */
-@media (min-width: 769px) {
-    .home-page .custom-megamenu.home-sidebar-drawer.expanded {
-        width: min(920px, 96vw) !important;
-        max-width: min(920px, 96vw) !important;
-    }
-
-    .home-page .custom-megamenu.home-sidebar-drawer.expanded .home-sidebar-left {
-        width: 35% !important;
-        flex: 0 0 35% !important;
-    }
-
-    .home-page .custom-megamenu.home-sidebar-drawer.expanded .home-sidebar-right {
-        width: 65% !important;
-        flex: 0 0 65% !important;
-    }
-
-    .home-page .custom-megamenu .home-sidebar-right .home-sidebar-panel {
-        padding: 48px 56px !important;
-    }
-
-    /* 購物指南：右欄不捲動（僅 guide） */
-    .home-page .custom-megamenu .home-sidebar-content-set[data-home-sidebar-content="guide"] .home-sidebar-panel {
-        overflow: hidden !important;
-        overflow-y: hidden !important;
-    }
-
-    .home-page .custom-megamenu .home-sidebar-panel .home-sidebar-panel-title {
-        font-size: 22px !important;
-        font-weight: 600 !important;
-        color: #111 !important;
-        margin: 0 0 20px 0 !important;
-    }
-
-    /* 購物指南區塊標題（單欄；較小字級） */
-    .home-page .custom-megamenu .home-sidebar-panel .home-sidebar-guide-title {
-        font-size: 16px !important;
-        font-weight: 600 !important;
-        color: #111 !important;
-        margin-top: 0 !important;
-        margin-bottom: 12px !important;
-    }
-
-    .home-page .custom-megamenu .home-sidebar-panel .home-sidebar-guide-col:first-child .home-sidebar-guide-title {
-        margin-top: 0 !important;
-    }
-
-    .home-page .custom-megamenu .home-sidebar-panel .home-sidebar-guide-col + .home-sidebar-guide-col .home-sidebar-guide-title {
-        margin-top: 0 !important;
-    }
-
-    .home-page .custom-megamenu .home-sidebar-panel .home-sidebar-panel-link {
-        font-size: 18px !important;
-        font-weight: 500 !important;
-        color: #333 !important;
-        line-height: 2.2 !important;
-        margin: 0 0 14px 0 !important;
-        transition: color 0.2s ease, transform 0.2s ease;
-    }
-
-    .home-page .custom-megamenu .home-sidebar-panel .home-sidebar-panel-link:hover,
-    .home-page .custom-megamenu .home-sidebar-panel .home-sidebar-panel-link:focus-visible {
-        color: #000 !important;
-        opacity: 1 !important;
-        transform: translateX(4px);
-    }
-
-    .home-page .custom-megamenu .home-sidebar-panel-links--helmets-promo .home-sidebar-panel-link {
-        font-size: 18px !important;
-        font-weight: 500 !important;
-        color: #333 !important;
-        line-height: 2.2 !important;
-    }
-
-    .home-page .custom-megamenu .home-sidebar-panel-links--helmets-promo .home-sidebar-panel-link:hover,
-    .home-page .custom-megamenu .home-sidebar-panel-links--helmets-promo .home-sidebar-panel-link:focus-visible {
-        color: #000 !important;
-        transform: translateX(4px);
-    }
-
-    .home-page .custom-megamenu .home-sidebar-panel .home-sidebar-panel-list--guide .home-sidebar-guide-link {
-        font-size: 14px !important;
-        font-weight: 500 !important;
-        color: #777 !important;
-        line-height: 1.8 !important;
-        margin: 5px 0 !important;
-        transition: color 0.2s ease;
-    }
-
-    .home-page .custom-megamenu .home-sidebar-panel .home-sidebar-panel-list--guide .home-sidebar-guide-link:hover,
-    .home-page .custom-megamenu .home-sidebar-panel .home-sidebar-panel-list--guide .home-sidebar-guide-link:focus-visible {
-        color: #111 !important;
-        opacity: 1 !important;
-    }
-
-    .home-page .custom-megamenu .home-sidebar-panel .home-sidebar-panel-item-text {
-        font-size: 18px !important;
-        font-weight: 500 !important;
-        line-height: 1.35 !important;
-    }
-
-    /* 購物指南 / 更多資訊 之間橫線 */
-    .home-page .custom-megamenu .home-sidebar-guide-col + .home-sidebar-guide-col {
-        margin-top: 20px !important;
-        margin-bottom: 0 !important;
-        padding-top: 24px !important;
-        border-top: 1px solid #ddd !important;
-    }
-}
-
 /* =========================================
    Home Unified Lower Sections
    ========================================= */
@@ -8773,7 +8643,7 @@ body.staff-page .staff-navbar-logout {
 
 .home-page .split-category-section {
     padding: 80px 0 20px;
-    margin: 50px auto 48px;
+    margin: 0 auto 48px;
     border-radius: 24px;
     background-color: #F5F5F5;
 }
@@ -12214,5 +12084,348 @@ body.oracle-modal-open {
     .daily-oracle-modal-page .modal-product-name {
         font-size: 18px;
     }
+}
+
+/* Home header layout fix: marquee row + navbar row + hero */
+.home-page .home-header {
+    position: relative;
+    top: auto;
+    left: 0;
+    z-index: 2200;
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+.home-page .home-header .top-marquee {
+    position: relative;
+    z-index: 3;
+    height: 40px;
+    flex: 0 0 40px;
+}
+
+.home-page .home-header .home-navbar {
+    position: fixed !important;
+    top: 40px !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 2300;
+    width: 100%;
+    background: transparent !important;
+    border-bottom: 0 !important;
+    box-shadow: none !important;
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+}
+
+.home-page .home-header .home-navbar:not(.is-scrolled),
+.home-page .home-header .home-navbar.scrolled,
+.home-page .home-header .home-navbar.is-scrolled {
+    background: transparent !important;
+    border-bottom: 0 !important;
+    box-shadow: none !important;
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+}
+
+.home-page .home-header .home-navbar.scrolled,
+.home-page .home-header .home-navbar.is-scrolled {
+    top: 0 !important;
+}
+
+@media (max-width: 1024px) {
+    .home-page .home-header .top-marquee {
+        height: 36px;
+        flex-basis: 36px;
+    }
+
+    .home-page .home-header .home-navbar {
+        top: 36px !important;
+    }
+}
+
+/* Home Hero visual polish */
+.home-page .hero {
+    height: calc(100vh + 80px);
+    min-height: max(760px, calc(100svh + 80px));
+}
+
+.home-page .hero,
+.home-page .hero-slider,
+.home-page .hero-slides,
+.home-page .hero-slide {
+    background-color: #f5f5f5 !important;
+}
+
+.home-page .hero-slider,
+.home-page .hero-slides,
+.home-page .hero-slide {
+    height: 100% !important;
+    min-height: 100% !important;
+}
+
+.home-page .hero-slide-image {
+    width: 100% !important;
+    height: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    object-fit: cover;
+    object-position: 70% center;
+}
+
+.home-page .hero-slide[data-category="Promotion"] .hero-slide-image {
+    object-position: center 8%;
+}
+
+.home-page .hero-slide[data-category="Promotion"] {
+    background-color: #ececec !important;
+}
+
+.home-page .hero-slide[data-category="VR Experience"] {
+    background-color: #f5f5f5 !important;
+}
+
+.home-page .hero-slide[data-category="VR Experience"] .hero-slide-image {
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+}
+
+.home-page .hero-slide[data-category="VR Experience"] .hero-slide-title {
+    color: #111;
+    text-shadow: none;
+}
+
+.home-page .hero-slide[data-category="VR Experience"] .hero-slide-subtitle {
+    color: #333;
+    text-shadow: none;
+}
+
+.home-page .hero-slide[data-category="Guide"] .hero-slide-content {
+    max-width: 680px;
+}
+
+.home-page .hero-slide[data-category="Guide"] .hero-slide-title {
+    white-space: normal;
+    word-break: keep-all;
+    overflow-wrap: normal;
+}
+
+.home-page .hero-slide-content {
+    bottom: clamp(128px, 17vh, 188px);
+}
+
+@media (max-width: 768px) {
+    .home-page .hero-slide-content {
+        bottom: 118px;
+    }
+}
+
+.home-page .hero-carousel-footer {
+    bottom: 70px;
+}
+
+.home-page .hero-carousel-meta {
+    color: #111;
+    opacity: 1;
+}
+
+.home-page .hero-dot {
+    background: rgba(0, 0, 0, 0.3);
+    border-color: rgba(0, 0, 0, 0.45);
+}
+
+.home-page .hero-dot.is-active {
+    background: #111;
+    border-color: #111;
+}
+
+/* Homepage floating capsule navbar (hero only) */
+.home-page .home-navbar,
+.home-page .home-navbar.scrolled,
+.home-page .home-navbar.is-scrolled,
+.home-page .home-navbar:not(.is-scrolled),
+.home-page .unified-navbar.home-navbar,
+.home-page .unified-navbar.home-navbar.scrolled,
+.home-page .unified-navbar.home-navbar.is-scrolled,
+.home-page .home-header .home-navbar,
+.home-page .home-header .home-navbar.scrolled,
+.home-page .home-header .home-navbar.is-scrolled {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+.home-page .home-header .home-navbar .nav-container {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    width: 100%;
+    max-width: none;
+    padding: 16px 28px !important;
+    min-height: 76px;
+    gap: 18px;
+}
+
+.home-page .home-header .home-navbar-left {
+    justify-self: start;
+}
+
+.home-page .home-header .home-navbar-center {
+    justify-self: center;
+    flex: 0 0 auto;
+    width: auto;
+    gap: 26px;
+    padding: 10px 24px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+.home-page .home-header .home-navbar-center .nav-item > a,
+.home-page .home-header .home-navbar-center .dropdown-arrow {
+    color: rgba(244, 248, 255, 0.96) !important;
+}
+
+.home-page .home-header .home-navbar-center .nav-item > a {
+    font-weight: 600;
+    font-size: 16px;
+    letter-spacing: 0.5px;
+}
+
+.home-page .home-header .home-navbar-center .nav-item > a:hover {
+    background: rgba(255, 255, 255, 0.12) !important;
+    border-radius: 999px;
+    opacity: 1;
+}
+
+.home-page .home-header .home-navbar-right {
+    justify-self: end;
+}
+
+@media (max-width: 1024px) {
+    .home-page .hero {
+        height: calc(100vh + 64px);
+        min-height: max(640px, calc(100svh + 64px));
+    }
+
+    .home-page .hero-slide-image {
+        object-position: 70% center;
+    }
+
+    .home-page .home-header .home-navbar .nav-container {
+        grid-template-columns: auto 1fr auto;
+        padding: 14px 16px !important;
+        gap: 12px;
+    }
+
+    .home-page .home-header .home-navbar-center {
+        gap: 16px;
+        padding: 8px 14px;
+    }
+
+    .home-page .home-header .home-navbar-center .nav-item > a {
+        font-size: 14px;
+        padding: 6px 4px;
+    }
+}
+
+/* Homepage navbar pinning (final override) */
+.home-page .home-header {
+    position: relative;
+    top: auto;
+    left: 0;
+    right: auto;
+    width: 100%;
+    z-index: 2300;
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+.home-page .home-header .top-marquee {
+    position: relative;
+    z-index: 2301;
+}
+
+.home-page .home-header .home-navbar {
+    position: fixed !important;
+    top: 40px !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100%;
+    z-index: 2300;
+}
+
+.home-page .home-navbar,
+.home-page .home-navbar.scrolled,
+.home-page .home-navbar.is-scrolled,
+.home-page .home-navbar.is-scrolled.scrolled,
+.home-page .home-header .home-navbar,
+.home-page .home-header .home-navbar.scrolled,
+.home-page .home-header .home-navbar.is-scrolled {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.home-page .home-navbar.scrolled,
+.home-page .home-navbar.is-scrolled,
+.home-page .home-header .home-navbar.scrolled,
+.home-page .home-header .home-navbar.is-scrolled {
+    top: 0 !important;
+    background: #FFFFFF !important;
+    background-color: #FFFFFF !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08) !important;
+    border-bottom: 1px solid rgba(17, 17, 17, 0.08) !important;
+}
+
+.home-page .home-navbar.scrolled a,
+.home-page .home-navbar.is-scrolled a,
+.home-page .home-header .home-navbar.scrolled a,
+.home-page .home-header .home-navbar.is-scrolled a,
+.home-page .home-navbar.scrolled .nav-action-icon,
+.home-page .home-navbar.is-scrolled .nav-action-icon,
+.home-page .home-header .home-navbar.scrolled .nav-action-icon,
+.home-page .home-header .home-navbar.is-scrolled .nav-action-icon,
+.home-page .home-navbar.scrolled .nav-action-icon svg,
+.home-page .home-navbar.is-scrolled .nav-action-icon svg,
+.home-page .home-header .home-navbar.scrolled .nav-action-icon svg,
+.home-page .home-header .home-navbar.is-scrolled .nav-action-icon svg,
+.home-page .home-navbar.scrolled .user-greeting,
+.home-page .home-navbar.is-scrolled .user-greeting,
+.home-page .home-header .home-navbar.scrolled .user-greeting,
+.home-page .home-header .home-navbar.is-scrolled .user-greeting,
+.home-page .home-navbar.scrolled .dropdown-arrow,
+.home-page .home-navbar.is-scrolled .dropdown-arrow,
+.home-page .home-header .home-navbar.scrolled .dropdown-arrow,
+.home-page .home-header .home-navbar.is-scrolled .dropdown-arrow {
+    color: #111 !important;
+    stroke: #111 !important;
+}
+
+@media (max-width: 1024px) {
+    .home-page .home-navbar:not(.scrolled):not(.is-scrolled),
+    .home-page .home-header .home-navbar:not(.scrolled):not(.is-scrolled) {
+        top: 36px !important;
+    }
+}
+
+.home-page,
+body.home-page,
+.home-page main,
+.home-page .hero {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
 }
 
