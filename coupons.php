@@ -77,7 +77,58 @@ try {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>優惠券專區 - HelmetVRse</title>
-    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/style.css?v=20260408-2">
+    <style>
+        .coupon-page-directory .coupon-item-btn-primary,
+        .coupon-page-directory .coupon-item-btn-primary.js-claim-coupon {
+            background: #475569;
+            color: #fff;
+            border: 1px solid #475569;
+            border-radius: 12px;
+            box-shadow: none;
+        }
+
+        .coupon-page-directory .coupon-item-btn-primary:hover,
+        .coupon-page-directory .coupon-item-btn-primary.js-claim-coupon:hover {
+            background: #334155;
+            border-color: #334155;
+            color: #fff;
+        }
+
+        .coupon-page-directory .coupon-item-btn-secondary {
+            background: #fff;
+            color: #475569;
+            border: 1px solid #cbd5e1;
+            border-radius: 12px;
+            box-shadow: none;
+        }
+
+        .coupon-page-directory .coupon-item-btn-secondary:hover {
+            background: #f8fafc;
+            color: #475569;
+            border-color: #cbd5e1;
+        }
+
+        .coupon-page-directory .coupon-item-btn.is-claimed,
+        .coupon-page-directory .coupon-item-btn.is-claimed:hover {
+            background: #9aa0a6;
+            border-color: #9aa0a6;
+            color: #fff;
+            cursor: not-allowed;
+            pointer-events: none;
+            opacity: 0.95;
+        }
+
+        .coupon-page-directory .coupon-item-btn-primary {
+            background-color: #2563eb !important;
+            border-color: #2563eb !important;
+        }
+
+        .coupon-page-directory .coupon-item-btn-primary:hover {
+            background-color: #1d4ed8 !important;
+            border-color: #1d4ed8 !important;
+        }
+    </style>
 </head>
 <body class="coupon-page-directory">
 <?php renderNavbar($pdo, $categories, $parts_category_id); ?>
@@ -123,7 +174,19 @@ try {
                             </div>
 
                             <div class="coupon-card__actions">
-                                <a href="<?php echo htmlspecialchars($activity['claim_url']); ?>" class="coupon-item-btn coupon-item-btn-primary">立即領取優惠</a>
+                                <?php if (($activity['title'] ?? '') === '滿三千免運'): ?>
+                                    <a href="products.php"
+                                       class="coupon-item-btn coupon-item-btn-primary"
+                                       style="background:#4e6e8e !important; border:none !important; color:#ffffff !important;"
+                                    >前往購物</a>
+                                <?php else: ?>
+                                    <button
+                                        type="button"
+                                        class="coupon-item-btn coupon-item-btn-primary js-claim-coupon"
+                                        data-post-url="<?php echo htmlspecialchars($activity['detail_url']); ?>"
+                                        style="background:#4e6e8e !important; border:none !important; color:#ffffff !important;"
+                                    >立即領取優惠</button>
+                                <?php endif; ?>
                                 <a href="<?php echo htmlspecialchars($activity['detail_url']); ?>" class="coupon-item-btn coupon-item-btn-secondary">查看詳情</a>
                             </div>
                         </div>
@@ -167,5 +230,70 @@ try {
             </div>
         </div>
     </footer>
+
+    <script>
+        (function () {
+            function toFormUrlEncoded(obj) {
+                return Object.keys(obj)
+                    .map(key => encodeURIComponent(key) + '=' + encodeURIComponent(obj[key]))
+                    .join('&');
+            }
+
+            function parseClaimResult(htmlText) {
+                const doc = new DOMParser().parseFromString(htmlText, 'text/html');
+                const messageEl = doc.querySelector('.cart-message');
+                const message = messageEl ? (messageEl.textContent || '').trim() : '';
+                const isSuccess = !!doc.querySelector('.cart-message.success');
+                const isClaimedText = (doc.body && doc.body.textContent) ? doc.body.textContent.includes('已領取優惠券') : false;
+                const looksClaimed = isSuccess || isClaimedText || message.includes('已領取');
+
+                return { success: looksClaimed, message };
+            }
+
+            document.addEventListener('DOMContentLoaded', function () {
+                document.querySelectorAll('.js-claim-coupon').forEach(function (btn) {
+                    btn.addEventListener('click', function () {
+                        if (btn.disabled || btn.classList.contains('is-claimed')) return;
+
+                        const postUrl = btn.dataset.postUrl;
+                        if (!postUrl) return;
+
+                        const originalText = btn.textContent;
+                        btn.disabled = true;
+                        btn.textContent = '領取中...';
+
+                        fetch(postUrl, {
+                            method: 'POST',
+                            credentials: 'same-origin',
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            },
+                            body: toFormUrlEncoded({ action: 'claim_coupon' })
+                        })
+                            .then(function (res) { return res.text(); })
+                            .then(function (text) {
+                                const result = parseClaimResult(text);
+                                if (result.success) {
+                                    btn.textContent = '已領取';
+                                    btn.classList.add('is-claimed');
+                                    btn.disabled = true;
+                                    return;
+                                }
+
+                                btn.disabled = false;
+                                btn.textContent = originalText || '立即領取優惠';
+                                alert(result.message || '領取失敗，請稍後再試');
+                            })
+                            .catch(function () {
+                                btn.disabled = false;
+                                btn.textContent = originalText || '立即領取優惠';
+                                alert('系統錯誤，請稍後再試');
+                            });
+                    });
+                });
+            });
+        })();
+    </script>
 </body>
 </html>

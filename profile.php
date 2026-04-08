@@ -18,8 +18,8 @@ $active_tab = isset($_GET['tab']) ? (string)$_GET['tab'] : 'info'; // 預設顯�
 
 // 設定頁籤分頁內的篩選條件（使用者端）
 $order_q = trim((string)($_GET['order_q'] ?? ''));
-$order_status_filter = trim((string)($_GET['order_status'] ?? '')); // processing/paid/shipped/completed/cancelled
-$allowedOrderStatusFilters = ['', 'processing', 'paid', 'shipped', 'completed', 'cancelled'];
+$order_status_filter = trim((string)($_GET['order_status'] ?? '')); // pending/shipped/completed/cancelled
+$allowedOrderStatusFilters = ['', 'pending', 'shipped', 'completed', 'cancelled'];
 if ($order_status_filter !== '' && !in_array($order_status_filter, $allowedOrderStatusFilters, true)) {
     $order_status_filter = '';
 }
@@ -159,7 +159,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             
             if (!$order) {
                 $error = '找不到此訂單';
-            } elseif (!in_array($order['status'], ['pending', 'pending_payment', 'paid'])) {
+            } elseif (!can_cancel_order_status((string)($order['status'] ?? ''))) {
                 $error = '此訂單無法取消';
             } else {
                 $pdo->beginTransaction();
@@ -610,19 +610,18 @@ try {
 $orders = [];
 if ($active_tab === 'orders') {
     try {
-        $sql = "SELECT id, coupon_id, total_amount, discount_amount, final_amount, status, payment_method, shipping_method, shipping_address, pickup_store, created_at, updated_at
+        $sql = "SELECT id, coupon_id, total_amount, discount_amount, final_amount, status, payment_method, shipping_method, shipping_address, pickup_store, staff_note, created_at, updated_at
                 FROM orders
                 WHERE user_id = :user_id";
 
         $params = [':user_id' => $user_id];
 
-        // 訂單狀態篩選（依系統狀態群組顯示）
+        // 訂單狀態篩選（前後台統一：待處理/已出貨/已完成/已取消）
         if ($order_status_filter !== '') {
-            if ($order_status_filter === 'processing') {
-                $sql .= " AND status IN ('pending', 'pending_payment')";
+            if ($order_status_filter === 'pending') {
+                $sql .= " AND status IN ('pending', 'pending_payment', 'paid', 'processing', 'progress')";
             } else {
                 $map = [
-                    'paid' => 'paid',
                     'shipped' => 'shipped',
                     'completed' => 'completed',
                     'cancelled' => 'cancelled'
@@ -648,7 +647,8 @@ if ($active_tab === 'orders') {
         
         // 為每個訂單查詢明細（包含尺寸）
         foreach ($orders as &$order) {
-            $stmt = $pdo->prepare("SELECT oi.id, oi.product_id, oi.quantity, oi.unit_price, oi.subtotal, oi.size, p.name AS product_name
+            $stmt = $pdo->prepare("SELECT oi.id, oi.product_id, oi.quantity, oi.unit_price, oi.subtotal, oi.size, p.name AS product_name,
+                                          " . primaryImageSubquery('p', 'pi') . " AS primary_image
                                    FROM order_items oi
                                    INNER JOIN products p ON oi.product_id = p.id
                                    WHERE oi.order_id = :order_id");
@@ -786,7 +786,7 @@ try {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>個人檔案 - HelmetVRse</title>
-    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo urlencode((string)@filemtime(__DIR__ . '/assets/css/style.css')); ?>">
 </head>
 <body>
 <!-- 導覽列 -->
@@ -957,8 +957,7 @@ try {
 
                                         <select name="order_status" class="member-filter-select">
                                             <option value="" <?php echo $order_status_filter === '' ? 'selected' : ''; ?>>全部狀態</option>
-                                            <option value="processing" <?php echo $order_status_filter === 'processing' ? 'selected' : ''; ?>>處理中</option>
-                                            <option value="paid" <?php echo $order_status_filter === 'paid' ? 'selected' : ''; ?>>已付款</option>
+                                            <option value="pending" <?php echo $order_status_filter === 'pending' ? 'selected' : ''; ?>>待處理</option>
                                             <option value="shipped" <?php echo $order_status_filter === 'shipped' ? 'selected' : ''; ?>>已出貨</option>
                                             <option value="completed" <?php echo $order_status_filter === 'completed' ? 'selected' : ''; ?>>已完成</option>
                                             <option value="cancelled" <?php echo $order_status_filter === 'cancelled' ? 'selected' : ''; ?>>已取消</option>
@@ -979,103 +978,139 @@ try {
                             <div class="member-feedback member-feedback--success"><?php echo htmlspecialchars($success); ?></div>
                         <?php endif; ?>
 
-                        <div class="member-list-card">
+                        <div class="member-list-card account-orders-shell">
                             <?php if (empty($orders)): ?>
                                 <div class="member-empty-message">目前尚未有任何訂單。</div>
                             <?php else: ?>
-                                <div class="member-orders-list">
+                                <div class="member-orders-list member-orders account-orders-list">
                                     <?php foreach ($orders as $order): ?>
                                         <?php
                                             $orderId = (int)$order['id'];
-                                            $badgeKey = appStatusBadgeClass((string)($order['status'] ?? ''));
-                                            $badgeLabel = appOrderStatusLabel((string)($order['status'] ?? ''));
-                                            $cancelable = in_array((string)($order['status'] ?? ''), ['pending', 'pending_payment', 'paid'], true);
+                                            $statusClass = get_order_status_class((string)($order['status'] ?? ''));
+                                            $badgeLabel = get_order_status_text((string)($order['status'] ?? ''));
+                                            $cancelable = can_cancel_order($order);
+                                            $isCompletedOrder = get_order_status_key((string)($order['status'] ?? '')) === 'completed';
                                         ?>
 
-                                        <div class="member-order-card">
-                                            <div class="member-order-summary">
-                                                <div class="member-order-left">
-                                                    <div class="member-order-id">訂單編號：#<?php echo $orderId; ?></div>
-                                                    <div class="member-order-date"><?php echo htmlspecialchars(date('Y-m-d H:i', strtotime((string)$order['created_at']))); ?></div>
+                                        <div class="account-order-row <?php echo $isCompletedOrder ? 'completed-order' : ''; ?>">
+                                            <div class="account-order-summary order-header">
+                                                <div class="account-order-header-left">
+                                                    <div class="account-order-number order-number">訂單 #<?php echo $orderId; ?></div>
+                                                    <div class="account-order-date order-date"><?php echo htmlspecialchars(date('Y-m-d H:i', strtotime((string)$order['created_at']))); ?></div>
                                                 </div>
-
-                                                <div class="member-order-right">
-                                                    <span class="member-badge <?php echo htmlspecialchars($badgeKey); ?>">
-                                                        <?php echo htmlspecialchars($badgeLabel); ?>
-                                                    </span>
-                                                    <div class="member-order-amount">NT$ <?php echo number_format(get_order_payable_amount($order), 0); ?></div>
-                                                </div>
-                                            </div>
-
-                                            <div class="member-order-actions">
-                                                <button
-                                                    type="button"
-                                                    class="member-btn member-btn--soft member-btn--small"
-                                                    onclick="toggleOrderDetails(<?php echo $orderId; ?>)"
-                                                >
-                                                    <span class="member-order-toggle-icon" id="member-order-toggle-icon-<?php echo $orderId; ?>">▼</span>
-                                                    <span id="member-order-toggle-text-<?php echo $orderId; ?>">查看明細</span>
-                                                </button>
-
-                                                <?php if ($cancelable): ?>
-                                                    <form method="POST" class="member-inline-form" onsubmit="return confirm('確定要取消此訂單嗎？');">
-                                                        <input type="hidden" name="action" value="cancel_order">
-                                                        <input type="hidden" name="order_id" value="<?php echo $orderId; ?>">
-                                                        <button type="submit" class="member-btn member-btn--danger-soft member-btn--small">
-                                                            取消訂單
+                                                <div class="account-order-header-right">
+                                                    <div class="account-order-amount order-total">NT$ <?php echo number_format(get_order_payable_amount($order), 0); ?></div>
+                                                    <div class="account-order-status">
+                                                        <span class="<?php echo htmlspecialchars($statusClass); ?>">
+                                                            <?php echo htmlspecialchars($badgeLabel); ?>
+                                                        </span>
+                                                    </div>
+                                                    <div class="account-order-actions order-header-actions">
+                                                        <button
+                                                            type="button"
+                                                            class="member-btn member-btn--soft member-btn--small account-order-action-secondary"
+                                                            onclick="toggleOrderDetails(<?php echo $orderId; ?>)"
+                                                        >
+                                                            <span class="member-order-toggle-icon" id="member-order-toggle-icon-<?php echo $orderId; ?>">▼</span>
+                                                            <span id="member-order-toggle-text-<?php echo $orderId; ?>">查看詳情</span>
                                                         </button>
-                                                    </form>
-                                                <?php endif; ?>
+
+                                                        <?php if ($cancelable): ?>
+                                                            <form method="POST" class="member-inline-form" onsubmit="return confirm('確定要取消此訂單嗎？');">
+                                                                <input type="hidden" name="action" value="cancel_order">
+                                                                <input type="hidden" name="order_id" value="<?php echo $orderId; ?>">
+                                                                    <button type="submit" class="member-btn member-btn--danger-soft member-btn--small account-order-action-primary">
+                                                                    取消訂單
+                                                                </button>
+                                                            </form>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                </div>
                                             </div>
 
                                             <div
                                                 id="member-order-details-<?php echo $orderId; ?>"
-                                                class="member-order-details member-order-details--hidden"
+                                                class="member-order-details member-order-details--hidden account-order-detail"
                                             >
-                                                <div class="member-order-details-content">
-                                                    <div class="member-order-meta">
-                                                        <?php if (!empty($order['payment_method'])): ?>
-                                                            <p><strong>付款方式：</strong><?php echo htmlspecialchars($payment_method_names[$order['payment_method']] ?? $order['payment_method']); ?></p>
-                                                        <?php endif; ?>
-                                                        <?php if (!empty($order['shipping_method'])): ?>
-                                                            <p><strong>送貨方式：</strong><?php echo htmlspecialchars($shipping_method_names[$order['shipping_method']] ?? $order['shipping_method']); ?></p>
-                                                        <?php endif; ?>
-                                                        <?php if (!empty($order['shipping_address'])): ?>
-                                                            <p><strong>配送地址：</strong><?php echo htmlspecialchars((string)$order['shipping_address']); ?></p>
-                                                        <?php endif; ?>
-                                                        <?php if (!empty($order['pickup_store'])): ?>
-                                                            <p><strong>取貨門市：</strong><?php echo htmlspecialchars((string)$order['pickup_store']); ?></p>
-                                                        <?php endif; ?>
-                                                    </div>
-
-                                                    <table class="member-order-items-table">
-                                                        <thead>
-                                                            <tr>
-                                                                <th>商品名稱</th>
-                                                                <th>尺寸</th>
-                                                                <th>數量</th>
-                                                                <th>單價</th>
-                                                                <th>小計</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
+                                                <div class="member-order-details-content order-expanded-content">
+                                                    <section class="account-order-products-section order-products-section">
+                                                        <h4 class="account-order-section-title order-products-title">商品清單</h4>
+                                                        <div class="account-order-products">
                                                             <?php foreach ($order['items'] as $item): ?>
-                                                                <tr>
-                                                                    <td><?php echo htmlspecialchars((string)$item['product_name']); ?></td>
-                                                                    <td><?php echo htmlspecialchars(formatCartSizeForDisplay((string)($item['size'] ?? ''))); ?></td>
-                                                                    <td><?php echo htmlspecialchars((string)$item['quantity']); ?></td>
-                                                                    <td>NT$ <?php echo number_format((float)$item['unit_price'], 0); ?></td>
-                                                                    <td>NT$ <?php echo number_format((float)$item['subtotal'], 0); ?></td>
-                                                                </tr>
+                                                                <div class="order-item-card">
+                                                                    <?php $order_item_img = resolve_product_card_image_src($item['primary_image'] ?? null); ?>
+                                                                    <img src="<?php echo htmlspecialchars($order_item_img, ENT_QUOTES); ?>" alt="<?php echo htmlspecialchars((string)$item['product_name']); ?>" class="order-item-img">
+
+                                                                    <div class="order-item-content">
+                                                                        <div class="order-item-name"><?php echo htmlspecialchars((string)$item['product_name']); ?></div>
+                                                                        <div class="order-item-meta">尺寸：<?php echo htmlspecialchars(formatCartSizeForDisplay((string)($item['size'] ?? ''))); ?></div>
+                                                                        <div class="order-item-price order-item-unit-price">單價 NT$ <?php echo number_format((float)$item['unit_price'], 0); ?></div>
+                                                                    </div>
+
+                                                                    <div class="order-item-actions">
+                                                                        <div class="order-item-qty">x<?php echo htmlspecialchars((string)$item['quantity']); ?></div>
+                                                                        <div class="subtotal order-item-subtotal">NT$ <?php echo number_format((float)$item['subtotal'], 0); ?></div>
+                                                                    </div>
+                                                                </div>
                                                             <?php endforeach; ?>
-                                                        </tbody>
-                                                        <tfoot>
-                                                            <tr>
-                                                                <td colspan="4" class="member-text-right"><strong>總計：</strong></td>
-                                                                <td><strong>NT$ <?php echo number_format(get_order_payable_amount($order), 0); ?></strong></td>
-                                                            </tr>
-                                                        </tfoot>
-                                                    </table>
+                                                        </div>
+                                                    </section>
+
+                                                    <div class="account-order-divider"></div>
+                                                    <section class="account-order-meta-section order-detail-section">
+                                                        <h4 class="account-order-section-title order-detail-title">訂單詳細資訊</h4>
+                                                        <div class="account-order-meta-grid order-detail-grid">
+                                                        <section class="account-order-meta-block order-detail-card">
+                                                            <h4>訂單資訊</h4>
+                                                            <?php if (!empty($order['payment_method'])): ?>
+                                                                <div class="account-order-meta-item order-detail-item">
+                                                                    <div class="account-order-meta-label order-detail-label">付款方式</div>
+                                                                    <div class="account-order-meta-value order-detail-value"><?php echo htmlspecialchars($payment_method_names[$order['payment_method']] ?? $order['payment_method']); ?></div>
+                                                                </div>
+                                                            <?php endif; ?>
+                                                            <div class="account-order-meta-item order-detail-item">
+                                                                <div class="account-order-meta-label order-detail-label">訂單總額</div>
+                                                                <div class="account-order-meta-value order-detail-value">NT$ <?php echo number_format(get_order_payable_amount($order), 0); ?></div>
+                                                            </div>
+                                                            <div class="account-order-meta-item order-detail-item">
+                                                                <div class="account-order-meta-label order-detail-label">下單時間</div>
+                                                                <div class="account-order-meta-value order-detail-value"><?php echo htmlspecialchars(date('Y-m-d H:i', strtotime((string)$order['created_at']))); ?></div>
+                                                            </div>
+                                                        </section>
+
+                                                        <section class="account-order-meta-block order-detail-card">
+                                                            <h4>配送資訊</h4>
+                                                            <?php if (!empty($order['shipping_method'])): ?>
+                                                                <div class="account-order-meta-item order-detail-item">
+                                                                    <div class="account-order-meta-label order-detail-label">配送方式</div>
+                                                                    <div class="account-order-meta-value order-detail-value"><?php echo htmlspecialchars($shipping_method_names[$order['shipping_method']] ?? $order['shipping_method']); ?></div>
+                                                                </div>
+                                                            <?php endif; ?>
+                                                            <?php if (!empty($order['shipping_address'])): ?>
+                                                                <div class="account-order-meta-item order-detail-item">
+                                                                    <div class="account-order-meta-label order-detail-label">配送地址</div>
+                                                                    <div class="account-order-meta-value order-detail-value"><?php echo htmlspecialchars((string)$order['shipping_address']); ?></div>
+                                                                </div>
+                                                            <?php endif; ?>
+                                                            <?php if (!empty($order['pickup_store'])): ?>
+                                                                <div class="account-order-meta-item order-detail-item">
+                                                                    <div class="account-order-meta-label order-detail-label">取貨門市</div>
+                                                                    <div class="account-order-meta-value order-detail-value"><?php echo htmlspecialchars((string)$order['pickup_store']); ?></div>
+                                                                </div>
+                                                            <?php endif; ?>
+                                                        </section>
+
+                                                        <?php if (!empty($order['staff_note'])): ?>
+                                                            <section class="account-order-meta-block order-detail-card">
+                                                                <h4>訂單備註</h4>
+                                                                <div class="account-order-meta-item order-detail-item">
+                                                                    <div class="account-order-meta-label order-detail-label">店員備註</div>
+                                                                    <div class="account-order-meta-value order-detail-value"><?php echo htmlspecialchars((string)$order['staff_note']); ?></div>
+                                                                </div>
+                                                            </section>
+                                                        <?php endif; ?>
+                                                        </div>
+                                                    </section>
 
                                                     <?php if ($reviewsReadyForUser && (string)($order['status'] ?? '') === 'completed'): ?>
                                                         <div class="member-order-review-section">
@@ -1232,7 +1267,7 @@ try {
                                                                 </div>
                                                             </form>
                                                         <?php else: ?>
-                                                            <div class="member-empty-message">目前訂單尚不可申請退貨。</div>
+                                                            <div class="member-empty-message account-order-note order-return-note">目前訂單尚不可申請退貨。</div>
                                                         <?php endif; ?>
                                                     <?php endif; ?>
                                                 </div>
@@ -1436,12 +1471,12 @@ try {
                 details.classList.remove('member-order-details--hidden');
                 details.classList.add('member-order-details--shown');
                 if (icon) icon.textContent = '▲';
-                if (text) text.textContent = '收合明細';
+                if (text) text.textContent = '收起';
             } else {
                 details.classList.add('member-order-details--hidden');
                 details.classList.remove('member-order-details--shown');
                 if (icon) icon.textContent = '▼';
-                if (text) text.textContent = '查看明細';
+                if (text) text.textContent = '查看詳情';
             }
         }
 

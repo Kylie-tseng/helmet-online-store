@@ -1,7 +1,6 @@
 <?php
 require_once 'config.php';
 require_once 'includes/cart_functions.php';
-require_once 'includes/navbar.php';
 
 // 檢查是否已登入
 if (!isset($_SESSION['user_id'])) {
@@ -23,12 +22,16 @@ $payment_method = $checkout_data['payment_method'];
 $shipping_address = $checkout_data['shipping_address'] ?? '';
 $pickup_store = $checkout_data['pickup_store'] ?? '';
 
+if ($payment_method !== 'cod') {
+    header('Location: checkout.php');
+    exit;
+}
+
 // 查詢購物車內容
 $cart_items = getCartItems($pdo, $user_id);
 
-// 如果購物車為空，導回購物車頁面
 if (empty($cart_items)) {
-    header('Location: cart.php');
+    header('Location: checkout.php');
     exit;
 }
 
@@ -37,30 +40,22 @@ $order_amount = calculateOrderAmount($cart_items, $shipping_method);
 $coupon_status = getAppliedCouponStatus($pdo, $cart_items);
 $order_summary = calculateOrderSummary($cart_items, $shipping_method, $coupon_status['coupon']);
 
-// 處理訂單建立（非信用卡付款）
-$order_created = false;
+// 處理訂單建立（貨到付款）
 $order_id = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_order'])) {
-    // 如果是信用卡付款，不應該到這裡
-    if ($payment_method === 'credit_card') {
-        header('Location: checkout.php');
-        exit;
-    }
-    
+    $cod_order_committed = false;
     try {
         $pdo->beginTransaction();
         
-        // 根據付款方式決定訂單狀態
-        $order_status = 'pending'; // 預設待處理
+        $order_status = 'pending';
         if ($payment_method === 'cod') {
-            $order_status = 'pending'; // 貨到付款，待出貨
+            $order_status = 'pending';
         }
         
         $order_amounts = build_orders_amount_fields($order_summary);
         $order_coupon_id = !empty($coupon_status['coupon']['id']) ? (int)$coupon_status['coupon']['id'] : null;
 
-        // 建立訂單
         $stmt = $pdo->prepare("INSERT INTO orders (user_id, coupon_id, total_amount, discount_amount, final_amount, status, payment_method, shipping_method, shipping_address, pickup_store) 
                                VALUES (:user_id, :coupon_id, :total_amount, :discount_amount, :final_amount, :status, :payment_method, :shipping_method, :shipping_address, :pickup_store)");
         $stmt->execute([
@@ -78,7 +73,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_order'])) {
         
         $order_id = $pdo->lastInsertId();
         
-        // 建立訂單明細
         foreach ($cart_items as $item) {
             $subtotal = $item['price'] * $item['quantity'];
             $cs = (string)($item['size'] ?? '');
@@ -95,23 +89,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_order'])) {
             ]);
         }
         
-        // 清空購物車
-        $stmt = $pdo->prepare("DELETE FROM cart WHERE user_id = :user_id");
-        $stmt->execute([':user_id' => $user_id]);
-        
-        // 清除結帳資料
-        unset($_SESSION['checkout_data']);
-        clearAppliedCoupon();
-        
         $pdo->commit();
-        $order_created = true;
-        // --- 在這裡觸發發信腳本 ---
-        // 這樣 send_order.php 就可以直接使用這頁已經算好的 $order_id, $cart_items 等變數
-        include 'send_order.php';
+        $cod_order_committed = true;
         
     } catch (PDOException $e) {
         $pdo->rollBack();
         $error_message = '建立訂單時發生錯誤：' . $e->getMessage();
+    }
+
+    if ($cod_order_committed) {
+        include __DIR__ . '/send_order.php';
+        $stmt = $pdo->prepare("DELETE FROM cart WHERE user_id = :user_id");
+        $stmt->execute([':user_id' => $user_id]);
+        unset($_SESSION['checkout_data']);
+        if (function_exists('clearAppliedCoupon')) {
+            clearAppliedCoupon();
+        }
+        $success_oid = (int)$order_id;
+        echo '<!DOCTYPE html><html lang="zh-TW"><head><meta charset="UTF-8"><meta http-equiv="refresh" content="0;url=order_success.php?order_id=' . $success_oid . '"><script>window.location.href=\'order_success.php?order_id=' . $success_oid . '\';</script></head><body></body></html>';
+        exit;
     }
 }
 
@@ -149,6 +145,8 @@ $shipping_method_names = [
     'pickup' => '超商取貨',
     'home' => '宅配到府'
 ];
+
+require_once 'includes/navbar.php';
 ?>
 <!DOCTYPE html>
 <html lang="zh-TW">
@@ -165,73 +163,14 @@ $shipping_method_names = [
     <!-- 訂單確認內容 -->
     <div class="checkout-container">
         <div class="container">
-            <h1 class="checkout-page-title">訂單建立成功</h1>
+            <h1 class="checkout-page-title">訂單確認</h1>
             
             <?php if (isset($error_message)): ?>
                 <div class="error-message">
                     <?php echo htmlspecialchars($error_message); ?>
                 </div>
-            <?php elseif ($order_created): ?>
-                <div class="order-success">
-                    <h2>訂單建立成功！</h2>
-                    <p>訂單編號：<?php echo htmlspecialchars($order_id); ?></p>
-                    <p>感謝您的購買，我們將盡快為您處理訂單。</p>
-
-                    <div class="checkout-summary-panel">
-                        <h3 class="checkout-summary-title">付款明細</h3>
-                        <div class="order-summary">
-                            <div class="summary-row">
-                                <span class="summary-label">訂單編號：</span>
-                                <span class="summary-value">#<?php echo htmlspecialchars($order_id); ?></span>
-                            </div>
-                            <div class="summary-row summary-total">
-                                <span class="summary-label">最終總價：</span>
-                                <span class="summary-value summary-total">NT$ <?php echo number_format($order_summary['final_total'], 0); ?></span>
-                            </div>
-                        </div>
-
-                        <button
-                            type="button"
-                            class="checkout-summary-items-toggle"
-                            data-checkout-items-toggle="1"
-                            data-checkout-items-target="orderConfirmItemsList"
-                            aria-expanded="false"
-                        >
-                            <span>查看商品清單</span>
-                            <svg class="checkout-summary-items-chevron" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                                <path d="M6 9L12 15L18 9" stroke="#333333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
-                        </button>
-
-                        <div id="orderConfirmItemsList" class="checkout-summary-items" aria-hidden="true">
-                            <div class="checkout-summary-items-inner">
-                                <?php foreach ($cart_items as $item): 
-                                    $subtotal = (float)$item['price'] * (int)$item['quantity'];
-                                ?>
-                                    <div class="checkout-summary-items-row">
-                                        <div class="checkout-summary-items-left">
-                                            <div class="checkout-summary-items-name"><?php echo htmlspecialchars($item['product_name']); ?></div>
-                                            <div class="checkout-summary-items-meta">
-                                                <?php echo htmlspecialchars(formatCartSizeForDisplay($item['size'] ?? '')); ?>
-                                                &nbsp;|&nbsp; Qty: <?php echo (int)$item['quantity']; ?>
-                                            </div>
-                                        </div>
-                                        <div class="checkout-summary-items-right">
-                                            <div class="checkout-summary-items-amount">NT$ <?php echo number_format($subtotal, 0); ?></div>
-                                        </div>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="order-success-actions">
-                        <a href="products.php" class="btn-primary">繼續購物</a>
-                        <a href="profile.php" class="btn-secondary">查看訂單</a>
-                    </div>
-                </div>
-            <?php else: ?>
-                <!-- 訂單內容 -->
+            <?php endif; ?>
+            <?php if (!isset($error_message)): ?>
                 <div class="order-confirm-wrapper">
                     <!-- 商品列表 -->
                     <div class="order-section">
@@ -323,20 +262,13 @@ $shipping_method_names = [
                     </div>
 
                     <!-- 確認按鈕 -->
-                    <?php if ($payment_method !== 'credit_card'): ?>
-                        <form method="POST" class="order-confirm-form">
-                            <input type="hidden" name="confirm_order" value="1">
-                            <div class="form-actions">
-                                <a href="checkout.php" class="btn-secondary">返回修改</a>
-                                <button type="submit" class="btn-primary">送出訂單</button>
-                            </div>
-                        </form>
-                    <?php else: ?>
+                    <form method="POST" action="order_confirm.php" class="order-confirm-form">
+                        <input type="hidden" name="confirm_order" value="1">
                         <div class="form-actions">
                             <a href="checkout.php" class="btn-secondary">返回修改</a>
-                            <p class="payment-note">您選擇信用卡付款，請在下一步完成付款流程。</p>
+                            <button type="submit" class="btn-primary">送出訂單</button>
                         </div>
-                    <?php endif; ?>
+                    </form>
                 </div>
             <?php endif; ?>
         </div>

@@ -1,7 +1,6 @@
 <?php
 require_once 'config.php';
 require_once 'includes/cart_functions.php';
-require_once 'includes/navbar.php';
 
 // 檢查是否已登入
 if (!isset($_SESSION['user_id'])) {
@@ -11,76 +10,9 @@ if (!isset($_SESSION['user_id'])) {
 
 $user_id = $_SESSION['user_id'];
 
-// 如果從信用卡付款頁返回（有 pending_order_id），恢復購物車
-if (isset($_SESSION['pending_order_id']) && isset($_GET['return_from_payment'])) {
-    $pending_order_id = $_SESSION['pending_order_id'];
-    
-    try {
-        $pdo->beginTransaction();
-        
-        // 查詢訂單明細
-        $stmt = $pdo->prepare("SELECT product_id, size, quantity, unit_price FROM order_items WHERE order_id = :order_id");
-        $stmt->execute([':order_id' => $pending_order_id]);
-        $order_items = $stmt->fetchAll();
-        
-        // 恢復購物車
-        foreach ($order_items as $item) {
-            $cart_restore_size = ($item['size'] === null || $item['size'] === '')
-                ? getCartSizeNoneValue()
-                : $item['size'];
-            // 檢查購物車中是否已存在相同商品+尺寸
-            $stmt = $pdo->prepare("SELECT id, quantity FROM cart WHERE user_id = :user_id AND product_id = :product_id AND size = :size");
-            $stmt->execute([
-                ':user_id' => $user_id,
-                ':product_id' => $item['product_id'],
-                ':size' => $cart_restore_size
-            ]);
-            $existing = $stmt->fetch();
-            
-            if ($existing) {
-                // 更新數量
-                $stmt = $pdo->prepare("UPDATE cart SET quantity = :quantity, unit_price = :unit_price, updated_at = NOW() WHERE id = :cart_id");
-                $stmt->execute([
-                    ':quantity' => $item['quantity'],
-                    ':unit_price' => $item['unit_price'],
-                    ':cart_id' => $existing['id']
-                ]);
-            } else {
-                // 新增到購物車
-                $stmt = $pdo->prepare("INSERT INTO cart (user_id, product_id, size, quantity, unit_price)
-                                       VALUES (:user_id, :product_id, :size, :quantity, :unit_price)");
-                $stmt->execute([
-                    ':user_id' => $user_id,
-                    ':product_id' => $item['product_id'],
-                    ':size' => $cart_restore_size,
-                    ':quantity' => $item['quantity'],
-                    ':unit_price' => $item['unit_price']
-                ]);
-            }
-        }
-        
-        // 刪除待付款訂單（因為用戶要返回修改）
-        $stmt = $pdo->prepare("DELETE FROM orders WHERE id = :order_id AND user_id = :user_id AND status = 'pending_payment'");
-        $stmt->execute([':order_id' => $pending_order_id, ':user_id' => $user_id]);
-        
-        // 清除 session
-        unset($_SESSION['pending_order_id']);
-        
-        $pdo->commit();
-        
-        // 重新導向到 checkout.php（不帶參數），避免重複處理
-        header('Location: checkout.php');
-        exit;
-    } catch (PDOException $e) {
-        $pdo->rollBack();
-        // 如果恢復失敗，繼續執行，讓後續邏輯處理
-    }
-}
-
 // 查詢購物車內容
 $cart_items = getCartItems($pdo, $user_id);
 
-// 如果購物車為空，導回購物車頁面
 if (empty($cart_items)) {
     header('Location: cart.php');
     exit;
@@ -98,6 +30,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     // 驗證
     $errors = [];
+    if (empty($cart_items)) {
+        $errors[] = '購物車內沒有商品，請返回購物車重新選購。';
+    }
     if ($coupon_notice !== '') {
         $errors[] = $coupon_notice;
     }
@@ -135,12 +70,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $order_amounts = build_orders_amount_fields($order_summary);
             $order_coupon_id = !empty($coupon_status['coupon']['id']) ? (int)$coupon_status['coupon']['id'] : null;
             
+            $credit_checkout_ok = false;
             try {
                 $pdo->beginTransaction();
                 
-                // 建立訂單（狀態為 pending_payment）
+                // 建立訂單（狀態為 pending，付款完成後才改為已付款等）
                 $stmt = $pdo->prepare("INSERT INTO orders (user_id, coupon_id, total_amount, discount_amount, final_amount, status, payment_method, shipping_method, shipping_address, pickup_store) 
-                                     VALUES (:user_id, :coupon_id, :total_amount, :discount_amount, :final_amount, 'pending_payment', :payment_method, :shipping_method, :shipping_address, :pickup_store)");
+                     VALUES (:user_id, :coupon_id, :total_amount, :discount_amount, :final_amount, 'pending', :payment_method, :shipping_method, :shipping_address, :pickup_store)");
                 $stmt->execute([
                     ':user_id' => $user_id,
                     ':coupon_id' => $order_coupon_id,
@@ -172,25 +108,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ]);
                 }
                 
-                // 清空購物車
-                $stmt = $pdo->prepare("DELETE FROM cart WHERE user_id = :user_id");
-                $stmt->execute([':user_id' => $user_id]);
-                
                 $pdo->commit();
-                
-                // 儲存訂單 ID 到 session
                 $_SESSION['pending_order_id'] = $order_id;
-                
-                // 導向信用卡繳費頁
-                header('Location: payment_credit_card.php');
-                exit;
+                $credit_checkout_ok = true;
             } catch (PDOException $e) {
                 $pdo->rollBack();
                 $errors[] = '建立訂單時發生錯誤：' . $e->getMessage();
             }
+            if ($credit_checkout_ok) {
+                session_write_close();
+                header('Location: payment_credit_card.php', true, 303);
+                exit;
+            }
         } else {
-            // 其他付款方式，導向訂單確認頁
-            header('Location: order_confirm.php');
+            session_write_close();
+            header('Location: order_confirm.php', true, 303);
             exit;
         }
     }
@@ -246,6 +178,8 @@ try {
 }
 
 $is_logged_in = isset($_SESSION['user_id']);
+
+require_once 'includes/navbar.php';
 ?>
 <!DOCTYPE html>
 <html lang="zh-TW">
@@ -326,7 +260,7 @@ $is_logged_in = isset($_SESSION['user_id']);
             <?php endif; ?>
 
             <div class="checkout-form-wrapper">
-                <form method="POST" id="checkoutForm" class="checkout-form">
+                <form method="POST" action="checkout.php" id="checkoutForm" class="checkout-form">
                     <div class="checkout-page-layout">
                         <!-- 左欄：送貨方式 / 付款方式 -->
                         <div class="checkout-main">
@@ -487,7 +421,7 @@ $is_logged_in = isset($_SESSION['user_id']);
             document.getElementById('pickupFields').style.display = shippingMethod === 'pickup' ? 'block' : 'none';
             document.getElementById('homeFields').style.display = shippingMethod === 'home' ? 'block' : 'none';
             
-            // 重新計算運費（使用 AJAX 或直接計算）
+            // 僅更新側欄顯示金額（實際金額以送件後伺服器計算為準）
             const subtotal = <?php echo (float)$order_summary['subtotal']; ?>;
             const couponDiscount = <?php echo (float)$order_summary['discount']; ?>;
             let shipping = subtotal >= 3000 ? 0 : 60;

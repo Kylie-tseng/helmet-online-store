@@ -5,6 +5,16 @@ require_once 'includes/category_utils.php';
 require_once 'includes/navbar.php';
 require_once 'includes/product_query_helpers.php';
 
+// 首頁輪播圖快取版本（依檔案修改時間，換圖後自動刷新）
+$heroImgVer = static function (string $relPath): string {
+    $path = __DIR__ . '/' . $relPath;
+    $t = @filemtime($path);
+    return $t ? (string)$t : '1';
+};
+$index2ImgVer = $heroImgVer('assets/images/index2.jpg');
+$index4ImgVer = $heroImgVer('assets/images/index4.jpg');
+$index5ImgVer = $heroImgVer('assets/images/index5.jpg');
+
 // 查詢分類資料
 try {
     $stmt = $pdo->query("SELECT id, name, description FROM categories ORDER BY id LIMIT 4");
@@ -157,7 +167,7 @@ if (is_array($promo_offers) && !empty($promo_offers)) {
                 </article>
 
                 <article class="hero-slide" data-category="Products">
-                    <img src="assets/images/index2.jpg?v=2" alt="Products 主視覺" class="hero-slide-image">
+                    <img src="assets/images/index2.jpg?v=<?php echo urlencode($index2ImgVer); ?>" alt="Products 主視覺" class="hero-slide-image">
                     <div class="hero-slide-overlay"></div>
                     <div class="hero-slide-content">
                         <h2 class="hero-slide-title">RIDE WITH STYLE</h2>
@@ -177,7 +187,7 @@ if (is_array($promo_offers) && !empty($promo_offers)) {
                 </article>
 
                 <article class="hero-slide" data-category="Promotion">
-                    <img src="assets/images/index4.jpg?v=3" alt="Promotion 主視覺" class="hero-slide-image">
+                    <img src="assets/images/index4.jpg?v=<?php echo urlencode($index4ImgVer); ?>" alt="Promotion 主視覺" class="hero-slide-image">
                     <div class="hero-slide-overlay"></div>
                     <div class="hero-slide-content">
                         <h2 class="hero-slide-title">LIMITED OFFERS</h2>
@@ -187,7 +197,7 @@ if (is_array($promo_offers) && !empty($promo_offers)) {
                 </article>
 
                 <article class="hero-slide" data-category="Guide">
-                    <img src="assets/images/index5.jpg?v=2" alt="Guide 主視覺" class="hero-slide-image">
+                    <img src="assets/images/index5.jpg?v=<?php echo urlencode($index5ImgVer); ?>" alt="Guide 主視覺" class="hero-slide-image">
                     <div class="hero-slide-overlay"></div>
                     <div class="hero-slide-content">
                         <h2 class="hero-slide-title">RIDE SMART,<br>RIDE SAFE</h2>

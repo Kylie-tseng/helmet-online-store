@@ -7,14 +7,14 @@ staffRequireAuth();
 
 $q = trim($_GET['q'] ?? '');
 $status = trim($_GET['status'] ?? '');
-$flashMessage = '';
+$flashMessage = (string)($_SESSION['staff_orders_flash'] ?? '');
+unset($_SESSION['staff_orders_flash']);
 
-$allowedStatuses = ['pending', 'pending_payment', 'paid', 'shipped', 'completed', 'cancelled'];
+$allowedStatuses = ['pending', 'shipped', 'completed', 'cancelled'];
+$lockedStatuses = ['completed', 'cancelled'];
 if ($status !== '' && !in_array($status, $allowedStatuses, true)) {
     $status = '';
 }
-
-$cancelableOrderStatuses = ['pending', 'pending_payment', 'paid'];
 
 $hasStaffNoteColumn = false;
 try {
@@ -29,135 +29,84 @@ try {
     $hasStaffNoteColumn = false;
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $action = trim($_POST['action'] ?? '');
-    if ($action === 'cancel_order') {
-        $orderId = (int)($_POST['order_id'] ?? 0);
-        if ($orderId > 0) {
-            try {
-                $stmt = $pdo->prepare("SELECT id, status FROM orders WHERE id = :id LIMIT 1");
-                $stmt->execute([':id' => $orderId]);
-                $order = $stmt->fetch(PDO::FETCH_ASSOC);
-
-                if (!$order) {
-                    $flashMessage = '找不到此訂單';
-                } elseif (!in_array((string)($order['status'] ?? ''), $cancelableOrderStatuses, true)) {
-                    $flashMessage = '此訂單已出貨，無法取消';
-                } else {
-                    $pdo->beginTransaction();
-
-                    $stmt = $pdo->prepare("UPDATE orders SET status = 'cancelled', updated_at = NOW() WHERE id = :order_id");
-                    $stmt->execute([':order_id' => $orderId]);
-
-                    $stmt = $pdo->prepare("SELECT product_id, size, quantity FROM order_items WHERE order_id = :order_id");
-                    $stmt->execute([':order_id' => $orderId]);
-                    $order_items = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-                    foreach ($order_items as $item) {
-                        $sz = $item['size'] ?? null;
-                        if ($sz === null || $sz === '' || $sz === getCartSizeNoneValue() || $sz === 'N') {
-                            continue;
-                        }
-
-                        $stmt = $pdo->prepare("UPDATE product_sizes
-                                               SET stock = stock + :quantity, updated_at = NOW()
-                                               WHERE product_id = :product_id AND size = :size");
-                        $stmt->execute([
-                            ':quantity' => (int)($item['quantity'] ?? 0),
-                            ':product_id' => (int)($item['product_id'] ?? 0),
-                            ':size' => (string)$sz
-                        ]);
-                    }
-
-                    $pdo->commit();
-                    $flashMessage = '訂單已成功取消。';
-                }
-            } catch (Throwable $e) {
-                if ($pdo->inTransaction()) {
-                    $pdo->rollBack();
-                }
-                $flashMessage = '取消失敗，請稍後再試。';
-            }
+if (!function_exists('staffOrdersRedirectWithFlash')) {
+    function staffOrdersRedirectWithFlash(string $message): void
+    {
+        $_SESSION['staff_orders_flash'] = $message;
+        $query = [];
+        $q = trim((string)($_GET['q'] ?? ''));
+        $status = trim((string)($_GET['status'] ?? ''));
+        if ($q !== '') {
+            $query['q'] = $q;
         }
-    } elseif ($action === 'update_status') {
-        $orderId = (int)($_POST['order_id'] ?? 0);
-        $newStatus = trim($_POST['new_status'] ?? '');
-        if ($orderId > 0 && in_array($newStatus, $allowedStatuses, true)) {
-            try {
-                // 若要取消，先檢查是否符合「未出貨才可取消」
-                if ($newStatus === 'cancelled') {
-                    $stmt = $pdo->prepare("SELECT status FROM orders WHERE id = :id LIMIT 1");
-                    $stmt->execute([':id' => $orderId]);
-                    $current = $stmt->fetch(PDO::FETCH_ASSOC);
-                    $currentStatus = (string)($current['status'] ?? '');
-
-                    if (!in_array($currentStatus, $cancelableOrderStatuses, true)) {
-                        $flashMessage = '此訂單已出貨，無法取消';
-                        goto update_status_end;
-                    }
-
-                    // 取消訂單（含庫存回復）
-                    $pdo->beginTransaction();
-                    $stmt = $pdo->prepare("UPDATE orders SET status = 'cancelled', updated_at = NOW() WHERE id = :order_id");
-                    $stmt->execute([':order_id' => $orderId]);
-
-                    $stmt = $pdo->prepare("SELECT product_id, size, quantity FROM order_items WHERE order_id = :order_id");
-                    $stmt->execute([':order_id' => $orderId]);
-                    $order_items = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-                    foreach ($order_items as $item) {
-                        $sz = $item['size'] ?? null;
-                        if ($sz === null || $sz === '' || $sz === getCartSizeNoneValue() || $sz === 'N') {
-                            continue;
-                        }
-
-                        $stmt = $pdo->prepare("UPDATE product_sizes
-                                               SET stock = stock + :quantity, updated_at = NOW()
-                                               WHERE product_id = :product_id AND size = :size");
-                        $stmt->execute([
-                            ':quantity' => (int)($item['quantity'] ?? 0),
-                            ':product_id' => (int)($item['product_id'] ?? 0),
-                            ':size' => (string)$sz
-                        ]);
-                    }
-
-                    $pdo->commit();
-                    $flashMessage = '訂單已成功取消。';
-                    goto update_status_end;
-                }
-
-                $stmt = $pdo->prepare("UPDATE orders SET status = :status, updated_at = NOW() WHERE id = :id");
-                $stmt->execute([':status' => $newStatus, ':id' => $orderId]);
-                $flashMessage = '訂單狀態已更新。';
-            } catch (Throwable $e) {
-                if ($pdo->inTransaction()) {
-                    $pdo->rollBack();
-                }
-                $flashMessage = '更新失敗，請稍後再試。';
-            }
+        if ($status !== '') {
+            $query['status'] = $status;
         }
-    } elseif ($action === 'update_note') {
-        $orderId = (int)($_POST['order_id'] ?? 0);
-        $staffNote = trim($_POST['staff_note'] ?? '');
-        if ($orderId > 0 && $hasStaffNoteColumn) {
-            try {
-                $stmt = $pdo->prepare("UPDATE orders SET staff_note = :note, updated_at = NOW() WHERE id = :id");
-                $stmt->execute([':note' => ($staffNote !== '' ? $staffNote : null), ':id' => $orderId]);
-                $flashMessage = '訂單備註已更新。';
-            } catch (Throwable $e) {
-                $flashMessage = '備註更新失敗。';
-            }
+        $target = 'orders.php';
+        if (!empty($query)) {
+            $target .= '?' . http_build_query($query);
         }
+        header('Location: ' . $target);
+        exit;
     }
 }
 
-update_status_end:
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = trim($_POST['action'] ?? '');
+    if ($action === 'update_status') {
+        $orderId = (int)($_POST['order_id'] ?? 0);
+        $newStatus = trim($_POST['new_status'] ?? '');
+        if ($orderId <= 0 || !in_array($newStatus, $allowedStatuses, true)) {
+            staffOrdersRedirectWithFlash('狀態更新失敗：資料不正確。');
+        }
+
+        try {
+            $stmt = $pdo->prepare("SELECT status FROM orders WHERE id = :id LIMIT 1");
+            $stmt->execute([':id' => $orderId]);
+            $current = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$current) {
+                staffOrdersRedirectWithFlash('找不到此訂單。');
+            }
+
+            $currentStatus = get_order_status_key((string)($current['status'] ?? ''));
+            if (in_array($currentStatus, $lockedStatuses, true) && $currentStatus !== $newStatus) {
+                staffOrdersRedirectWithFlash('此訂單已結案，無法再變更狀態。');
+            }
+
+            $stmt = $pdo->prepare("UPDATE orders SET status = :status, updated_at = NOW() WHERE id = :id");
+            $stmt->execute([':status' => $newStatus, ':id' => $orderId]);
+            staffOrdersRedirectWithFlash('訂單狀態已更新。');
+        } catch (Throwable $e) {
+            staffOrdersRedirectWithFlash('更新失敗，請稍後再試。');
+        }
+    } elseif ($action === 'update_note') {
+        $orderId = (int)($_POST['order_id'] ?? 0);
+        $staffNote = (string)($_POST['staff_note'] ?? '');
+        if ($orderId <= 0) {
+            staffOrdersRedirectWithFlash('備註更新失敗：資料不正確。');
+        }
+        if (!$hasStaffNoteColumn) {
+            staffOrdersRedirectWithFlash('目前資料表缺少 staff_note 欄位。');
+        }
+
+        try {
+            $stmt = $pdo->prepare("UPDATE orders SET staff_note = :note, updated_at = NOW() WHERE id = :id");
+            $stmt->execute([':note' => $staffNote, ':id' => $orderId]);
+            staffOrdersRedirectWithFlash('訂單備註已更新。');
+        } catch (Throwable $e) {
+            staffOrdersRedirectWithFlash('備註更新失敗。');
+        }
+    } else {
+        staffOrdersRedirectWithFlash('不支援的操作。');
+    }
+}
 
 $orders = [];
 try {
     $staffNoteSelect = $hasStaffNoteColumn ? "o.staff_note" : "NULL AS staff_note";
-    $sql = "SELECT o.id, o.final_amount, o.status, o.created_at, {$staffNoteSelect},
-                   u.name AS user_name
+    $sql = "SELECT o.id, o.final_amount, o.status, o.created_at, o.payment_method, o.shipping_method, o.shipping_address, o.pickup_store, {$staffNoteSelect},
+                   u.name AS user_name,
+                   u.username AS user_username
             FROM orders o
             LEFT JOIN users u ON u.id = o.user_id
             WHERE 1=1";
@@ -167,7 +116,11 @@ try {
         $params[':status'] = $status;
     }
     if ($q !== '') {
-        $sql .= " AND (CAST(o.id AS CHAR) LIKE :q OR u.name LIKE :q)";
+        $sql .= " AND (
+                    CAST(o.id AS CHAR) LIKE :q
+                    OR u.name LIKE :q
+                    OR u.username LIKE :q
+                )";
         $params[':q'] = '%' . $q . '%';
     }
     $sql .= " ORDER BY o.created_at DESC LIMIT 100";
@@ -175,6 +128,15 @@ try {
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($orders as &$order) {
+        $detailStmt = $pdo->prepare("SELECT oi.product_id, oi.quantity, oi.unit_price, oi.subtotal, oi.size, p.name AS product_name
+                                     FROM order_items oi
+                                     INNER JOIN products p ON oi.product_id = p.id
+                                     WHERE oi.order_id = :order_id");
+        $detailStmt->execute([':order_id' => (int)$order['id']]);
+        $order['items'] = $detailStmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+    unset($order);
 } catch (Throwable $e) {
     $orders = [];
 }
@@ -190,14 +152,14 @@ staffPageStart($pdo, '訂單管理', 'orders');
             type="text"
             name="q"
             class="staff-input"
-            placeholder="搜尋訂單編號 / 會員"
+            placeholder="搜尋訂單編號 / 會員名稱 / 會員帳號"
             value="<?php echo htmlspecialchars($q); ?>"
         >
         <select name="status" class="staff-select">
-            <option value="">全部狀態</option>
+            <option value="">全部</option>
             <?php foreach ($allowedStatuses as $item): ?>
                 <option value="<?php echo htmlspecialchars($item); ?>" <?php echo $status === $item ? 'selected' : ''; ?>>
-                    <?php echo htmlspecialchars(staffStatusLabel($item)); ?>
+                    <?php echo htmlspecialchars(get_order_status_text($item)); ?>
                 </option>
             <?php endforeach; ?>
         </select>
@@ -220,18 +182,31 @@ staffPageStart($pdo, '訂單管理', 'orders');
             <tbody>
                 <?php if (empty($orders)): ?>
                     <tr>
-                        <td colspan="7">目前沒有符合條件的訂單。</td>
+                        <td colspan="7"><?php echo $q !== '' ? '查無符合搜尋條件的訂單。' : '目前沒有符合條件的訂單。'; ?></td>
                     </tr>
                 <?php else: ?>
-                        <?php foreach ($orders as $order): ?>
-                            <?php $isCancelable = in_array((string)($order['status'] ?? ''), $cancelableOrderStatuses, true); ?>
+                    <?php foreach ($orders as $order): ?>
+                        <?php
+                            $orderStatus = (string)($order['status'] ?? '');
+                            $statusKey = get_order_status_key($orderStatus);
+                            $statusClass = get_order_status_class($orderStatus);
+                            $isLocked = in_array($statusKey, $lockedStatuses, true);
+                            $orderId = (int)$order['id'];
+                            $paymentMap = ['credit_card' => '信用卡', 'cod' => '貨到付款'];
+                            $shippingMap = ['pickup' => '超商取貨', 'home' => '宅配到府'];
+                        ?>
                         <tr>
-                            <td>#<?php echo (int)$order['id']; ?></td>
-                            <td><?php echo htmlspecialchars((string)($order['user_name'] ?? '訪客')); ?></td>
+                            <td>#<?php echo $orderId; ?></td>
+                            <td>
+                                <?php echo htmlspecialchars((string)($order['user_name'] ?? '訪客')); ?>
+                                <?php if (!empty($order['user_username'])): ?>
+                                    <br><small>@<?php echo htmlspecialchars((string)$order['user_username']); ?></small>
+                                <?php endif; ?>
+                            </td>
                             <td><?php echo htmlspecialchars(staffCurrency((float)($order['final_amount'] ?? 0))); ?></td>
                             <td>
-                                <span class="staff-badge <?php echo staffStatusBadgeClass((string)($order['status'] ?? '')); ?>">
-                                    <?php echo htmlspecialchars(staffStatusLabel((string)($order['status'] ?? 'unknown'))); ?>
+                                <span class="<?php echo htmlspecialchars($statusClass); ?>">
+                                    <?php echo htmlspecialchars(get_order_status_text($orderStatus)); ?>
                                 </span>
                             </td>
                             <td>
@@ -246,35 +221,65 @@ staffPageStart($pdo, '訂單管理', 'orders');
                             </td>
                             <td><?php echo htmlspecialchars(date('Y-m-d H:i', strtotime((string)$order['created_at']))); ?></td>
                             <td>
-                                    <div class="staff-order-actions">
-                                        <?php if ($isCancelable): ?>
-                                            <form method="POST" class="staff-inline-form">
-                                                <input type="hidden" name="action" value="cancel_order">
-                                                <input type="hidden" name="order_id" value="<?php echo (int)$order['id']; ?>">
-                                                <button type="submit" class="staff-action-btn staff-action-btn-danger">取消訂單</button>
-                                            </form>
+                                <div class="staff-order-actions">
+                                    <form method="POST" class="staff-inline-form">
+                                        <input type="hidden" name="action" value="update_status">
+                                        <input type="hidden" name="order_id" value="<?php echo $orderId; ?>">
+                                        <select name="new_status" class="staff-select staff-select-mini" <?php echo $isLocked ? 'disabled' : ''; ?>>
+                                            <?php foreach ($allowedStatuses as $item): ?>
+                                                <option value="<?php echo htmlspecialchars($item); ?>" <?php echo ($statusKey === $item) ? 'selected' : ''; ?>>
+                                                    <?php echo htmlspecialchars(get_order_status_text($item)); ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                        <button type="submit" class="staff-action-btn staff-action-btn-primary" <?php echo $isLocked ? 'disabled' : ''; ?>>更新</button>
+                                    </form>
+                                    <button
+                                        type="button"
+                                        class="staff-action-btn staff-action-btn-muted js-staff-order-toggle"
+                                        data-target="staff-order-details-<?php echo $orderId; ?>"
+                                    >
+                                        查看明細
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr id="staff-order-details-<?php echo $orderId; ?>" class="staff-order-detail-row" style="display:none;">
+                            <td colspan="7">
+                                <div class="order-detail-panel">
+                                    <div class="order-detail-grid">
+                                        <p><strong>付款方式：</strong><?php echo htmlspecialchars($paymentMap[(string)($order['payment_method'] ?? '')] ?? (string)($order['payment_method'] ?? '')); ?></p>
+                                        <p><strong>配送方式：</strong><?php echo htmlspecialchars($shippingMap[(string)($order['shipping_method'] ?? '')] ?? (string)($order['shipping_method'] ?? '')); ?></p>
+                                        <?php if (!empty($order['shipping_address'])): ?>
+                                            <p><strong>配送地址：</strong><?php echo htmlspecialchars((string)$order['shipping_address']); ?></p>
                                         <?php endif; ?>
-
-                                        <form method="POST" class="staff-inline-form">
-                                            <input type="hidden" name="action" value="update_status">
-                                            <input type="hidden" name="order_id" value="<?php echo (int)$order['id']; ?>">
-                                            <select name="new_status" class="staff-select staff-select-mini">
-                                                <?php foreach ($allowedStatuses as $item): ?>
-                                                    <?php
-                                                        $disabledCancel = ($item === 'cancelled' && !$isCancelable);
-                                                    ?>
-                                                    <option
-                                                        value="<?php echo htmlspecialchars($item); ?>"
-                                                        <?php echo ((string)$order['status'] === $item) ? 'selected' : ''; ?>
-                                                        <?php echo $disabledCancel ? 'disabled' : ''; ?>
-                                                    >
-                                                        <?php echo htmlspecialchars(staffStatusLabel($item)); ?>
-                                                    </option>
-                                                <?php endforeach; ?>
-                                            </select>
-                                            <button type="submit" class="staff-action-btn staff-action-btn-primary">更新</button>
-                                        </form>
+                                        <?php if (!empty($order['pickup_store'])): ?>
+                                            <p><strong>取貨門市：</strong><?php echo htmlspecialchars((string)$order['pickup_store']); ?></p>
+                                        <?php endif; ?>
                                     </div>
+                                    <table class="order-detail-table">
+                                        <thead>
+                                            <tr>
+                                                <th>商品名稱</th>
+                                                <th>尺寸</th>
+                                                <th>數量</th>
+                                                <th>單價</th>
+                                                <th>小計</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach (($order['items'] ?? []) as $item): ?>
+                                                <tr>
+                                                    <td><?php echo htmlspecialchars((string)($item['product_name'] ?? '')); ?></td>
+                                                    <td><?php echo htmlspecialchars(formatCartSizeForDisplay((string)($item['size'] ?? ''))); ?></td>
+                                                    <td><?php echo htmlspecialchars((string)($item['quantity'] ?? '0')); ?></td>
+                                                    <td><?php echo htmlspecialchars(staffCurrency((float)($item['unit_price'] ?? 0))); ?></td>
+                                                    <td><?php echo htmlspecialchars(staffCurrency((float)($item['subtotal'] ?? 0))); ?></td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </td>
                         </tr>
                     <?php endforeach; ?>
@@ -283,5 +288,16 @@ staffPageStart($pdo, '訂單管理', 'orders');
         </table>
     </div>
 </section>
+<script>
+document.addEventListener('click', function (e) {
+    const btn = e.target.closest('.js-staff-order-toggle');
+    if (!btn) return;
+    const targetId = btn.getAttribute('data-target');
+    const row = targetId ? document.getElementById(targetId) : null;
+    if (!row) return;
+    const isHidden = row.style.display === 'none' || row.style.display === '';
+    row.style.display = isHidden ? 'table-row' : 'none';
+    btn.textContent = isHidden ? '收起明細' : '查看明細';
+});
+</script>
 <?php staffPageEnd(); ?>
-

@@ -33,8 +33,8 @@ if ($submitted) {
 
     if (!$token_valid) {
         // 若 token 已失效，維持前面錯誤訊息
-    } elseif (strlen($new_password) < 8) {
-        $error = '密碼長度至少需要 8 碼';
+    } elseif (strlen($new_password) < 6) {
+        $error = '密碼長度至少需要 6 碼';
     } elseif ($new_password !== $confirm_password) {
         $error = '兩次輸入的密碼不一致';
     } else {
@@ -94,7 +94,7 @@ if ($submitted) {
                             class="form-input"
                             placeholder="請輸入新密碼"
                             required
-                            minlength="8"
+                            minlength="6"
                             autocomplete="new-password"
                         >
                     </div>
@@ -108,7 +108,7 @@ if ($submitted) {
                             class="form-input"
                             placeholder="請再次輸入新密碼"
                             required
-                            minlength="8"
+                            minlength="6"
                             autocomplete="new-password"
                         >
                     </div>
@@ -158,8 +158,8 @@ if ($submitted) {
                     return false;
                 }
 
-                if (password.length < 8) {
-                    setError('密碼長度至少需要 8 碼');
+                if (password.length < 6) {
+                    setError('密碼長度至少需要 6 碼');
                     return false;
                 }
 
@@ -179,7 +179,7 @@ if ($submitted) {
                 hasSubmitted = true;
                 if (!validatePasswords()) {
                     e.preventDefault();
-                    if (!passwordInput.value || passwordInput.value.length < 8) {
+                    if (!passwordInput.value || passwordInput.value.length < 6) {
                         passwordInput.focus();
                     } else {
                         confirmInput.focus();

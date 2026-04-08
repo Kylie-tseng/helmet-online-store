@@ -1,7 +1,6 @@
 <?php
 require_once 'config.php';
 require_once 'includes/cart_functions.php';
-require_once 'includes/navbar.php';
 require_once 'includes/product_query_helpers.php';
 
 // 檢查是否已登入
@@ -22,7 +21,7 @@ $order_id = $_SESSION['pending_order_id'];
 
 // 查詢訂單資料
 try {
-    $stmt = $pdo->prepare("SELECT * FROM orders WHERE id = :order_id AND user_id = :user_id AND status = 'pending_payment'");
+    $stmt = $pdo->prepare("SELECT * FROM orders WHERE id = :order_id AND user_id = :user_id AND payment_method = 'credit_card' AND status = 'pending'");
     $stmt->execute([':order_id' => $order_id, ':user_id' => $user_id]);
     $order = $stmt->fetch();
     
@@ -50,7 +49,6 @@ try {
 }
 
 // 處理付款表單提交
-$payment_success = false;
 $payment_error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_payment'])) {
@@ -75,25 +73,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_payment'])) {
     }
     
     if (empty($errors)) {
+        $payment_updated = false;
         try {
-            // 1. 更新訂單狀態
             $stmt = $pdo->prepare("UPDATE orders SET status = 'paid', updated_at = NOW() WHERE id = :order_id AND user_id = :user_id");
             $stmt->execute([':order_id' => $order_id, ':user_id' => $user_id]);
-            
-            include 'send_order.php';
-            
-            // 清除 session
+            $payment_updated = true;
+        } catch (PDOException $e) {
+            $payment_error = '付款處理時發生錯誤：' . $e->getMessage();
+        }
+        if ($payment_updated) {
+            include __DIR__ . '/send_order.php';
+            $stmt = $pdo->prepare("DELETE FROM cart WHERE user_id = :user_id");
+            $stmt->execute([':user_id' => $user_id]);
             unset($_SESSION['pending_order_id']);
             unset($_SESSION['checkout_data']);
             if (function_exists('clearAppliedCoupon')) {
                 clearAppliedCoupon();
             }
-            
-            // 4. 關鍵：設定成功 flag，讓下方 HTML 顯示成功資訊，不執行跳轉
-            $payment_success = true;
-            
-        } catch (PDOException $e) {
-            $payment_error = '付款處理時發生錯誤：' . $e->getMessage();
+            $success_oid = (int)$order_id;
+            echo '<!DOCTYPE html><html lang="zh-TW"><head><meta charset="UTF-8"><meta http-equiv="refresh" content="0;url=order_success.php?order_id=' . $success_oid . '"><script>window.location.href=\'order_success.php?order_id=' . $success_oid . '\';</script></head><body></body></html>';
+            exit;
         }
     } else {
         $payment_error = implode('<br>', $errors);
@@ -112,6 +111,8 @@ try {
     $categories = [];
     $parts_category_id = null;
 }
+
+require_once 'includes/navbar.php';
 ?>
 <!DOCTYPE html>
 <html lang="zh-TW">
@@ -126,69 +127,9 @@ try {
 
     <div class="checkout-container">
         <div class="container">
-            <h1 class="checkout-page-title"><?php echo $payment_success ? '訂單建立成功' : '信用卡繳費'; ?></h1>
+            <h1 class="checkout-page-title">信用卡繳費</h1>
             
-            <?php if ($payment_success): ?>
-                <div class="order-success">
-                    <h2>付款成功！訂單已建立!</h2>
-                    <p>訂單編號：<?php echo htmlspecialchars($order_id); ?></p>
-                    <p>感謝您的購買，我們將盡快為您處理訂單。</p>
-                    
-                    <div class="checkout-summary-panel">
-                        <h3 class="checkout-summary-title">付款明細</h3>
-                        <div class="order-summary">
-                            <div class="summary-row">
-                                <span class="summary-label">訂單編號：</span>
-                                <span class="summary-value">#<?php echo htmlspecialchars($order_id); ?></span>
-                            </div>
-                            <div class="summary-row summary-total">
-                                <span class="summary-label">訂單總金額：</span>
-                                <span class="summary-value summary-total">NT$ <?php echo number_format(get_order_payable_amount($order), 0); ?></span>
-                            </div>
-                        </div>
-
-                        <button
-                            type="button"
-                            class="checkout-summary-items-toggle"
-                            data-checkout-items-toggle="1"
-                            data-checkout-items-target="paymentItemsList"
-                            aria-expanded="false"
-                        >
-                            <span>查看商品清單</span>
-                            <svg class="checkout-summary-items-chevron" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                                <path d="M6 9L12 15L18 9" stroke="#333333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
-                        </button>
-
-                        <div id="paymentItemsList" class="checkout-summary-items" aria-hidden="true">
-                            <div class="checkout-summary-items-inner">
-                                <?php foreach ($order_items as $oi): 
-                                    $oi_subtotal = isset($oi['subtotal']) ? (float)$oi['subtotal'] : ((float)$oi['unit_price'] * (int)$oi['quantity']);
-                                ?>
-                                    <div class="checkout-summary-items-row">
-                                        <div class="checkout-summary-items-left">
-                                            <div class="checkout-summary-items-name"><?php echo htmlspecialchars($oi['product_name']); ?></div>
-                                            <div class="checkout-summary-items-meta">
-                                                <?php echo htmlspecialchars(formatCartSizeForDisplay($oi['size'] ?? '')); ?>
-                                                &nbsp;|&nbsp; Qty: <?php echo (int)$oi['quantity']; ?>
-                                            </div>
-                                        </div>
-                                        <div class="checkout-summary-items-right">
-                                            <div class="checkout-summary-items-amount">NT$ <?php echo number_format($oi_subtotal, 0); ?></div>
-                                        </div>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="order-success-actions">
-                        <a href="products.php" class="btn-primary">繼續購物</a>
-                        <a href="profile.php?tab=orders" class="btn-secondary">查看訂單</a>
-                    </div>
-                </div>
-            <?php else: ?>
-                <div class="payment-summary">
+            <div class="payment-summary">
                     <h2 class="section-title">訂單摘要</h2>
                     <div class="order-summary">
                         <div class="summary-row">
@@ -242,7 +183,7 @@ try {
                         <div class="error-message"><?php echo $payment_error; ?></div>
                     <?php endif; ?>
 
-                    <form method="POST" class="payment-form">
+                    <form method="POST" action="payment_credit_card.php" class="payment-form">
                         <div class="form-group">
                             <label class="form-label">卡號 <span class="required">*</span></label>
                             <input type="text" name="card_number" class="form-input" placeholder="0000 0000 0000 0000" maxlength="19" required>
@@ -267,7 +208,6 @@ try {
                         </div>
                     </form>
                 </div>
-            <?php endif; ?>
         </div>
     </div>
 

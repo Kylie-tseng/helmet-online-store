@@ -3673,6 +3673,710 @@ input[type="button"]:hover,
     flex-wrap: wrap;
 }
 
+/* 前台會員中心：訂單管理新版卡片（僅訂單分頁） */
+.member-orders .account-order-card {
+    padding: 18px 20px;
+    border-radius: 16px;
+    border: 1px solid #e8ebef;
+    box-shadow: 0 3px 14px rgba(17, 24, 39, 0.04);
+    background: #fff;
+}
+
+.member-orders .account-order-header {
+    padding-bottom: 10px;
+}
+
+.member-orders .account-order-header-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.account-order-id {
+    font-size: 17px;
+    font-weight: 900;
+    color: #111827;
+}
+
+.account-order-status {
+    justify-self: center;
+}
+
+.account-order-total {
+    font-size: 19px;
+    font-weight: 900;
+    color: #111827;
+    justify-self: end;
+}
+
+.account-order-meta {
+    margin-top: 6px;
+    font-size: 13px;
+    color: #6b7280;
+}
+
+.member-orders .account-order-body {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr;
+    gap: 32px;
+    padding-top: 10px;
+}
+
+.member-orders .account-order-products {
+    min-width: 0;
+}
+
+.member-orders .account-order-side {
+    min-width: 0;
+}
+
+.account-order-product {
+    padding: 10px 0;
+    border-bottom: 1px solid #eef2f6;
+}
+
+.account-order-product:last-child {
+    border-bottom: 0;
+}
+
+.account-order-product-name {
+    font-size: 15px;
+    font-weight: 700;
+    color: #111827;
+}
+
+.account-order-product-row {
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.account-order-product-meta {
+    color: #6b7280;
+    font-size: 13px;
+}
+
+.account-order-product-price {
+    color: #111827;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.account-order-section {
+    margin-bottom: 12px;
+}
+
+.account-order-section:last-child {
+    margin-bottom: 0;
+}
+
+.account-order-section h4 {
+    margin: 0 0 6px;
+    font-size: 13px;
+    color: #374151;
+    font-weight: 800;
+}
+
+.account-order-section p {
+    margin: 0 0 5px;
+    font-size: 13px;
+    color: #4b5563;
+    line-height: 1.5;
+}
+
+.member-orders .account-order-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.member-orders .account-order-detail {
+    margin-top: 12px;
+    border-top: 1px solid #eceff3;
+    padding-top: 12px;
+}
+
+.member-orders .account-order-detail .order-detail-table {
+    margin-top: 0;
+}
+
+.member-orders .account-order-detail .order-detail-table th {
+    background: #f7f8fa;
+}
+
+.member-orders .account-order-detail .order-detail-table td,
+.member-orders .account-order-detail .order-detail-table th {
+    border-left: 0;
+    border-right: 0;
+}
+
+/* 前台會員中心：極簡列表式訂單（覆蓋舊卡片感） */
+.account-orders-list {
+    display: block;
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+    min-height: unset !important;
+}
+
+.account-orders-shell {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    padding: 0 !important;
+    margin: 0 !important;
+    min-height: unset !important;
+}
+
+/* 訂單管理白卡高度再壓縮 */
+.member-main-card .account-orders-shell {
+    padding-top: 2px !important;
+    padding-bottom: 2px !important;
+}
+
+.member-orders-toolbar {
+    margin-bottom: 10px !important;
+    padding-bottom: 6px !important;
+}
+
+.account-orders-list .account-order-row {
+    padding: 10px 0 !important;
+    min-height: auto !important;
+    align-items: center;
+    border-bottom: 1px solid #e8ebef;
+}
+
+.account-orders-list .account-order-row:first-child {
+    margin-top: 0 !important;
+    padding-top: 10px !important;
+}
+
+.account-orders-list .account-order-row:last-child {
+    border-bottom: 0;
+}
+
+/* 訂單管理：移除卡片/摘要 hover 視覺效果 */
+.account-orders-list .account-order-row,
+.account-orders-list .account-order-summary,
+.account-orders-list .order-header,
+.account-orders-list .order-item-card {
+    transition: none !important;
+}
+
+.account-orders-list .account-order-row:hover,
+.account-orders-list .account-order-summary:hover,
+.account-orders-list .order-header:hover,
+.account-orders-list .order-item-card:hover {
+    background: inherit !important;
+    box-shadow: none !important;
+    transform: none !important;
+    transition: none !important;
+}
+
+.account-orders-list .account-order-row {
+    cursor: default;
+}
+
+.account-orders-list .account-order-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+}
+
+.account-orders-list .account-order-header-left {
+    min-width: 0;
+}
+
+.account-orders-list .account-order-header-right {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.account-orders-list .account-order-number {
+    font-size: 17px;
+    font-weight: 600;
+    color: #222;
+}
+
+.account-orders-list .account-order-date {
+    margin-top: 4px;
+    font-size: 13px;
+    color: #6b7280;
+}
+
+.account-orders-list .account-order-amount {
+    font-size: 20px;
+    font-weight: 900;
+    color: #111827;
+}
+
+.account-orders-list .account-order-status .order-status-badge {
+    font-size: 11px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-weight: 600;
+}
+
+.account-orders-list .account-order-actions {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.account-orders-list .account-order-actions .member-btn {
+    min-height: 36px;
+    padding: 8px 14px;
+    border-radius: 999px;
+}
+
+.account-orders-list .account-order-action-secondary {
+    background: #fff;
+    border: 1px solid #d4dae1;
+    color: #374151;
+}
+
+.account-orders-list .account-order-action-secondary:hover {
+    background: #f8fafc;
+}
+
+.account-orders-list .account-order-action-primary {
+    background: #1f2937;
+    border: 1px solid #1f2937;
+    color: #fff;
+}
+
+.account-orders-list .account-order-action-primary:hover {
+    background: #111827;
+    border-color: #111827;
+    color: #fff;
+}
+
+.account-orders-list .account-order-detail {
+    margin-top: 8px;
+    padding-top: 0;
+    border-top: none;
+}
+
+.account-orders-list .account-order-divider {
+    border-top: 1px solid #eef2f6;
+    margin: 8px 0;
+}
+
+.account-orders-list .order-item-img {
+    width: 64px;
+    height: 64px;
+    object-fit: cover;
+    border-radius: 8px;
+    flex: 0 0 64px;
+}
+
+.account-orders-list .order-item-name {
+    font-weight: 600;
+    font-size: 15px;
+    color: #222;
+    margin-bottom: 4px;
+}
+
+.account-orders-list .order-item-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 0;
+    border-bottom: 1px solid #eef2f6;
+    border-radius: 0;
+    margin-bottom: 0;
+    background: #fff;
+}
+
+.account-orders-list .order-item-card:last-child {
+    border-bottom: 0;
+}
+
+.account-orders-list .order-item-content {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.account-orders-list .order-item-meta {
+    color: #666;
+    font-size: 14px;
+    margin-top: 2px;
+    margin-bottom: 0;
+}
+
+.account-orders-list .order-item-price {
+    color: #333;
+    margin-top: 2px;
+}
+
+.account-orders-list .order-item-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 4px;
+}
+
+.account-orders-list .order-item-qty {
+    font-size: 13px;
+    color: #666;
+}
+
+.account-orders-list .subtotal {
+    font-weight: 600;
+    color: #222;
+    font-size: 16px;
+}
+
+.account-orders-list .account-order-meta-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px 18px;
+}
+
+.account-orders-list .account-order-section-title {
+    margin: 0 0 8px;
+    font-size: 19px;
+    font-weight: 600;
+    color: #222;
+}
+
+.account-orders-list .account-order-meta-block h4 {
+    margin: 0 0 12px;
+    font-size: 17px;
+    font-weight: 600;
+    color: #222;
+    letter-spacing: 0.02em;
+}
+
+.account-orders-list .account-order-meta-block p {
+    margin: 0 0 5px;
+    font-size: 15px;
+    color: #444;
+    line-height: 1.5;
+}
+
+.account-orders-list .account-order-meta-block p strong {
+    font-weight: 500;
+    color: #333;
+}
+
+.account-orders-list .account-order-meta-block {
+    margin-bottom: 0;
+    background: #fafbfc;
+    border: 1px solid #edf0f4;
+    border-radius: 14px;
+    padding: 12px 14px;
+    min-height: 220px;
+}
+
+.account-orders-list .account-order-meta-item {
+    margin-bottom: 8px;
+}
+
+.account-orders-list .account-order-meta-item:last-child {
+    margin-bottom: 0;
+}
+
+.account-orders-list .account-order-meta-label {
+    font-size: 12px;
+    color: #6b7280;
+    margin-bottom: 3px;
+}
+
+.account-orders-list .account-order-meta-value {
+    font-size: 14px;
+    color: #222;
+    line-height: 1.5;
+    font-weight: 500;
+}
+
+.account-orders-list .account-order-detail .member-empty-message {
+    padding: 8px 0 0;
+    font-size: 12px;
+    font-weight: 500;
+    color: #6b7280;
+}
+
+.account-orders-list .account-order-note {
+    margin-top: 16px;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    color: #666;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+/* 會員訂單展開區：Apple / MUJI 減法風格 */
+.account-orders-list .order-expanded-content {
+    background: #fff;
+    border-radius: 20px;
+    box-shadow: none;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 12px 0;
+    min-width: 0;
+    position: static;
+    left: auto;
+    right: auto;
+    transform: none;
+}
+
+.account-orders-list .order-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    padding: 6px 0 8px;
+    border-bottom: 1px solid #ececec;
+}
+
+.account-orders-list .order-number {
+    font-size: 18px;
+    font-weight: 600;
+    color: #222;
+}
+
+.account-orders-list .order-date {
+    margin-top: 4px;
+    font-size: 13px;
+    color: #777;
+}
+
+.account-orders-list .order-total {
+    font-size: 18px;
+    font-weight: 600;
+    color: #222;
+    letter-spacing: 0;
+}
+
+.account-orders-list .account-order-row > div {
+    padding: 0 !important;
+}
+
+.account-orders-list .order-header-right {
+    gap: 10px;
+}
+
+.account-orders-list .order-header-actions .member-btn,
+.account-orders-list .order-header-actions button {
+    height: 36px;
+    padding: 0 14px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 600;
+    box-shadow: none;
+}
+
+.account-orders-list .order-products-section {
+    margin-top: 10px;
+    margin-bottom: 10px;
+}
+
+.account-orders-list .order-header + .order-products-section {
+    margin-top: 8px;
+}
+
+.account-orders-list .order-products-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #222;
+    margin-bottom: 8px;
+}
+
+.account-orders-list .order-item-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 0;
+    border: none;
+    border-bottom: 1px solid #efefef;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+.account-orders-list .order-item-card + .order-item-card {
+    margin-top: 2px;
+}
+
+.account-orders-list .order-item-card:last-child {
+    border-bottom: none;
+}
+
+.account-orders-list .order-item-img {
+    width: 56px;
+    height: 56px;
+    border-radius: 10px;
+    object-fit: cover;
+    background: #f7f7f7;
+}
+
+.account-orders-list .order-item-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.account-orders-list .order-item-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: #222;
+    margin-bottom: 2px;
+}
+
+.account-orders-list .order-item-meta {
+    font-size: 14px;
+    color: #777;
+    margin: 0;
+    line-height: 1.4;
+}
+
+.account-orders-list .order-item-unit-price {
+    font-size: 14px;
+    color: #666;
+    margin: 0;
+    line-height: 1.4;
+}
+
+.account-orders-list .order-item-actions {
+    min-width: 110px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 4px;
+}
+
+.account-orders-list .order-item-qty {
+    font-size: 14px;
+    color: #777;
+}
+
+.account-orders-list .order-item-subtotal {
+    font-size: 16px;
+    font-weight: 600;
+    color: #222;
+}
+
+.account-orders-list .order-detail-section {
+    margin-top: 10px;
+    padding-top: 12px;
+    border-top: 1px solid #ececec;
+}
+
+.account-orders-list .order-detail-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #222;
+    margin-bottom: 12px;
+}
+
+.account-orders-list .order-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+}
+
+.account-orders-list .order-detail-card {
+    border: 1px solid #ececec;
+    border-radius: 16px;
+    background: #f7f7f7;
+    padding: 14px 16px;
+    min-height: auto;
+    height: auto;
+}
+
+.account-orders-list .order-detail-card h4 {
+    font-size: 15px;
+    font-weight: 600;
+    color: #222;
+    margin-bottom: 10px;
+}
+
+.account-orders-list .order-detail-item {
+    margin-bottom: 10px;
+}
+
+.account-orders-list .order-detail-label {
+    display: block;
+    font-size: 13px;
+    color: #888;
+    margin-bottom: 2px;
+}
+
+.account-orders-list .order-return-note {
+    margin-top: 10px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.account-orders-list .order-detail-value {
+    display: block;
+    font-size: 15px;
+    color: #222;
+    font-weight: 500;
+    line-height: 1.35;
+}
+
+.order-status-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid #d1d5db;
+    font-size: 12px;
+    font-weight: 800;
+    white-space: nowrap;
+    line-height: 1.2;
+}
+
+.order-status--pending {
+    background: #f5f5f5;
+    color: #444;
+    border-color: #d6d6d6;
+}
+
+.order-status--shipped {
+    background: #eef2f7;
+    color: #1f2937;
+    border-color: #d6deea;
+}
+
+.order-status--completed {
+    background: #edf5ef;
+    color: #14532d;
+    border-color: #cfe4d5;
+}
+
+.order-status--cancelled {
+    background: #f9eded;
+    color: #7f1d1d;
+    border-color: #ebd3d3;
+}
+
 .member-badge {
     display: inline-flex;
     padding: 4px 10px;
@@ -3726,6 +4430,55 @@ input[type="button"]:hover,
 
 .member-order-details-content {
     width: 100%;
+}
+
+.order-detail-panel {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 14px;
+}
+
+.order-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 16px;
+}
+
+.order-detail-grid p {
+    margin: 0;
+    font-size: 14px;
+    color: #2b2b2b;
+}
+
+.order-detail-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 14px;
+}
+
+.order-detail-table thead {
+    background-color: #f5f6fa;
+}
+
+.order-detail-table th {
+    padding: 11px 10px;
+    text-align: left;
+    font-size: 14px;
+    font-weight: 900;
+    color: #333;
+    border-bottom: 2px solid #e5e7eb;
+}
+
+.order-detail-table td {
+    padding: 11px 10px;
+    font-size: 14px;
+    color: #2b2b2b;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.staff-page .staff-order-detail-row > td {
+    background: #f9fafb;
 }
 
 .member-order-meta p {
@@ -3914,6 +4667,65 @@ input[type="button"]:hover,
     .member-order-actions {
         flex-direction: column;
         align-items: stretch;
+    }
+
+    .member-orders .account-order-header-top {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .member-orders .account-order-status,
+    .member-orders .account-order-total {
+        justify-self: auto;
+    }
+
+    .member-orders .account-order-body {
+        grid-template-columns: 1fr;
+        gap: 14px;
+    }
+
+    .member-orders .account-order-actions .member-inline-form,
+    .member-orders .account-order-actions .member-btn,
+    .member-orders .account-order-actions .member-inline-form button {
+        width: 100%;
+    }
+
+    .account-orders-list .account-order-summary {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .account-orders-list .account-order-header-right {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .account-orders-list .account-order-actions .member-inline-form,
+    .account-orders-list .account-order-actions .member-btn,
+    .account-orders-list .account-order-actions .member-inline-form button {
+        width: 100%;
+    }
+
+    .account-orders-list .order-item-img {
+        width: 64px;
+        height: 64px;
+        flex-basis: 64px;
+    }
+
+    .account-orders-list .order-item-card {
+        gap: 12px;
+        padding: 12px;
+        align-items: flex-start;
+    }
+
+    .account-orders-list .order-item-actions {
+        align-items: flex-start;
+    }
+
+    .account-orders-list .account-order-meta-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
     }
 
     .member-coupons-grid {
@@ -7091,6 +7903,82 @@ body.auth-page .register-footer {
     font-size: 13px;
 }
 
+/* 註冊頁表單間距微調（僅作用於註冊頁） */
+body.auth-register-page .form-group {
+    margin-bottom: 16px;
+}
+
+body.auth-register-page .form-label {
+    display: block;
+    margin-bottom: 6px;
+}
+
+body.auth-register-page .form-group .form-input {
+    margin-bottom: 0;
+}
+
+/* 帳號可用性提示為空時不佔高度，避免撐開「帳號」與「姓名」距離 */
+body.auth-register-page .auth-username-status {
+    margin-top: 4px;
+    min-height: 0;
+}
+
+body.auth-register-page .auth-username-status:empty {
+    display: none;
+}
+
+/* 重設密碼成功頁：前往登入按鈕文字維持白色 */
+body.auth-reset-password-page .login-footer .login-btn.auth-gradient-btn,
+body.auth-reset-password-page .login-footer .login-btn.auth-gradient-btn:hover {
+    color: #fff !important;
+}
+
+/* =========================================
+   Coupon page button final override (LAST)
+   ========================================= */
+body .coupon-page-directory .coupon-card__actions > button.coupon-item-btn,
+body .coupon-page-directory .coupon-card__actions > .coupon-item-btn.coupon-item-btn-primary,
+body .coupon-page-directory .coupon-card__actions > .js-claim-coupon,
+body .coupon-page-directory .coupon-card__actions > :first-child {
+    background: #475569 !important;
+    background-color: #475569 !important;
+    color: #ffffff !important;
+    border: 1px solid #475569 !important;
+    box-shadow: none !important;
+    border-radius: 12px !important;
+    -webkit-appearance: none !important;
+    appearance: none !important;
+}
+
+body .coupon-page-directory .coupon-card__actions > button.coupon-item-btn:hover,
+body .coupon-page-directory .coupon-card__actions > .coupon-item-btn.coupon-item-btn-primary:hover,
+body .coupon-page-directory .coupon-card__actions > .js-claim-coupon:hover,
+body .coupon-page-directory .coupon-card__actions > :first-child:hover {
+    background: #334155 !important;
+    background-color: #334155 !important;
+    border-color: #334155 !important;
+    color: #ffffff !important;
+}
+
+body .coupon-page-directory .coupon-card__actions > a.coupon-item-btn,
+body .coupon-page-directory .coupon-card__actions > .coupon-item-btn.coupon-item-btn-secondary,
+body .coupon-page-directory .coupon-card__actions > :last-child {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #475569 !important;
+    border: 1px solid #cbd5e1 !important;
+    box-shadow: none !important;
+    border-radius: 12px !important;
+}
+
+body .coupon-page-directory .coupon-card__actions > a.coupon-item-btn:hover,
+body .coupon-page-directory .coupon-card__actions > .coupon-item-btn.coupon-item-btn-secondary:hover,
+body .coupon-page-directory .coupon-card__actions > :last-child:hover {
+    background: #f8fafc !important;
+    color: #475569 !important;
+    border-color: #cbd5e1 !important;
+}
+
 /* =========================================
    Staff Mode (Site-native extension)
    ========================================= */
@@ -7770,6 +8658,10 @@ body.staff-page .staff-navbar-logout {
 .staff-page .staff-badge.done { background: #edf5ef; color: #14532d; }
 .staff-page .staff-badge.danger { background: #f9eded; color: #7f1d1d; }
 
+.staff-page .order-detail-panel {
+    margin: 8px 0;
+}
+
 @media (max-width: 768px) {
     .staff-page .staff-workspace {
         padding-top: 10px;
@@ -7799,6 +8691,10 @@ body.staff-page .staff-navbar-logout {
 
     .staff-page .staff-size-row {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .order-detail-grid {
+        grid-template-columns: 1fr;
     }
 }
 
@@ -8325,11 +9221,11 @@ body.staff-page .staff-navbar-logout {
     min-width: 118px;
 }
 
-.offer-hero.offer-new-member .offer-hero-bg { background-image: url('images/index2.jpg'); }
+.offer-hero.offer-new-member .offer-hero-bg { background-image: url('../images/index2.jpg?v=5'); }
 .offer-hero.offer-anniversary .offer-hero-bg { background-image: url('images/index_helmet.jpg'); }
 .offer-hero.offer-discount .offer-hero-bg { background-image: url('images/index3.jpg'); }
-.offer-hero.offer-rider .offer-hero-bg { background-image: url('images/index4.jpg'); }
-.offer-hero.offer-shipping .offer-hero-bg { background-image: url('images/index5.jpg'); }
+.offer-hero.offer-rider .offer-hero-bg { background-image: url('../images/index4.jpg?v=5'); }
+.offer-hero.offer-shipping .offer-hero-bg { background-image: url('../images/index5.jpg?v=4'); }
 
 @media (max-width: 1024px) {
     .offer-summary-grid,
@@ -10325,6 +11221,231 @@ body.staff-page .staff-navbar-logout {
     background: #f3f6fa;
     border-color: #8ea2b8;
     color: #33465f !important;
+}
+
+/* =========================================
+   Coupons Directory Page - Claim button only
+   (避免影響「查看詳情」與全站其他按鈕)
+   ========================================= */
+.coupon-page-directory .coupon-card__actions .coupon-item-btn-primary.js-claim-coupon {
+    background: #3A5A78 !important;
+    color: #fff !important;
+    border-color: #3A5A78 !important;
+    border: none !important;
+    border-radius: 10px !important;
+    padding: 10px 18px !important;
+    font-weight: 600 !important;
+    height: auto !important;
+    line-height: 1.2 !important;
+}
+
+.coupon-page-directory .coupon-card__actions .coupon-item-btn-primary.js-claim-coupon:hover {
+    background: #2F4F6F !important;
+    border-color: #2F4F6F !important;
+}
+
+/* 已領取狀態（相容 Cursor 先前可能加的 claimed / is-claimed） */
+.coupon-page-directory .coupon-card__actions .coupon-item-btn-primary.js-claim-coupon.is-claimed,
+.coupon-page-directory .coupon-card__actions .coupon-item-btn-primary.js-claim-coupon.claimed,
+.coupon-page-directory .coupon-card__actions .coupon-item-btn-primary.js-claim-coupon:disabled {
+    background: #ccc !important;
+    color: #666 !important;
+    border-color: #ccc !important;
+    cursor: not-allowed !important;
+    transform: none !important;
+}
+
+.coupon-page-directory .coupon-card__actions .coupon-item-btn-primary.js-claim-coupon:disabled:hover,
+.coupon-page-directory .coupon-card__actions .coupon-item-btn-primary.js-claim-coupon.is-claimed:hover,
+.coupon-page-directory .coupon-card__actions .coupon-item-btn-primary.js-claim-coupon.claimed:hover {
+    background: #ccc !important;
+    border-color: #ccc !important;
+}
+
+/* =========================================
+   Global text hierarchy: black + blue focus
+   ========================================= */
+body {
+    color: #1a1a1a;
+}
+
+p, li, td, th, label, input, textarea, select {
+    color: #222;
+}
+
+small,
+.member-empty-message,
+.account-orders-list .account-order-meta-block p,
+.favorites-page .favorites-header p,
+.favorites-page .favorites-empty p {
+    color: #666 !important;
+}
+
+/* 主要標題/粗體重點改回黑色 */
+.member-toolbar-title,
+.account-orders-list .account-order-amount,
+.account-orders-list .account-order-section-title,
+.member-coupon-title,
+.coupon-page-directory .coupon-title,
+.coupon-page-directory .coupon-subtitle,
+.offer-new-member-page .nm-simple-coupon-title,
+.offer-new-member-page .nm-simple-coupon-subtitle {
+    color: #1a1a1a !important;
+    font-weight: 700 !important;
+}
+
+/* 優惠券區按鈕恢復藍色主題 */
+.coupon-page-directory .coupon-item-btn-primary {
+    background: #3A5A78 !important;
+    border-color: #3A5A78 !important;
+    color: #fff !important;
+}
+
+.coupon-page-directory .coupon-item-btn-primary:hover {
+    background: #2F4F6F !important;
+    border-color: #2F4F6F !important;
+}
+
+.coupon-page-directory .coupon-item-btn-secondary {
+    background: #fff !important;
+    border-color: #3A5A78 !important;
+    color: #3A5A78 !important;
+}
+
+.coupon-page-directory .coupon-item-btn-secondary:hover {
+    background: #f6f9fc !important;
+    border-color: #2F4F6F !important;
+    color: #2F4F6F !important;
+}
+
+/* 優惠券頁右側雙按鈕統一（深灰主按鈕 + 淡灰次按鈕） */
+.coupon-page-directory .coupon-card__actions .coupon-item-btn-primary,
+.coupon-page-directory .coupon-card__actions .coupon-item-btn-primary.js-claim-coupon {
+    background-color: #2f2f2f !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 12px !important;
+    padding: 10px 18px !important;
+    font-weight: 500 !important;
+}
+
+.coupon-page-directory .coupon-card__actions .coupon-item-btn-primary:hover,
+.coupon-page-directory .coupon-card__actions .coupon-item-btn-primary.js-claim-coupon:hover {
+    background-color: #1f1f1f !important;
+}
+
+.coupon-page-directory .coupon-card__actions .coupon-item-btn-secondary {
+    background-color: #ffffff !important;
+    color: #333 !important;
+    border: 1px solid #cfd6dd !important;
+    border-radius: 12px !important;
+    padding: 10px 18px !important;
+}
+
+.coupon-page-directory .coupon-card__actions .coupon-item-btn-secondary:hover {
+    background-color: #f7f7f7 !important;
+    color: #333 !important;
+    border-color: #cfd6dd !important;
+}
+
+/* 使用實際 DOM 結構強制覆蓋：actions 第一顆(領取) / 第二顆(詳情) */
+.coupon-page-directory .coupon-card__actions > :first-child {
+    background-color: #2f2f2f !important;
+    color: #fff !important;
+    border: none !important;
+    border-radius: 12px !important;
+    box-shadow: none !important;
+}
+
+.coupon-page-directory .coupon-card__actions > :first-child:hover {
+    background-color: #1f1f1f !important;
+    color: #fff !important;
+}
+
+.coupon-page-directory .coupon-card__actions > :last-child {
+    background-color: #fff !important;
+    color: #334155 !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 12px !important;
+    box-shadow: none !important;
+}
+
+.coupon-page-directory .coupon-card__actions > :last-child:hover {
+    background-color: #f8fafc !important;
+    color: #334155 !important;
+    border-color: #cbd5e1 !important;
+}
+
+/* =========================================
+   Favorites Page UI Optimization
+   (scoped to favorites page only)
+   ========================================= */
+.favorites-page .favorites-header,
+.favorites-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.favorites-page .favorites-header h1,
+.favorites-header h1 {
+    font-size: 28px;
+    font-weight: 700;
+}
+
+.favorites-page .favorites-header p,
+.favorites-header p {
+    color: #777;
+    font-size: 14px;
+}
+
+.favorites-page .favorites-container,
+.favorites-container {
+    max-width: 900px;
+    margin: 40px auto;
+    background: #fff;
+    border-radius: 12px;
+    padding: 40px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+
+.favorites-page .favorites-empty,
+.favorites-empty {
+    text-align: center;
+    padding: 40px 20px;
+}
+
+.favorites-page .empty-icon,
+.empty-icon {
+    font-size: 40px;
+    color: #bbb;
+    margin-bottom: 10px;
+}
+
+.favorites-page .favorites-empty h3,
+.favorites-empty h3 {
+    font-size: 20px;
+    margin-bottom: 10px;
+}
+
+.favorites-page .favorites-empty p,
+.favorites-empty p {
+    color: #777;
+    margin-bottom: 20px;
+}
+
+.favorites-page .favorites-btn,
+.favorites-btn {
+    display: inline-block;
+    background: #222;
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 8px;
+    text-decoration: none;
+}
+
+.favorites-page .favorites-btn:hover,
+.favorites-btn:hover {
+    background: #333;
 }
 
 @media (max-width: 992px) {
@@ -13380,5 +14501,49 @@ body.home-page,
     .product-review-meta {
         align-items: flex-start;
     }
+}
+
+/* ===== FINAL END OVERRIDE: Coupon right actions ===== */
+body .coupon-page-directory .coupon-card__actions > button.coupon-item-btn,
+body .coupon-page-directory .coupon-card__actions > .coupon-item-btn.coupon-item-btn-primary,
+body .coupon-page-directory .coupon-card__actions > .js-claim-coupon,
+body .coupon-page-directory .coupon-card__actions > :first-child {
+    background: #475569 !important;
+    background-color: #475569 !important;
+    color: #ffffff !important;
+    border: 1px solid #475569 !important;
+    box-shadow: none !important;
+    border-radius: 12px !important;
+    -webkit-appearance: none !important;
+    appearance: none !important;
+}
+
+body .coupon-page-directory .coupon-card__actions > button.coupon-item-btn:hover,
+body .coupon-page-directory .coupon-card__actions > .coupon-item-btn.coupon-item-btn-primary:hover,
+body .coupon-page-directory .coupon-card__actions > .js-claim-coupon:hover,
+body .coupon-page-directory .coupon-card__actions > :first-child:hover {
+    background: #334155 !important;
+    background-color: #334155 !important;
+    border-color: #334155 !important;
+    color: #ffffff !important;
+}
+
+body .coupon-page-directory .coupon-card__actions > a.coupon-item-btn,
+body .coupon-page-directory .coupon-card__actions > .coupon-item-btn.coupon-item-btn-secondary,
+body .coupon-page-directory .coupon-card__actions > :last-child {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #475569 !important;
+    border: 1px solid #cbd5e1 !important;
+    box-shadow: none !important;
+    border-radius: 12px !important;
+}
+
+body .coupon-page-directory .coupon-card__actions > a.coupon-item-btn:hover,
+body .coupon-page-directory .coupon-card__actions > .coupon-item-btn.coupon-item-btn-secondary:hover,
+body .coupon-page-directory .coupon-card__actions > :last-child:hover {
+    background: #f8fafc !important;
+    color: #475569 !important;
+    border-color: #cbd5e1 !important;
 }
 

@@ -53,20 +53,25 @@ try {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>收藏商品 - HelmetVRse</title>
-    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/style.css?v=<?php echo urlencode((string)@filemtime(__DIR__ . '/assets/css/style.css')); ?>">
 </head>
-<body>
+<body class="favorites-page">
 <?php renderNavbar($pdo, $categories, $parts_category_id); ?>
 
     <section class="products-section">
-        <div class="container">
-            <div class="section-header">
-                <h1 class="section-title">收藏商品</h1>
-                <p class="section-subtitle">你已收藏的商品都在這裡</p>
+        <div class="container favorites-container">
+            <div class="favorites-header">
+                <h1>收藏商品</h1>
+                <p>將喜歡的商品加入收藏，隨時回來查看與購買</p>
             </div>
 
             <?php if (empty($favorites)): ?>
-                <div class="empty-message">目前尚無收藏商品，快去逛逛商品吧。</div>
+                <div class="favorites-empty">
+                    <div class="empty-icon">♡</div>
+                    <h3>還沒有收藏商品</h3>
+                    <p>快去挑選你喜歡的安全帽吧！</p>
+                    <a href="products.php" class="favorites-btn">開始逛逛</a>
+                </div>
             <?php else: ?>
                 <div class="products-grid">
                     <?php foreach ($favorites as $item): ?>

@@ -21,6 +21,8 @@ try {
 } catch (PDOException $e) {
     // ignore
 }
+
+$index2AboutImgVer = (string)(@filemtime(__DIR__ . '/assets/images/index2.jpg') ?: time());
 ?>
 <!DOCTYPE html>
 <html lang="zh-TW">
@@ -36,7 +38,7 @@ try {
     <main class="about-main">
         <section class="about-hero-section">
             <div class="about-hero-media">
-                <img src="assets/images/index2.jpg" alt="HelmetVRse 品牌主視覺">
+                <img src="assets/images/index2.jpg?v=<?php echo urlencode($index2AboutImgVer); ?>" alt="HelmetVRse 品牌主視覺">
             </div>
             <div class="about-hero-overlay">
                 <div class="about-container">
