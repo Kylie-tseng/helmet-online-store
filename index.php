@@ -52,6 +52,94 @@ try {
     $hotProducts = [];
 }
 
+// 熱門商品固定 6 個：移除配件，優先包含「通勤半罩」與「競速半罩」
+try {
+    // 先移除周邊與配件
+    $hotProducts = array_values(array_filter($hotProducts, function ($hp) {
+        return (string)($hp['category_name'] ?? '') !== '周邊與配件';
+    }));
+
+    // 補入半罩式的通勤/競速商品（各取 1）
+    $targetProducts = [];
+    $stmt = $pdo->prepare("SELECT p.id, p.name, p.price, p.style,
+                                  " . primaryImageSubquery('p', 'pi') . " AS primary_image,
+                                  c.name AS category_name
+                           FROM products p
+                           INNER JOIN categories c ON p.category_id = c.id
+                           WHERE p.status = 'active'
+                             AND c.name = '半罩式安全帽'
+                             AND p.style IN ('通勤', '競速')
+                           ORDER BY FIELD(p.style, '通勤', '競速'), p.id ASC");
+    $stmt->execute();
+    $rows = $stmt->fetchAll();
+
+    $pickedStyle = [];
+    foreach ($rows as $row) {
+        $styleKey = (string)($row['style'] ?? '');
+        if (($styleKey === '通勤' || $styleKey === '競速') && !isset($pickedStyle[$styleKey])) {
+            $targetProducts[] = $row;
+            $pickedStyle[$styleKey] = true;
+        }
+        if (count($targetProducts) >= 2) {
+            break;
+        }
+    }
+
+    // 合併：目標商品優先，再補原本熱門商品；避免重複，最後裁成 6 個
+    $merged = [];
+    $seen = [];
+    foreach (array_merge($targetProducts, $hotProducts) as $p) {
+        $pid = (int)($p['id'] ?? 0);
+        if ($pid <= 0 || isset($seen[$pid])) {
+            continue;
+        }
+        $merged[] = $p;
+        $seen[$pid] = true;
+        if (count($merged) >= 6) {
+            break;
+        }
+    }
+    $hotProducts = $merged;
+} catch (PDOException $e) {
+    // 保持原熱門商品清單
+}
+
+// 若不足 6 個，補齊（不補配件）
+try {
+    if (count($hotProducts) < 6) {
+        $stmt = $pdo->prepare("SELECT p.id, p.name, p.price, p.style,
+                                      " . primaryImageSubquery('p', 'pi') . " AS primary_image,
+                                      c.name AS category_name
+                               FROM products p
+                               INNER JOIN categories c ON p.category_id = c.id
+                               WHERE p.status = 'active'
+                               ORDER BY p.id ASC");
+        $stmt->execute();
+        $fallbackRows = $stmt->fetchAll();
+
+        $seen = [];
+        foreach ($hotProducts as $p) {
+            $seen[(int)($p['id'] ?? 0)] = true;
+        }
+        foreach ($fallbackRows as $p) {
+            $pid = (int)($p['id'] ?? 0);
+            if ($pid <= 0 || isset($seen[$pid])) {
+                continue;
+            }
+            if ((string)($p['category_name'] ?? '') === '周邊與配件') {
+                continue;
+            }
+            $hotProducts[] = $p;
+            $seen[$pid] = true;
+            if (count($hotProducts) >= 6) {
+                break;
+            }
+        }
+    }
+} catch (PDOException $e) {
+    // 保持目前熱門商品清單
+}
+
 $is_logged_in = isset($_SESSION['user_id']);
 $favorite_ids = [];
 if ($is_logged_in) {
@@ -353,7 +441,6 @@ if (is_array($promo_offers) && !empty($promo_offers)) {
                     '競賽' => 'RACING',
                     '競速' => 'RACING',
                     '街頭' => 'STREET',
-                    '女性' => 'WOMEN',
                 ];
                 ?>
 
@@ -384,7 +471,7 @@ if (is_array($promo_offers) && !empty($promo_offers)) {
                             }
 
                             $style_label = (string)($product['style'] ?? '');
-                            $style_english_badge = $style_english_map[$style_label] ?? 'OTHER';
+                            $style_english_badge = $style_english_map[$style_label] ?? '';
                             ?>
                             <article class="featured-product-card">
                                 <div class="featured-product-media">
@@ -397,7 +484,9 @@ if (is_array($promo_offers) && !empty($promo_offers)) {
                                     <div class="featured-product-meta">
                                         <div class="featured-product-badge-group" aria-label="商品標籤">
                                             <span class="featured-product-helmet-badge"><?php echo htmlspecialchars($helmet_badge); ?></span>
-                                            <span class="featured-product-style-badge"><?php echo htmlspecialchars($style_english_badge); ?></span>
+                                            <?php if ($style_english_badge !== ''): ?>
+                                                <span class="featured-product-style-badge"><?php echo htmlspecialchars($style_english_badge); ?></span>
+                                            <?php endif; ?>
                                         </div>
                                         <form action="api/toggle_favorite.php" method="POST" class="product-favorite-inline-form">
                                             <input type="hidden" name="product_id" value="<?php echo (int)$product['id']; ?>">
@@ -449,7 +538,6 @@ if (is_array($promo_offers) && !empty($promo_offers)) {
                         '通勤' => 'COMMUTER',
                         '競速' => 'RACING',
                         '競賽' => 'RACING',
-                        '女性' => 'WOMEN',
                     ];
 
                     // 首頁風格卡片導向：直接帶入 products.php 的 style 參數
@@ -458,14 +546,12 @@ if (is_array($promo_offers) && !empty($promo_offers)) {
                         '復古' => 'retro',
                         '通勤' => 'commuter',
                         '競速' => 'racing',
-                        '女性' => 'women',
                     ];
 
                     $home_style_cards = [
                         ['label' => '復古', 'svg_rect' => '%23d8dde3', 'svg_path' => '%23b8c0ca', 'path_d' => 'M0 310L130 220L250 265L360 200L470 250L600 190V380H0Z'],
                         ['label' => '通勤', 'svg_rect' => '%23d9dfe5', 'svg_path' => '%23b7bec8', 'path_d' => 'M0 292L120 210L220 245L340 195L470 255L600 182V380H0Z'],
                         ['label' => '競速', 'svg_rect' => '%23dce1e6', 'svg_path' => '%23bcc4cd', 'path_d' => 'M0 305L120 228L250 275L370 210L500 258L600 200V380H0Z'],
-                        ['label' => '女性', 'svg_rect' => '%23d7dde2', 'svg_path' => '%23b4bcc5', 'path_d' => 'M0 296L128 220L236 258L352 202L462 244L600 187V380H0Z'],
                     ];
                     foreach ($home_style_cards as $sc):
                         $style_cn = (string)($sc['label'] ?? '');

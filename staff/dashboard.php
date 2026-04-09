@@ -11,7 +11,6 @@ $quickStats = [
     'pending_returns' => 0,
     'today_orders' => 0,
     'today_sales' => 0.0,
-    'hidden_reviews_count' => 0,
 ];
 
 try {
@@ -21,33 +20,6 @@ try {
         $c = (int)$row['cnt'];
         if (in_array($s, ['pending', 'pending_payment'], true)) {
             $quickStats['pending_orders'] += $c;
-        }
-    }
-} catch (Throwable $e) {
-}
-
-// 已隱藏的評價數（供評價管理入口使用）
-try {
-    $stmt = $pdo->query("SHOW TABLES LIKE 'reviews'");
-    $hasReviewsTable = (bool)$stmt->fetchColumn();
-    if ($hasReviewsTable) {
-        $cols = $pdo->query("SHOW COLUMNS FROM reviews")->fetchAll(PDO::FETCH_ASSOC);
-        $hiddenCol = '';
-        foreach ($cols as $c) {
-            $field = (string)($c['Field'] ?? '');
-            if ($field === 'is_hidden') {
-                $hiddenCol = 'is_hidden';
-                break;
-            }
-            if ($field === 'hidden') {
-                $hiddenCol = 'hidden';
-                break;
-            }
-        }
-        if ($hiddenCol !== '') {
-            $stmt2 = $pdo->prepare("SELECT COUNT(*) FROM reviews WHERE {$hiddenCol} = 1");
-            $stmt2->execute();
-            $quickStats['hidden_reviews_count'] = (int)$stmt2->fetchColumn();
         }
     }
 } catch (Throwable $e) {
@@ -154,11 +126,5 @@ staffPageStart($pdo, '店員工作入口', 'dashboard');
         <span class="staff-entry-cta">前往功能</span>
     </a>
 
-    <a href="reviews.php" class="staff-entry-card">
-        <h2>評價管理</h2>
-        <p>管理商品評價、隱藏或移除不當內容。</p>
-        <div class="staff-entry-meta">已隱藏評論：<?php echo number_format($quickStats['hidden_reviews_count']); ?></div>
-        <span class="staff-entry-cta">前往功能</span>
-    </a>
 </section>
 <?php staffPageEnd(); ?>

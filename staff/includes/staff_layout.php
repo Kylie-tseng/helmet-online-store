@@ -29,7 +29,6 @@ if (!function_exists('staffNavItems')) {
                 'products' => ['label' => '商品與分類', 'href' => 'products.php'],
                 'sales' => ['label' => '銷售統計', 'href' => 'sales.php'],
                 'returns' => ['label' => '退貨申請', 'href' => 'returns.php'],
-                'reviews' => ['label' => '評價管理', 'href' => 'reviews.php'],
                 'coupons' => ['label' => '優惠活動', 'href' => 'coupons.php'],
                 'members' => ['label' => '會員管理', 'href' => 'members.php'],
                 'staff_accounts' => ['label' => '員工權限', 'href' => 'staff_accounts.php'],
@@ -44,7 +43,6 @@ if (!function_exists('staffNavItems')) {
             'products' => ['label' => '商品管理', 'href' => 'products.php'],
             'sales_report' => ['label' => '銷售統計', 'href' => 'sales_report.php'],
             'returns' => ['label' => '退貨申請', 'href' => 'returns.php'],
-            'reviews' => ['label' => '評價管理', 'href' => 'reviews.php'],
         ];
     }
 }

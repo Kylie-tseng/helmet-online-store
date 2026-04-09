@@ -46,6 +46,14 @@ try {
 } catch (PDOException $e) {
     $favorites = [];
 }
+
+if (!isset($_SESSION['compare_list']) || !is_array($_SESSION['compare_list'])) {
+    $_SESSION['compare_list'] = [];
+}
+$compare_list = array_values(array_unique(array_map('intval', $_SESSION['compare_list'])));
+$compare_count = count($compare_list);
+$compare_flash = isset($_SESSION['compare_flash']) ? trim((string)$_SESSION['compare_flash']) : '';
+unset($_SESSION['compare_flash']);
 ?>
 <!DOCTYPE html>
 <html lang="zh-TW">
@@ -58,36 +66,59 @@ try {
 <body class="favorites-page">
 <?php renderNavbar($pdo, $categories, $parts_category_id); ?>
 
-    <section class="products-section">
-        <div class="container favorites-container">
-            <div class="favorites-header">
-                <h1>收藏商品</h1>
-                <p>將喜歡的商品加入收藏，隨時回來查看與購買</p>
-            </div>
+    <main class="favorites-main">
+        <section class="favorites-shell">
+            <header class="favorites-header">
+                <div class="favorites-header-top">
+                    <h1 class="favorites-title">我的收藏</h1>
+                    <div class="favorites-actions">
+                        <div class="favorites-pill favorites-pill-static">收藏 <?php echo (int)count($favorites); ?></div>
+                        <?php if ((int)$compare_count > 0): ?>
+                            <a href="compare.php" class="favorites-pill favorites-pill-link">前往比較</a>
+                        <?php else: ?>
+                            <span class="favorites-pill favorites-pill-link is-disabled">前往比較</span>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <p class="favorites-subtitle">收藏喜歡的商品，之後可以快速比較與加入購物車</p>
+            </header>
 
             <?php if (empty($favorites)): ?>
-                <div class="favorites-empty">
-                    <div class="empty-icon">♡</div>
-                    <h3>還沒有收藏商品</h3>
-                    <p>快去挑選你喜歡的安全帽吧！</p>
-                    <a href="products.php" class="favorites-btn">開始逛逛</a>
-                </div>
+                <section class="favorites-empty-state" aria-label="收藏清單為空">
+                    <div class="favorites-empty-icon-wrap" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" class="favorites-empty-icon">
+                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"></path>
+                        </svg>
+                    </div>
+                    <h2 class="favorites-empty-title">目前還沒有收藏商品</h2>
+                    <p class="favorites-empty-desc">先去逛逛全罩式、半罩式或配件，找到喜歡的再收藏吧。</p>
+                    <div class="favorites-empty-actions">
+                        <a href="products.php" class="favorites-cta-primary">開始逛逛</a>
+                        <a href="products.php?sort=popular" class="favorites-cta-secondary">熱門商品</a>
+                    </div>
+                </section>
             <?php else: ?>
-                <div class="products-grid">
+                <section class="favorites-grid" aria-label="收藏商品清單">
                     <?php foreach ($favorites as $item): ?>
-                        <div class="product-card">
-                            <div class="product-image">
-                                <?php
-                                $fav_img = resolve_product_card_image_src($item['primary_image'] ?? null);
-                                ?>
-                                <img src="<?php echo htmlspecialchars($fav_img, ENT_QUOTES); ?>" alt="<?php echo htmlspecialchars($item['name']); ?>">
-                            </div>
-                            <div class="product-info">
-                                <p class="product-category"><?php echo htmlspecialchars($item['category_name']); ?></p>
-                                <h3 class="product-name"><?php echo htmlspecialchars($item['name']); ?></h3>
-                                <div class="product-price-row">
-                                    <p class="product-price">NT$ <?php echo number_format($item['price'], 0); ?></p>
-                                    <form action="api/toggle_favorite.php" method="POST" class="product-favorite-inline-form">
+                        <?php $is_in_compare = in_array((int)$item['id'], $compare_list, true); ?>
+                        <article class="favorite-card">
+                            <?php if ($is_in_compare): ?>
+                                <span class="compare-badge">比較中</span>
+                            <?php endif; ?>
+                            <a class="favorite-card-image-link" href="product_detail.php?id=<?php echo (int)$item['id']; ?>">
+                                <?php $fav_img = resolve_product_card_image_src($item['primary_image'] ?? null); ?>
+                                <img class="favorite-card-image" src="<?php echo htmlspecialchars($fav_img, ENT_QUOTES); ?>" alt="<?php echo htmlspecialchars($item['name']); ?>">
+                            </a>
+
+                            <div class="favorite-card-body">
+                                <p class="favorite-card-meta"><?php echo htmlspecialchars($item['category_name']); ?></p>
+                                <h3 class="favorite-card-name">
+                                    <a href="product_detail.php?id=<?php echo (int)$item['id']; ?>"><?php echo htmlspecialchars($item['name']); ?></a>
+                                </h3>
+
+                                <div class="favorite-card-price-row">
+                                    <p class="favorite-card-price">NT$ <?php echo number_format($item['price'], 0); ?></p>
+                                    <form action="api/toggle_favorite.php" method="POST" class="favorite-card-heart-form">
                                         <input type="hidden" name="product_id" value="<?php echo (int)$item['id']; ?>">
                                         <input type="hidden" name="redirect" value="favorites.php">
                                         <button type="submit" class="favorite-btn favorite-icon-btn active" aria-label="取消收藏" title="取消收藏">
@@ -98,15 +129,99 @@ try {
                                         </button>
                                     </form>
                                 </div>
-                                <div class="favorite-actions">
-                                    <a href="product_detail.php?id=<?php echo (int)$item['id']; ?>" class="product-btn">查看詳情</a>
+
+                                <div class="favorite-card-actions">
+                                    <button type="button" class="btn-add-cart btn-primary" data-id="<?php echo (int)$item['id']; ?>">加入購物車</button>
+                                    <a href="product_detail.php?id=<?php echo (int)$item['id']; ?>" class="btn-secondary">查看詳情</a>
                                 </div>
+                                <form action="compare_actions.php" method="POST" class="favorite-compare-form">
+                                    <input type="hidden" name="product_id" value="<?php echo (int)$item['id']; ?>">
+                                    <input type="hidden" name="redirect" value="favorites.php">
+                                    <button
+                                        type="submit"
+                                        name="action"
+                                        value="<?php echo $is_in_compare ? 'remove' : 'add'; ?>"
+                                        class="favorite-compare-btn btn-compare <?php echo $is_in_compare ? 'favorite-compare-active' : ''; ?>"
+                                    >
+                                        <?php echo $is_in_compare ? '已加入比較' : '加入比較'; ?>
+                                    </button>
+                                </form>
                             </div>
-                        </div>
+                        </article>
                     <?php endforeach; ?>
-                </div>
+                </section>
             <?php endif; ?>
-        </div>
-    </section>
+        </section>
+    </main>
+    <?php if ($compare_flash !== ''): ?>
+    <div id="compare-toast" class="compare-toast"><?php echo htmlspecialchars($compare_flash); ?></div>
+    <?php endif; ?>
+    <script>
+    (function () {
+        function updateCartCount(count) {
+            if (typeof window.updateNavbarBadges === 'function') {
+                window.updateNavbarBadges({ cart_count: count });
+                return;
+            }
+            var badge = document.getElementById('cartBadge');
+            if (!badge) return;
+            var n = parseInt(count, 10) || 0;
+            badge.textContent = String(n);
+            if (n > 0) {
+                badge.classList.remove('is-empty');
+            } else {
+                badge.classList.add('is-empty');
+            }
+        }
+
+        function showToast(text) {
+            var old = document.querySelector('.favorites-page .toast');
+            if (old) old.remove();
+            var t = document.createElement('div');
+            t.innerText = text;
+            t.className = 'toast';
+            document.body.appendChild(t);
+            setTimeout(function () { t.remove(); }, 2000);
+        }
+
+        document.querySelectorAll('.btn-add-cart').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var id = this.dataset.id;
+                var fd = new FormData();
+                fd.append('product_id', id);
+                fd.append('quantity', '1');
+                fetch('api/add_to_cart.php', {
+                    method: 'POST',
+                    body: fd
+                })
+                .then(function (res) { return res.json(); })
+                .then(function (data) {
+                    if (data && data.success) {
+                        updateCartCount(data.cart_count || 0);
+                        showToast('已加入購物車');
+                    } else if (data && data.message) {
+                        showToast(data.message);
+                    } else {
+                        showToast('加入購物車失敗');
+                    }
+                })
+                .catch(function () {
+                    showToast('加入購物車時發生錯誤');
+                });
+            });
+        });
+
+        document.addEventListener('DOMContentLoaded', function () {
+            var toast = document.getElementById('compare-toast');
+            if (!toast) return;
+            setTimeout(function () {
+                toast.classList.add('hide');
+                setTimeout(function () {
+                    toast.remove();
+                }, 250);
+            }, 2000);
+        });
+    })();
+    </script>
 </body>
 </html>

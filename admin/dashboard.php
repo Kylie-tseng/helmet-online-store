@@ -21,7 +21,6 @@ $today_orders = 0;
 $total_members = 0;
 $low_stock_products = 0;
 $pending_returns = 0;
-$hidden_reviews_count = 0;
 $active_coupons = 0;
 $staff_accounts = 0;
 
@@ -84,36 +83,6 @@ try {
 } catch (Throwable $e) {
 }
 
-// 已隱藏評論數
-try {
-    $stmt = $pdo->query("SHOW TABLES LIKE 'reviews'");
-    $hasReviews = (bool)$stmt->fetchColumn();
-    if ($hasReviews) {
-        $hiddenCol = '';
-        try {
-            $cols = $pdo->query("SHOW COLUMNS FROM reviews")->fetchAll(PDO::FETCH_ASSOC);
-            foreach ($cols as $c) {
-                $field = (string)($c['Field'] ?? '');
-                if ($field === 'is_hidden') {
-                    $hiddenCol = 'is_hidden';
-                    break;
-                }
-                if ($field === 'hidden') {
-                    $hiddenCol = 'hidden';
-                    break;
-                }
-            }
-        } catch (Throwable $e) {
-            $hiddenCol = '';
-        }
-        if ($hiddenCol !== '') {
-            $stmt2 = $pdo->query("SELECT COUNT(*) FROM reviews WHERE {$hiddenCol} = 1");
-            $hidden_reviews_count = (int)$stmt2->fetchColumn();
-        }
-    }
-} catch (Throwable $e) {
-}
-
 // 啟用中優惠券數（is_active=1 且未過期）
 try {
     $stmt = $pdo->query("SELECT COUNT(*) FROM coupons
@@ -165,13 +134,6 @@ staffPageStart($pdo, '管理者工作入口', 'dashboard');
         <h2>待處理退貨</h2>
         <p>追蹤退貨申請與退款流程。</p>
         <div class="staff-entry-meta">待處理：<?php echo number_format((int)$pending_returns); ?></div>
-        <span class="staff-entry-cta">前往功能</span>
-    </a>
-
-    <a href="reviews.php" class="staff-entry-card">
-        <h2>已隱藏評論</h2>
-        <p>管理不當或需要處理的評論。</p>
-        <div class="staff-entry-meta">已隱藏：<?php echo number_format((int)$hidden_reviews_count); ?></div>
         <span class="staff-entry-cta">前往功能</span>
     </a>
 

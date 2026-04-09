@@ -2,8 +2,8 @@
 require_once 'config.php';
 require_once 'includes/cart_functions.php';
 require_once 'includes/navbar.php';
-require_once __DIR__ . '/includes/reviews_init.php';
 require_once 'includes/product_query_helpers.php';
+require_once 'includes/product_card_image.php';
 
 // 取得商品 ID
 $product_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
@@ -84,6 +84,67 @@ if ($product) {
     }
 }
 
+// 相關商品推薦（最多 4 筆）：先同分類同風格，不足再補同分類
+$related_products = [];
+if ($product) {
+    try {
+        $current_id = (int)$product['id'];
+        $category_id = (int)$product['category_id'];
+        $style_value = trim((string)($product['style'] ?? ''));
+
+        $first_sql = "SELECT p.id, p.name, p.price, p.category_id,
+                             " . primaryImageSubquery('p', 'pi') . " AS primary_image
+                      FROM products p
+                      WHERE p.status = 'active'
+                        AND p.id <> :current_id
+                        AND p.category_id = :category_id";
+        $first_params = [
+            ':current_id' => $current_id,
+            ':category_id' => $category_id
+        ];
+
+        if ($style_value !== '') {
+            $first_sql .= " AND p.style = :style";
+            $first_params[':style'] = $style_value;
+        } else {
+            $first_sql .= " AND (p.style IS NULL OR p.style = '')";
+        }
+
+        $first_sql .= " ORDER BY p.id DESC LIMIT 4";
+        $stmt = $pdo->prepare($first_sql);
+        $stmt->execute($first_params);
+        $first_batch = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $related_products = $first_batch ?: [];
+        $picked_ids = array_map('intval', array_column($related_products, 'id'));
+
+        if (count($related_products) < 4) {
+            $needed = 4 - count($related_products);
+            $exclude_ids = array_merge([$current_id], $picked_ids);
+            $exclude_ids = array_values(array_unique(array_map('intval', $exclude_ids)));
+
+            $exclude_placeholders = implode(',', array_fill(0, count($exclude_ids), '?'));
+            $second_sql = "SELECT p.id, p.name, p.price, p.category_id,
+                                  " . primaryImageSubquery('p', 'pi') . " AS primary_image
+                           FROM products p
+                           WHERE p.status = 'active'
+                             AND p.category_id = ?
+                             AND p.id NOT IN ($exclude_placeholders)
+                           ORDER BY p.id DESC
+                           LIMIT $needed";
+            $second_params = array_merge([$category_id], $exclude_ids);
+            $stmt = $pdo->prepare($second_sql);
+            $stmt->execute($second_params);
+            $second_batch = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            if (!empty($second_batch)) {
+                $related_products = array_merge($related_products, $second_batch);
+            }
+        }
+    } catch (PDOException $e) {
+        $related_products = [];
+    }
+}
+
 // 商品多圖（product_images）：sort_order ASC, id ASC；第一張為主圖
 $product_gallery_urls = [];
 $gallery_images_dir = 'assets/images/products/';
@@ -116,69 +177,6 @@ if ($product) {
     }
 }
 
-// 商品評價（只顯示未被隱藏的評論）
-$reviewsSummary = [
-    'total' => 0,
-    'avg' => 0.0,
-    'list' => [],
-];
-$reviewsHiddenColumnName = '';
-$reviewsTableReady = false;
-
-try {
-    $reviewsEnsure = reviewsEnsureTable($pdo);
-    $reviewsHiddenColumnName = (string)($reviewsEnsure['hidden_column'] ?? '');
-    $reviewsTableReady = (bool)($reviewsEnsure['table_exists'] ?? false);
-} catch (Throwable $e) {
-    $reviewsTableReady = false;
-}
-
-if ($product && $reviewsTableReady) {
-    try {
-        $whereHidden = '';
-        if ($reviewsHiddenColumnName !== '') {
-            $whereHidden = " AND r.{$reviewsHiddenColumnName} = 0";
-        }
-
-        $sql = "SELECT
-                        COUNT(*) AS total,
-                        COALESCE(AVG(r.rating), 0) AS avg_rating
-                FROM reviews r
-                WHERE r.product_id = :product_id
-                      {$whereHidden}";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([':product_id' => $product_id]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        $reviewsSummary['total'] = (int)($row['total'] ?? 0);
-        $reviewsSummary['avg'] = (float)($row['avg_rating'] ?? 0);
-
-        $sql2 = "SELECT r.id, r.rating, r.comment, r.created_at, u.name AS user_name
-                 FROM reviews r
-                 LEFT JOIN users u ON u.id = r.user_id
-                 WHERE r.product_id = :product_id
-                       {$whereHidden}
-                 ORDER BY r.created_at DESC
-                 LIMIT 20";
-        $stmt2 = $pdo->prepare($sql2);
-        $stmt2->execute([':product_id' => $product_id]);
-        $reviewsSummary['list'] = $stmt2->fetchAll(PDO::FETCH_ASSOC);
-    } catch (Throwable $e) {
-        // keep defaults
-    }
-}
-
-function mask_username(?string $name): string
-{
-    $name = (string)($name ?? '');
-    $name = trim($name);
-    if ($name === '') return '匿名';
-    if (mb_strlen($name, 'UTF-8') <= 2) {
-        return mb_substr($name, 0, 1, 'UTF-8') . '*';
-    }
-    $first = mb_substr($name, 0, 1, 'UTF-8');
-    $last = mb_substr($name, -1, null, 'UTF-8');
-    return $first . '***' . $last;
-}
 ?>
 <!DOCTYPE html>
 <html lang="zh-TW">
@@ -193,7 +191,7 @@ function mask_username(?string $name): string
     <?php renderNavbar($pdo, $categories, $parts_category_id); ?>
 
     <!-- 商品詳情內容 -->
-    <div class="product-detail-container">
+    <div class="product-detail-container product-detail-page">
         <div class="container">
             <?php if ($error_message): ?>
                 <div class="product-detail-error">
@@ -201,65 +199,68 @@ function mask_username(?string $name): string
                     <a href="products.php" class="btn-primary">返回商品總覽</a>
                 </div>
             <?php elseif ($product): ?>
-                <div class="product-detail-wrapper">
+                <div class="product-detail-wrapper product-detail-layout">
                     <!-- 左側：縮圖列表 + 右側：主圖（多圖切換） -->
                     <?php
                     $gallery_count = count($product_gallery_urls);
                     $main_image_src = $product_gallery_urls[0];
                     $gallery_single_class = $gallery_count <= 1 ? ' product-detail-gallery--single' : '';
                     ?>
-                    <div class="product-detail-gallery<?php echo $gallery_single_class; ?>">
+                    <div class="product-detail-gallery product-left product-image-gallery<?php echo $gallery_single_class; ?>">
+                        <div class="product-detail-main-image product-detail-image product-image-box product-main-image">
+                            <img
+                                id="mainProductImage"
+                                src="<?php echo htmlspecialchars($main_image_src, ENT_QUOTES); ?>"
+                                alt="<?php echo htmlspecialchars($product['name']); ?>"
+                            >
+                        </div>
                         <?php if ($gallery_count > 1): ?>
-                            <div class="product-detail-thumbs" role="tablist" aria-label="商品圖片縮圖">
+                            <div class="product-detail-thumbs product-thumbnails" role="tablist" aria-label="商品圖片縮圖">
                                 <?php foreach ($product_gallery_urls as $gi => $gurl): ?>
                                     <button
                                         type="button"
                                         class="product-detail-thumb<?php echo $gi === 0 ? ' is-active' : ''; ?>"
                                         data-src="<?php echo htmlspecialchars($gurl, ENT_QUOTES); ?>"
+                                        onclick="document.getElementById('mainProductImage').src=this.dataset.src;"
                                         aria-label="檢視圖片 <?php echo (int)($gi + 1); ?>"
                                         aria-pressed="<?php echo $gi === 0 ? 'true' : 'false'; ?>"
                                     >
-                                        <img src="<?php echo htmlspecialchars($gurl, ENT_QUOTES); ?>" alt="" loading="lazy">
+                                        <img class="thumbnail-img" src="<?php echo htmlspecialchars($gurl, ENT_QUOTES); ?>" alt="" loading="lazy">
                                     </button>
                                 <?php endforeach; ?>
                             </div>
                         <?php endif; ?>
-                        <div class="product-detail-main-image product-detail-image">
-                            <img
-                                id="productDetailMainImg"
-                                src="<?php echo htmlspecialchars($main_image_src, ENT_QUOTES); ?>"
-                                alt="<?php echo htmlspecialchars($product['name']); ?>"
-                            >
-                        </div>
                     </div>
 
                     <!-- 右側資訊區 -->
-                    <div class="product-detail-info">
+                    <div class="product-detail-info product-right">
                         <div class="product-detail-header">
                             <span class="product-detail-category"><?php echo htmlspecialchars($product['category_name']); ?></span>
-                            <h1 class="product-detail-name"><?php echo htmlspecialchars($product['name']); ?></h1>
-                            <div class="product-detail-price">
-                                NT$ <?php echo number_format($product['price'], 0); ?>
+                            <h1 class="product-detail-name product-title"><?php echo htmlspecialchars($product['name']); ?></h1>
+                            <div class="product-price-row">
+                                <div class="product-detail-price product-price">
+                                    NT$ <?php echo number_format($product['price'], 0); ?>
+                                </div>
+                                <form action="api/toggle_favorite.php" method="POST" class="product-favorite-form">
+                                    <input type="hidden" name="product_id" value="<?php echo (int)$product['id']; ?>">
+                                    <input type="hidden" name="redirect" value="<?php echo htmlspecialchars('product_detail.php?id=' . (int)$product['id']); ?>">
+                                    <button
+                                        type="submit"
+                                        class="favorite-btn favorite-icon-btn <?php echo $is_favorited ? 'active' : ''; ?>"
+                                        aria-label="<?php echo $is_favorited ? '取消收藏' : '加入收藏'; ?>"
+                                        title="<?php echo $is_favorited ? '取消收藏' : '加入收藏'; ?>"
+                                    >
+                                        <svg class="heart-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                            <path class="heart-outline" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"></path>
+                                            <path class="heart-fill" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"></path>
+                                        </svg>
+                                    </button>
+                                </form>
                             </div>
-                            <form action="api/toggle_favorite.php" method="POST" class="product-favorite-form">
-                                <input type="hidden" name="product_id" value="<?php echo (int)$product['id']; ?>">
-                                <input type="hidden" name="redirect" value="<?php echo htmlspecialchars('product_detail.php?id=' . (int)$product['id']); ?>">
-                                <button
-                                    type="submit"
-                                    class="favorite-btn favorite-icon-btn <?php echo $is_favorited ? 'active' : ''; ?>"
-                                    aria-label="<?php echo $is_favorited ? '取消收藏' : '加入收藏'; ?>"
-                                    title="<?php echo $is_favorited ? '取消收藏' : '加入收藏'; ?>"
-                                >
-                                    <svg class="heart-icon" viewBox="0 0 24 24" aria-hidden="true">
-                                        <path class="heart-outline" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"></path>
-                                        <path class="heart-fill" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"></path>
-                                    </svg>
-                                </button>
-                            </form>
                         </div>
 
                         <?php if (!empty($product['description'])): ?>
-                            <div class="product-detail-description">
+                            <div class="product-detail-description product-description-block">
                                 <h3>商品描述</h3>
                                 <p><?php echo nl2br(htmlspecialchars($product['description'])); ?></p>
                             </div>
@@ -270,7 +271,7 @@ function mask_username(?string $name): string
                         <?php endif; ?>
 
                         <!-- 互動區塊 -->
-                        <div class="product-detail-actions">
+                        <div class="product-detail-actions product-options-block">
                             <?php if ($is_logged_in): ?>
                                 <?php if ($show_helmet_size_block && !$sizes_in_stock): ?>
                                     <div class="product-detail-no-size">
@@ -305,19 +306,27 @@ function mask_username(?string $name): string
 
                                         <div class="form-group">
                                             <label class="form-label">數量</label>
-                                            <input type="number" 
-                                                   name="quantity" 
-                                                   class="form-input" 
-                                                   id="quantityInput"
-                                                   min="1" 
-                                                   max="<?php echo htmlspecialchars($first_in_stock ? (int)$first_in_stock['stock'] : 1); ?>" 
-                                                   value="1" 
-                                                   required>
+                                            <div class="custom-qty-dropdown" id="customQtyDropdown">
+                                                <button type="button" class="custom-qty-trigger" id="customQtyTrigger" aria-haspopup="listbox" aria-expanded="false">
+                                                    <span id="customQtyValue">1</span>
+                                                    <span class="custom-qty-arrow">▾</span>
+                                                </button>
+                                                <div class="custom-qty-menu" id="customQtyMenu" role="listbox">
+                                                    <?php
+                                                    $max_qty = $first_in_stock ? max(1, (int)$first_in_stock['stock']) : 1;
+                                                    for ($i = 1; $i <= $max_qty; $i++):
+                                                    ?>
+                                                        <button type="button" class="custom-qty-option" data-value="<?php echo $i; ?>"><?php echo $i; ?></button>
+                                                    <?php endfor; ?>
+                                                </div>
+                                                <input type="hidden" name="quantity" id="quantityHiddenInput" value="1" required>
+                                            </div>
                                         </div>
 
-                                        <button type="submit" class="btn-primary product-detail-add-cart">
-                                            加入購物車
-                                        </button>
+                                        <div class="product-cta-group">
+                                            <button type="submit" class="btn-primary product-cta-primary product-detail-add-cart">加入購物車</button>
+                                            <button type="button" class="btn-secondary product-cta-secondary product-detail-buy-now">立即購買</button>
+                                        </div>
                                     </form>
                                 <?php else: ?>
                                     <!-- 配件（is_addon=1）或無 product_sizes：不顯示尺寸；後端購物車 size 寫入 F -->
@@ -325,18 +334,23 @@ function mask_username(?string $name): string
                                         <input type="hidden" name="product_id" value="<?php echo htmlspecialchars($product['id']); ?>">
                                         <div class="form-group">
                                             <label class="form-label">數量</label>
-                                            <input type="number"
-                                                   name="quantity"
-                                                   class="form-input"
-                                                   id="quantityInputSimple"
-                                                   min="1"
-                                                   max="99"
-                                                   value="1"
-                                                   required>
+                                            <div class="custom-qty-dropdown" id="customQtyDropdownSimple">
+                                                <button type="button" class="custom-qty-trigger" id="customQtyTriggerSimple" aria-haspopup="listbox" aria-expanded="false">
+                                                    <span id="customQtyValueSimple">1</span>
+                                                    <span class="custom-qty-arrow">▾</span>
+                                                </button>
+                                                <div class="custom-qty-menu" id="customQtyMenuSimple" role="listbox">
+                                                    <?php for ($i = 1; $i <= 10; $i++): ?>
+                                                        <button type="button" class="custom-qty-option" data-value="<?php echo $i; ?>"><?php echo $i; ?></button>
+                                                    <?php endfor; ?>
+                                                </div>
+                                                <input type="hidden" name="quantity" id="quantityHiddenInputSimple" value="1" required>
+                                            </div>
                                         </div>
-                                        <button type="submit" class="btn-primary product-detail-add-cart">
-                                            加入購物車
-                                        </button>
+                                        <div class="product-cta-group">
+                                            <button type="submit" class="btn-primary product-cta-primary product-detail-add-cart">加入購物車</button>
+                                            <button type="button" class="btn-secondary product-cta-secondary product-detail-buy-now">立即購買</button>
+                                        </div>
                                     </form>
                                 <?php endif; ?>
 
@@ -360,6 +374,14 @@ function mask_username(?string $name): string
                                         function bindAddToCartForm(formId, qtyResetId) {
                                             var form = document.getElementById(formId);
                                             if (!form) return;
+                                            var buyNow = false;
+                                            var buyNowBtn = form.querySelector('.product-detail-buy-now');
+                                            if (buyNowBtn) {
+                                                buyNowBtn.addEventListener('click', function() {
+                                                    buyNow = true;
+                                                    form.requestSubmit();
+                                                });
+                                            }
                                             form.addEventListener('submit', function(e) {
                                                 e.preventDefault();
                                                 var submitBtn = form.querySelector('button[type="submit"]');
@@ -381,6 +403,10 @@ function mask_username(?string $name): string
                                                         showToast(data.message, 'success');
                                                         var q = document.getElementById(qtyResetId);
                                                         if (q) q.value = 1;
+                                                        if (buyNow) {
+                                                            window.location.href = 'checkout.php';
+                                                            return;
+                                                        }
                                                     } else {
                                                         if (data.redirect) {
                                                             window.location.href = data.redirect;
@@ -396,28 +422,111 @@ function mask_username(?string $name): string
                                                 .finally(function() {
                                                     submitBtn.disabled = false;
                                                     submitBtn.textContent = originalText;
+                                                    buyNow = false;
                                                 });
                                             });
+                                        }
+
+                                        function initCustomQtyDropdown(config) {
+                                            var dropdown = document.getElementById(config.dropdownId);
+                                            var trigger = document.getElementById(config.triggerId);
+                                            var valueEl = document.getElementById(config.valueId);
+                                            var menu = document.getElementById(config.menuId);
+                                            var hidden = document.getElementById(config.hiddenId);
+                                            if (!dropdown || !trigger || !valueEl || !menu || !hidden) return null;
+
+                                            function closeMenu() {
+                                                dropdown.classList.remove('is-open');
+                                                trigger.setAttribute('aria-expanded', 'false');
+                                            }
+
+                                            function openMenu() {
+                                                dropdown.classList.add('is-open');
+                                                trigger.setAttribute('aria-expanded', 'true');
+                                            }
+
+                                            function setValue(value) {
+                                                var v = String(value || '1');
+                                                valueEl.textContent = v;
+                                                hidden.value = v;
+                                            }
+
+                                            function bindMenuOptions() {
+                                                menu.querySelectorAll('.custom-qty-option').forEach(function(optionBtn) {
+                                                    optionBtn.addEventListener('click', function() {
+                                                        setValue(optionBtn.getAttribute('data-value'));
+                                                        closeMenu();
+                                                    });
+                                                });
+                                            }
+
+                                            function rebuildOptions(maxValue) {
+                                                var max = parseInt(maxValue, 10) || 1;
+                                                if (max < 1) max = 1;
+                                                var current = parseInt(hidden.value || '1', 10);
+                                                menu.innerHTML = '';
+                                                for (var i = 1; i <= max; i++) {
+                                                    var btn = document.createElement('button');
+                                                    btn.type = 'button';
+                                                    btn.className = 'custom-qty-option';
+                                                    btn.setAttribute('data-value', String(i));
+                                                    btn.textContent = String(i);
+                                                    menu.appendChild(btn);
+                                                }
+                                                setValue(Math.min(current, max));
+                                                bindMenuOptions();
+                                            }
+
+                                            trigger.addEventListener('click', function() {
+                                                if (dropdown.classList.contains('is-open')) {
+                                                    closeMenu();
+                                                } else {
+                                                    openMenu();
+                                                }
+                                            });
+
+                                            document.addEventListener('click', function(e) {
+                                                if (!dropdown.contains(e.target)) {
+                                                    closeMenu();
+                                                }
+                                            });
+
+                                            bindMenuOptions();
+                                            setValue(hidden.value || '1');
+
+                                            return { rebuildOptions: rebuildOptions, setValue: setValue };
                                         }
 
                                         <?php if ($show_helmet_size_block && $sizes_in_stock): ?>
                                         (function() {
                                             var sizeSelect = document.getElementById('sizeSelect');
-                                            var qtyInput = document.getElementById('quantityInput');
-                                            if (sizeSelect && qtyInput) {
+                                            var qtyDropdown = initCustomQtyDropdown({
+                                                dropdownId: 'customQtyDropdown',
+                                                triggerId: 'customQtyTrigger',
+                                                valueId: 'customQtyValue',
+                                                menuId: 'customQtyMenu',
+                                                hiddenId: 'quantityHiddenInput'
+                                            });
+                                            if (sizeSelect && qtyDropdown) {
+                                                var initialOpt = sizeSelect.options[sizeSelect.selectedIndex];
+                                                qtyDropdown.rebuildOptions(initialOpt ? initialOpt.getAttribute('data-stock') : 1);
+
                                                 sizeSelect.addEventListener('change', function() {
                                                     var opt = this.options[this.selectedIndex];
-                                                    var maxStock = parseInt(opt.getAttribute('data-stock'), 10) || 1;
-                                                    qtyInput.max = maxStock;
-                                                    if (parseInt(qtyInput.value, 10) > maxStock) {
-                                                        qtyInput.value = maxStock;
-                                                    }
+                                                    qtyDropdown.rebuildOptions(opt ? opt.getAttribute('data-stock') : 1);
                                                 });
                                             }
                                         })();
-                                        bindAddToCartForm('addToCartForm', 'quantityInput');
+                                        bindAddToCartForm('addToCartForm', 'quantityHiddenInput');
                                         <?php else: ?>
-                                        bindAddToCartForm('addToCartFormSimple', 'quantityInputSimple');
+                                        initCustomQtyDropdown({
+                                            dropdownId: 'customQtyDropdownSimple',
+                                            triggerId: 'customQtyTriggerSimple',
+                                            valueId: 'customQtyValueSimple',
+                                            menuId: 'customQtyMenuSimple',
+                                            hiddenId: 'quantityHiddenInputSimple'
+                                        });
+                                        bindAddToCartForm('addToCartFormSimple', 'quantityHiddenInputSimple');
                                         <?php endif; ?>
                                     </script>
                                 <?php endif; ?>
@@ -430,49 +539,35 @@ function mask_username(?string $name): string
                                 </div>
                             <?php endif; ?>
                             
-                            <?php if ($reviewsTableReady): ?>
-                                <section class="product-reviews-section">
-                                    <div class="product-reviews-summary">
-                                        <div class="product-reviews-avg">
-                                            <span class="product-reviews-avg-value"><?php echo number_format((float)$reviewsSummary['avg'], 1); ?></span>
-                                            <span class="product-reviews-avg-suffix">/ 5</span>
-                                        </div>
-                                        <div class="product-reviews-count">
-                                            (<?php echo (int)$reviewsSummary['total']; ?> 則評論)
-                                        </div>
-                                    </div>
-
-                                    <?php if ((int)$reviewsSummary['total'] <= 0): ?>
-                                        <div class="product-reviews-empty">目前尚無評價</div>
-                                    <?php else: ?>
-                                        <div class="product-reviews-list">
-                                            <?php foreach ($reviewsSummary['list'] as $rv): ?>
-                                                <article class="product-review-card">
-                                                    <div class="product-review-top">
-                                                        <div class="product-review-stars">
-                                                            <?php
-                                                                $rt = (int)($rv['rating'] ?? 0);
-                                                                echo str_repeat('★', max(0, min(5, $rt))) . str_repeat('☆', max(0, 5 - min(5, $rt)));
-                                                            ?>
-                                                        </div>
-                                                        <div class="product-review-meta">
-                                                            <span class="product-review-user"><?php echo htmlspecialchars(mask_username((string)($rv['user_name'] ?? ''))); ?></span>
-                                                            <span class="product-review-date"><?php echo htmlspecialchars(date('Y-m-d', strtotime((string)($rv['created_at'] ?? '')))); ?></span>
-                                                        </div>
-                                                    </div>
-
-                                                    <?php if (!empty($rv['comment'])): ?>
-                                                        <div class="product-review-comment"><?php echo nl2br(htmlspecialchars((string)$rv['comment'])); ?></div>
-                                                    <?php endif; ?>
-                                                </article>
-                                            <?php endforeach; ?>
-                                        </div>
-                                    <?php endif; ?>
-                                </section>
-                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
+
+                <?php if (!empty($related_products)): ?>
+                    <section class="product-related-section" aria-label="相關商品推薦">
+                        <div class="product-related-header">
+                            <h2 class="product-related-title">相關商品推薦</h2>
+                            <p class="product-related-subtitle">依目前商品類型推薦相似商品</p>
+                        </div>
+                        <div class="product-related-grid">
+                            <?php foreach ($related_products as $rp): ?>
+                                <?php $rp_img = resolve_product_card_image_src($rp['primary_image'] ?? null); ?>
+                                <article class="product-related-card">
+                                    <a class="product-related-image-link" href="product_detail.php?id=<?php echo (int)$rp['id']; ?>">
+                                        <img class="product-related-image" src="<?php echo htmlspecialchars($rp_img, ENT_QUOTES); ?>" alt="<?php echo htmlspecialchars((string)$rp['name']); ?>">
+                                    </a>
+                                    <div class="product-related-body">
+                                        <h3 class="product-related-name">
+                                            <a href="product_detail.php?id=<?php echo (int)$rp['id']; ?>"><?php echo htmlspecialchars((string)$rp['name']); ?></a>
+                                        </h3>
+                                        <p class="product-related-price">NT$ <?php echo number_format((float)$rp['price'], 0); ?></p>
+                                        <a class="product-related-link" href="product_detail.php?id=<?php echo (int)$rp['id']; ?>">查看詳情</a>
+                                    </div>
+                                </article>
+                            <?php endforeach; ?>
+                        </div>
+                    </section>
+                <?php endif; ?>
             <?php endif; ?>
         </div>
     </div>
@@ -576,7 +671,7 @@ function mask_username(?string $name): string
 
         // 商品詳情：縮圖切換主圖
         (function() {
-            const mainImg = document.getElementById('productDetailMainImg');
+            const mainImg = document.getElementById('mainProductImage');
             if (!mainImg) return;
             document.querySelectorAll('.product-detail-thumb').forEach(function(btn) {
                 btn.addEventListener('click', function() {

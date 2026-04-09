@@ -44,7 +44,23 @@ if ($product_id <= 0) {
     exit;
 }
 
-toggleFavorite($pdo, $user_id, $product_id);
+$is_now_favorited = toggleFavorite($pdo, $user_id, $product_id);
+
+if (!$is_now_favorited) {
+    if (!isset($_SESSION['compare_list']) || !is_array($_SESSION['compare_list'])) {
+        $_SESSION['compare_list'] = [];
+    }
+    $before_count = count($_SESSION['compare_list']);
+    $_SESSION['compare_list'] = array_values(array_filter(
+        array_map('intval', $_SESSION['compare_list']),
+        function ($id) use ($product_id) {
+            return (int)$id !== (int)$product_id;
+        }
+    ));
+    if (count($_SESSION['compare_list']) < $before_count) {
+        $_SESSION['compare_flash'] = '已取消收藏，並同步移除比較清單';
+    }
+}
 
 unset($_SESSION['favorite_message']);
 

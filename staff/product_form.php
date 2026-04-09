@@ -27,6 +27,7 @@ $form = [
     'style' => '',
 ];
 $stocks = ['S' => 0, 'M' => 0, 'L' => 0, 'XL' => 0];
+$allowed_styles = ['復古', '通勤', '競速'];
 
 if ($isEdit) {
     try {
@@ -42,7 +43,8 @@ if ($isEdit) {
             $form['price'] = (float)$row['price'];
             $form['status'] = (string)$row['status'];
             $form['description'] = (string)($row['description'] ?? '');
-            $form['style'] = (string)($row['style'] ?? '');
+            $loadedStyle = trim((string)($row['style'] ?? ''));
+            $form['style'] = in_array($loadedStyle, $allowed_styles, true) ? $loadedStyle : '';
         }
     } catch (Throwable $e) {
         $error = '讀取商品資料失敗。';
@@ -144,6 +146,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $status = trim($_POST['status'] ?? 'inactive');
     $description = trim($_POST['description'] ?? '');
     $style = trim($_POST['style'] ?? '');
+    if (!in_array($style, $allowed_styles, true)) {
+        $style = '';
+    }
     $stockS = max(0, (int)($_POST['stock_s'] ?? 0));
     $stockM = max(0, (int)($_POST['stock_m'] ?? 0));
     $stockL = max(0, (int)($_POST['stock_l'] ?? 0));
@@ -281,7 +286,7 @@ staffPageStart($pdo, $isEdit ? '編輯商品' : '新增商品', 'products');
             <span>風格</span>
             <select name="style" class="staff-select">
                 <option value="">不指定</option>
-                <?php foreach (['復古', '通勤', '競速', '女性'] as $style): ?>
+                <?php foreach ($allowed_styles as $style): ?>
                     <option value="<?php echo htmlspecialchars($style); ?>" <?php echo $form['style'] === $style ? 'selected' : ''; ?>><?php echo htmlspecialchars($style); ?></option>
                 <?php endforeach; ?>
             </select>

@@ -11,4 +11,5 @@ if (($_SESSION['role'] ?? '') !== 'admin') {
     exit;
 }
 
-require_once __DIR__ . '/../staff/reviews.php';
+header('Location: dashboard.php');
+exit;

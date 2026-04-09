@@ -14,13 +14,12 @@ $is_search_mode = ($search_keyword !== '');
 $style_param = isset($_GET['style']) ? trim((string)$_GET['style']) : '';
 $style_label = resolve_product_list_style($style_param);
 $style_param_token = strtolower($style_param);
-$legacy_style_tokens = ['retro', 'vintage', 'commuter', 'racing', 'women'];
-$use_legacy_style_collection_layout = in_array($style_param_token, $legacy_style_tokens, true);
+$legacy_style_tokens = ['retro', 'vintage', 'commuter', 'racing'];
+$use_legacy_style_collection_layout = ($style_label !== null) && in_array($style_param_token, $legacy_style_tokens, true);
 $style_label_to_token_map = [
     '復古' => 'vintage',
     '通勤' => 'commuter',
     '競速' => 'racing',
-    '女性' => 'women',
 ];
 $active_style_token = $use_legacy_style_collection_layout
     ? $style_param_token
@@ -170,7 +169,6 @@ $style_english_title_map = [
     '復古' => 'VINTAGE',
     '通勤' => 'COMMUTER',
     '競速' => 'RACING',
-    '女性' => 'WOMEN',
 ];
 $style_english_title = $is_style_collection_page ? ($style_english_title_map[$style_label] ?? '') : '';
 
@@ -179,7 +177,6 @@ $style_desc_map = [
     '復古' => '把經典輪廓與懷舊質感穿進每一次出發，騎出不退流行的風格態度。',
     '通勤' => '從日常移動出發，找到兼顧舒適、實用與俐落外型的通勤裝備選擇。',
     '競速' => '以速度感與性能語彙為靈感，探索更銳利、更有侵略感的騎乘風格配置。',
-    '女性' => '在俐落輪廓與細節質感之間，找到更貼近日常穿搭與個人風格的騎乘選擇。',
 ];
 $style_header_desc = $is_style_collection_page ? ($style_desc_map[$style_label] ?? '') : '';
 ?>
@@ -338,7 +335,7 @@ $style_header_desc = $is_style_collection_page ? ($style_desc_map[$style_label] 
                     <div class="products-header">
                         <div class="products-header-row">
                             <h1 class="products-page-title"><?php echo htmlspecialchars($page_title); ?></h1>
-                            <form action="products.php" method="GET" class="products-search-form" role="search">
+                            <form action="products.php" method="GET" class="products-search-form search-bar" role="search">
                                 <?php if ($category_id !== null): ?>
                                     <input type="hidden" name="category" value="<?php echo (int)$category_id; ?>">
                                 <?php elseif ($category_param !== '' && $category_param !== '全部商品'): ?>

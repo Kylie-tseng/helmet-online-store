@@ -5,7 +5,7 @@
  * @return string[]
  */
 function get_product_style_labels() {
-    return ['復古', '通勤', '競速', '女性'];
+    return ['復古', '通勤', '競速'];
 }
 
 /**
@@ -25,7 +25,6 @@ function resolve_product_list_style($raw) {
         'vintage' => '復古',
         'commuter' => '通勤',
         'racing' => '競速',
-        'women' => '女性',
     ];
     if (isset($english_to_cn[$raw_lc])) {
         return $english_to_cn[$raw_lc];
