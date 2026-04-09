@@ -87,8 +87,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $sortStmt = $pdo->prepare("SELECT COALESCE(MAX(sort_order), 0) FROM product_images WHERE product_id = :pid");
                         $sortStmt->execute([':pid' => $productId]);
                         $sort = ((int)$sortStmt->fetchColumn()) + 1;
-                        $ins = $pdo->prepare("INSERT INTO product_images (product_id, image_url, sort_order, is_primary, created_at)
-                                              VALUES (:pid, :img, :sort, 0, NOW())");
+                        $ins = $pdo->prepare("INSERT INTO product_images (product_id, image_url, sort_order)
+                                              VALUES (:pid, :img, :sort)");
                         $ins->execute([':pid' => $productId, ':img' => $filename, ':sort' => $sort]);
                         $message = '圖片上傳成功。';
                     } catch (Throwable $e) {
@@ -119,24 +119,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             } catch (Throwable $e) {
                 $error = '刪除圖片失敗。';
-            }
-        }
-    } elseif ($isEdit && $action === 'set_primary') {
-        $imageId = (int)($_POST['image_id'] ?? 0);
-        if ($imageId > 0) {
-            try {
-                $pdo->beginTransaction();
-                $pdo->prepare("UPDATE product_images SET is_primary = 0 WHERE product_id = :pid")
-                    ->execute([':pid' => $productId]);
-                $pdo->prepare("UPDATE product_images SET is_primary = 1 WHERE id = :id AND product_id = :pid")
-                    ->execute([':id' => $imageId, ':pid' => $productId]);
-                $pdo->commit();
-                $message = '已設為主圖。';
-            } catch (Throwable $e) {
-                if ($pdo->inTransaction()) {
-                    $pdo->rollBack();
-                }
-                $error = '設定主圖失敗。';
             }
         }
     } else {
@@ -177,8 +159,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                            price = :price,
                                            status = :status,
                                            description = :description,
-                                           style = :style,
-                                           updated_at = NOW()
+                                           style = :style
                                        WHERE id = :id");
                     $stmt->execute([
                     ':name' => $name,
@@ -190,8 +171,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ':id' => $productId,
                     ]);
                 } else {
-                    $stmt = $pdo->prepare("INSERT INTO products (category_id, name, style, description, price, status, is_addon, is_featured, created_at, updated_at)
-                                       VALUES (:category_id, :name, :style, :description, :price, :status, 0, 0, NOW(), NOW())");
+                    $stmt = $pdo->prepare("INSERT INTO products (category_id, name, style, description, price, status, is_addon, is_featured, created_at)
+                                       VALUES (:category_id, :name, :style, :description, :price, :status, 0, 0, NOW())");
                     $stmt->execute([
                     ':category_id' => $categoryId,
                     ':name' => $name,
@@ -233,10 +214,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 if ($isEdit) {
     try {
-        $stmt = $pdo->prepare("SELECT id, image_url, sort_order, is_primary
+        $stmt = $pdo->prepare("SELECT id, image_url, sort_order
                                FROM product_images
                                WHERE product_id = :pid
-                               ORDER BY is_primary DESC, sort_order ASC, id ASC");
+                               ORDER BY sort_order ASC, id ASC");
         $stmt->execute([':pid' => $productId]);
         $images = $stmt->fetchAll(PDO::FETCH_ASSOC);
     } catch (Throwable $e) {
@@ -334,15 +315,7 @@ staffPageStart($pdo, $isEdit ? '編輯商品' : '新增商品', 'products');
                 <article class="staff-image-card">
                     <img src="../assets/images/products/<?php echo htmlspecialchars((string)$img['image_url']); ?>" alt="" class="staff-image-thumb" onerror="this.style.display='none'">
                     <div class="staff-image-actions">
-                        <?php if ((int)$img['is_primary'] === 1): ?>
-                            <span class="staff-badge done">主圖</span>
-                        <?php else: ?>
-                            <form method="POST" class="staff-inline-form">
-                                <input type="hidden" name="action" value="set_primary">
-                                <input type="hidden" name="image_id" value="<?php echo (int)$img['id']; ?>">
-                                <button type="submit" class="staff-action-btn staff-action-btn-ghost">設為主圖</button>
-                            </form>
-                        <?php endif; ?>
+                        <span class="staff-badge pending" title="前台主圖依 sort_order 由小到大，第一張為主圖">排序 <?php echo (int)($img['sort_order'] ?? 0); ?></span>
                         <form method="POST" class="staff-inline-form" onsubmit="return confirm('確定刪除此圖片？');">
                             <input type="hidden" name="action" value="delete_image">
                             <input type="hidden" name="image_id" value="<?php echo (int)$img['id']; ?>">

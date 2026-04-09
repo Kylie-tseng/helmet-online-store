@@ -145,17 +145,20 @@ if ($product) {
     }
 }
 
-// 商品多圖（product_images）：sort_order ASC, id ASC；第一張為主圖
+// 商品多圖（product_images）：SELECT *，ORDER BY sort_order ASC, id ASC；第一張為主圖
+$images = [];
 $product_gallery_urls = [];
 $gallery_images_dir = 'assets/images/products/';
 $gallery_default = $gallery_images_dir . 'default.jpg';
 
 if ($product) {
     try {
-        $img_stmt = $pdo->prepare("SELECT image_url FROM product_images WHERE product_id = :product_id " . productImageOrderClause());
+        $img_stmt = $pdo->prepare(
+            "SELECT * FROM product_images WHERE product_id = :product_id " . productImageOrderClause()
+        );
         $img_stmt->execute([':product_id' => $product_id]);
-        $img_rows = $img_stmt->fetchAll(PDO::FETCH_ASSOC);
-        foreach ($img_rows as $img_row) {
+        $images = $img_stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($images as $img_row) {
             $rel = trim((string)($img_row['image_url'] ?? ''));
             if ($rel === '') {
                 continue;
@@ -168,7 +171,7 @@ if ($product) {
             $product_gallery_urls[] = $gallery_images_dir . $rel;
         }
     } catch (PDOException $e) {
-        // 資料表不存在或其他錯誤時略過，改走下方 fallback
+        $images = [];
         $product_gallery_urls = [];
     }
 

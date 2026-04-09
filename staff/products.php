@@ -22,8 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($productId > 0 && $action === 'toggle_status') {
         try {
             $stmt = $pdo->prepare("UPDATE products
-                                   SET status = CASE WHEN status = 'active' THEN 'inactive' ELSE 'active' END,
-                                       updated_at = NOW()
+                                   SET status = CASE WHEN status = 'active' THEN 'inactive' ELSE 'active' END
                                    WHERE id = :id");
             $stmt->execute([':id' => $productId]);
             $flashMessage = '商品狀態已更新。';

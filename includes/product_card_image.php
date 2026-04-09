@@ -3,7 +3,7 @@
  * 商品列表／卡片用圖片路徑（不含商品詳情頁多圖）
  *
  * 規則：
- * 1. primary_image（來自 product_images 第一張子查詢）→ assets/images/products/ + primary_image
+ * 1. primary_image（來自 product_images：sort_order ASC, id ASC 第一張子查詢）→ assets/images/products/ + primary_image
  * 2. 否則 → assets/images/products/default.jpg
  *
  * @param string|null $primary_image 子查詢欄位 primary_image（僅檔名或相對路徑片段）
