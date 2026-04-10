@@ -253,7 +253,7 @@ $style_header_desc = $is_style_collection_page ? ($style_desc_map[$style_label] 
                         <div class="style-collection-grid">
                             <?php foreach ($products_for_grid as $product): ?>
                                 <?php $is_favorited = in_array((int)$product['id'], $favorite_ids, true); ?>
-                                <div class="product-card-page">
+                                <div class="product-card-page" data-product-id="<?php echo (int)$product['id']; ?>">
                                     <div class="product-image-page">
                                         <?php $list_img = resolve_product_card_image_src($product['primary_image'] ?? null); ?>
                                         <img src="<?php echo htmlspecialchars($list_img, ENT_QUOTES); ?>"
@@ -372,7 +372,7 @@ $style_header_desc = $is_style_collection_page ? ($style_desc_map[$style_label] 
                         <div class="products-grid-page">
                             <?php foreach ($products as $product): ?>
                                 <?php $is_favorited = in_array((int)$product['id'], $favorite_ids, true); ?>
-                                <div class="product-card-page">
+                                <div class="product-card-page" data-product-id="<?php echo (int)$product['id']; ?>">
                                     <div class="product-image-page">
                                         <?php
                                         $list_img = resolve_product_card_image_src($product['primary_image'] ?? null);
@@ -431,8 +431,8 @@ $style_header_desc = $is_style_collection_page ? ($style_desc_map[$style_label] 
                     <h3 class="footer-title">顧客服務</h3>
                     <ul class="footer-links">
                         <li><a href="guide.php">購物指南</a></li>
-                        <li><a href="faq.php">常見問題</a></li>
-                        <li><a href="return.php">退換貨政策</a></li>
+                        <li><a href="faq.php">常見問題 FAQ</a></li>
+                        <li><a href="return.php">退貨政策</a></li>
                         <li><a href="shipping.php">運送說明</a></li>
                     </ul>
                 </div>

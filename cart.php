@@ -4,9 +4,13 @@ require_once 'includes/cart_functions.php';
 require_once 'includes/navbar.php';
 require_once 'includes/product_query_helpers.php';
 
-// 檢查是否已登入
+// 檢查是否已登入（未登入時保留 cart.php?coupon= 以便登入後繼續帶入）
 if (!isset($_SESSION['user_id'])) {
-    header('Location: login.php?redirect=' . urlencode('cart.php') . '&notice=cart');
+    $redirect_cart = 'cart.php';
+    if (!empty($_GET['coupon']) && trim((string)$_GET['coupon']) !== '') {
+        $redirect_cart = 'cart.php?coupon=' . rawurlencode(trim((string)$_GET['coupon']));
+    }
+    header('Location: login.php?redirect=' . rawurlencode($redirect_cart) . '&notice=cart');
     exit;
 }
 
@@ -22,60 +26,69 @@ if (isset($_SESSION['cart_message'])) {
     unset($_SESSION['cart_message_type']);
 }
 
+// 優惠券相關改以浮動 toast 顯示（與商品詳情加入購物車通知同風格）
+$cart_coupon_toast_flash = null;
+if (!empty($_SESSION['cart_coupon_toast']) && is_array($_SESSION['cart_coupon_toast'])) {
+    $rawToast = $_SESSION['cart_coupon_toast'];
+    unset($_SESSION['cart_coupon_toast']);
+    $toastMsg = trim((string)($rawToast['message'] ?? ''));
+    if ($toastMsg !== '') {
+        $toastType = strtolower((string)($rawToast['type'] ?? 'success'));
+        if (!in_array($toastType, ['success', 'error', 'warning'], true)) {
+            $toastType = 'success';
+        }
+        $cart_coupon_toast_flash = ['message' => $toastMsg, 'type' => $toastType];
+    }
+}
+
+// URL 帶入優惠券：cart.php?coupon=CODE（驗證後自動套用，或僅寫入輸入欄預填）
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && array_key_exists('coupon', $_GET)) {
+    $incoming_coupon = trim((string)$_GET['coupon']);
+    if ($incoming_coupon !== '') {
+        $result = applyMemberCouponFromCode($pdo, $user_id, $incoming_coupon);
+        if (($result['reason'] ?? '') === 'already_applied') {
+            // 已套用相同券，不重複提示
+        } elseif ($result['ok'] && ($result['reason'] ?? '') === null) {
+            $_SESSION['cart_coupon_toast'] = ['message' => '優惠券套用成功，已更新折扣', 'type' => 'success'];
+        } elseif (!$result['ok'] && ($result['reason'] ?? '') === 'empty_cart') {
+            $_SESSION['cart_coupon_toast'] = ['message' => $result['message'], 'type' => $result['type']];
+        } elseif (!$result['ok'] && ($result['reason'] ?? '') === 'below_minimum') {
+            $_SESSION['coupon_code_prefill'] = normalizeCouponCode($incoming_coupon);
+            $_SESSION['cart_coupon_toast'] = ['message' => '已帶入優惠券代碼。' . $result['message'], 'type' => 'warning'];
+        } elseif ($result['message'] !== '') {
+            $_SESSION['cart_coupon_toast'] = ['message' => $result['message'], 'type' => $result['type']];
+        }
+    }
+    header('Location: cart.php');
+    exit;
+}
+
 // 處理更新數量
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     if ($_POST['action'] === 'apply_coupon') {
         $coupon_code = isset($_POST['coupon_code']) ? trim($_POST['coupon_code']) : '';
-        $cart_items_for_coupon = getCartItems($pdo, $user_id);
-        $subtotal_for_coupon = 0.0;
-        foreach ($cart_items_for_coupon as $item) {
-            $subtotal_for_coupon += (float)$item['price'] * (int)$item['quantity'];
-        }
 
         if ($coupon_code === '') {
-            $_SESSION['cart_message'] = '請輸入優惠券代碼';
-            $_SESSION['cart_message_type'] = 'error';
+            $_SESSION['cart_coupon_toast'] = ['message' => '請輸入優惠券代碼', 'type' => 'error'];
         } else {
-            try {
-                $ownership = validateUserCouponOwnership($pdo, $user_id, $coupon_code);
-                if (!$ownership['valid']) {
-                    clearAppliedCoupon();
-                    $_SESSION['cart_message'] = $ownership['message'];
-                    $_SESSION['cart_message_type'] = 'error';
-                    header('Location: cart.php');
-                    exit;
-                }
-
-                $coupon = getCouponByCode($pdo, $coupon_code);
-                $validation = validateCoupon($coupon, $subtotal_for_coupon);
-
-                if ($validation['valid']) {
-                    if (!markUserCouponUsed($pdo, $user_id, $coupon_code)) {
-                        clearAppliedCoupon();
-                        $_SESSION['cart_message'] = '優惠券使用失敗，請稍後再試';
-                        $_SESSION['cart_message_type'] = 'error';
-                        header('Location: cart.php');
-                        exit;
-                    }
-
-                    setAppliedCoupon($coupon);
-                    $discount_amount = calculateCouponDiscount($coupon, $subtotal_for_coupon);
-                    $_SESSION['cart_message'] = '優惠券套用成功，折扣 NT$ ' . number_format($discount_amount, 0);
-                    $_SESSION['cart_message_type'] = 'success';
-                } else {
-                    clearAppliedCoupon();
-                    $_SESSION['cart_message'] = $validation['message'];
-                    $_SESSION['cart_message_type'] = 'error';
-                }
-            } catch (PDOException $e) {
-                $_SESSION['cart_message'] = '套用優惠券時發生錯誤，請稍後再試';
-                $_SESSION['cart_message_type'] = 'error';
+            $result = applyMemberCouponFromCode($pdo, $user_id, $coupon_code);
+            if (($result['reason'] ?? '') === 'already_applied') {
+                // 已為目前套用之券，不額外跳訊息
+            } elseif ($result['ok'] && ($result['reason'] ?? '') === null) {
+                $_SESSION['cart_coupon_toast'] = ['message' => '優惠券套用成功，已更新折扣', 'type' => 'success'];
+            } elseif (!$result['ok'] && ($result['reason'] ?? '') === 'empty_cart') {
+                $_SESSION['cart_coupon_toast'] = ['message' => $result['message'], 'type' => $result['type']];
+            } elseif (!$result['ok'] && ($result['reason'] ?? '') === 'below_minimum') {
+                $_SESSION['coupon_code_prefill'] = normalizeCouponCode($coupon_code);
+                $_SESSION['cart_coupon_toast'] = ['message' => '已帶入優惠券代碼。' . $result['message'], 'type' => 'warning'];
+            } else {
+                $_SESSION['cart_coupon_toast'] = ['message' => $result['message'], 'type' => $result['type']];
             }
         }
     } elseif ($_POST['action'] === 'remove_coupon') {
         clearAppliedCoupon();
-        $_SESSION['cart_message'] = '已移除優惠券';
-        $_SESSION['cart_message_type'] = 'success';
+        unset($_SESSION['coupon_code_prefill']);
+        $_SESSION['cart_coupon_toast'] = ['message' => '已移除優惠券', 'type' => 'success'];
     } elseif ($_POST['action'] === 'update_quantity') {
         $cart_id = isset($_POST['cart_id']) ? (int)$_POST['cart_id'] : 0;
         $quantity = isset($_POST['quantity']) ? (int)$_POST['quantity'] : 0;
@@ -158,17 +171,35 @@ $coupon_status = getAppliedCouponStatus($pdo, $cart_items);
 $order_summary = calculateOrderSummary($cart_items, 'pickup', $coupon_status['coupon']);
 $free_shipping_threshold = getFreeShippingThreshold();
 $remaining_for_free_shipping = max(0, $free_shipping_threshold - $order_summary['subtotal']);
-if (!empty($coupon_status['message']) && empty($cart_message)) {
-    $cart_message = $coupon_status['message'];
-    $cart_message_type = 'warning';
+// 優惠券 toast：redirect flash 優先；否則本頁 getAppliedCouponStatus 失效訊息
+$cart_coupon_toast = $cart_coupon_toast_flash;
+if ($cart_coupon_toast === null && !empty($coupon_status['message'])) {
+    $cart_coupon_toast = [
+        'message' => (string)$coupon_status['message'],
+        'type' => 'warning'
+    ];
 }
-$coupon_panel_message = '';
-$coupon_panel_message_type = '';
-if (!empty($cart_message) &&
-    (strpos($cart_message, '優惠券') !== false || strpos($cart_message, '最低消費') !== false)
-) {
-    $coupon_panel_message = $cart_message;
-    $coupon_panel_message_type = $cart_message_type;
+
+// 舊版若仍寫入 cart_message 的優惠券文案，改走 toast、不顯示頁面大區塊
+if ($cart_message !== '' && (strpos($cart_message, '優惠券') !== false || strpos($cart_message, '最低消費') !== false)) {
+    if ($cart_coupon_toast === null) {
+        $tm = in_array($cart_message_type, ['success', 'error', 'warning'], true) ? $cart_message_type : 'warning';
+        $cart_coupon_toast = ['message' => $cart_message, 'type' => $tm];
+    }
+    $cart_message = '';
+    $cart_message_type = '';
+}
+
+$coupon_input_value = '';
+if (!empty($coupon_status['coupon']) && !empty($coupon_status['coupon']['coupon_code'])) {
+    $coupon_input_value = (string)$coupon_status['coupon']['coupon_code'];
+} elseif (!empty($_SESSION['coupon_code_prefill'])) {
+    $coupon_input_value = (string)$_SESSION['coupon_code_prefill'];
+}
+
+$cart_applicable_coupons = [];
+if (!empty($cart_items) && empty($coupon_status['coupon'])) {
+    $cart_applicable_coupons = getCartApplicableCouponsForUser($pdo, $user_id, $order_summary['subtotal']);
 }
 
 // 加價購商品（僅購物車有商品時顯示；配件購物車尺寸固定為 F，不需選 S/M/L/XL）
@@ -187,28 +218,27 @@ if (!empty($cart_items)) {
     }
 }
 
-// 查詢所有分類（用於導覽列）
+// 查詢所有分類（用於導覽列；並解析「周邊與配件」ID 供購物車尺寸顯示）
+$parts_category_id = null;
 try {
     $stmt = $pdo->query("SELECT id, name, description FROM categories ORDER BY id");
     $categories = $stmt->fetchAll();
+    foreach ($categories as $cat_row) {
+        if (($cat_row['name'] ?? '') === '周邊與配件') {
+            $parts_category_id = (int)$cat_row['id'];
+            break;
+        }
+    }
 } catch (PDOException $e) {
     $categories = [];
 }
 
-// 查詢「周邊與配件」的分類 ID
-$parts_category_id = null;
-try {
-    $stmt = $pdo->prepare("SELECT id FROM categories WHERE name = '周邊與配件' LIMIT 1");
-    $stmt->execute();
-    $parts_category = $stmt->fetch();
-    if ($parts_category) {
-        $parts_category_id = $parts_category['id'];
-    }
-} catch (PDOException $e) {
-    // 如果查詢失敗，保持為 null
-}
-
 $is_logged_in = isset($_SESSION['user_id']);
+
+$cart_coupon_toast_json = 'null';
+if (!empty($cart_coupon_toast) && !empty($cart_coupon_toast['message'])) {
+    $cart_coupon_toast_json = json_encode($cart_coupon_toast, JSON_HEX_TAG | JSON_HEX_APOS | JSON_UNESCAPED_UNICODE);
+}
 ?>
 <!DOCTYPE html>
 <html lang="zh-TW">
@@ -216,11 +246,13 @@ $is_logged_in = isset($_SESSION['user_id']);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>購物車 - HelmetVRse</title>
-    <link rel="stylesheet" href="assets/css/style.css?v=20260304-addon-fix">
+    <link rel="stylesheet" href="assets/css/style.css?v=20260410-cart-toast">
 </head>
-<body>
+<body class="cart-page">
 <!-- 導覽列 -->
     <?php renderNavbar($pdo, $categories, $parts_category_id); ?>
+
+    <div id="cart-page-toast" class="toast cart-page-cart-toast hidden" role="status" aria-live="polite"><span id="cart-page-toast-message"></span></div>
 
     <!-- 購物車內容 -->
     <div class="cart-container">
@@ -267,7 +299,7 @@ $is_logged_in = isset($_SESSION['user_id']);
                                             <h3 class="cart-item-name"><?php echo htmlspecialchars($item['product_name']); ?></h3>
                                             <p class="cart-item-meta">
                                                 <span class="cart-item-category"><?php echo htmlspecialchars($item['category_name']); ?></span>
-                                                <span class="cart-item-size">尺寸：<?php echo htmlspecialchars(formatCartSizeForDisplay($item['size'] ?? '')); ?></span>
+                                                <span class="cart-item-size">尺寸：<?php echo htmlspecialchars(formatCartLineSizeDisplay($item['size'] ?? '', (int)($item['category_id'] ?? 0), $parts_category_id)); ?></span>
                                             </p>
                                             <div class="cart-item-unit-row">
                                                 <span class="cart-item-unit-label">單價</span>
@@ -368,15 +400,30 @@ $is_logged_in = isset($_SESSION['user_id']);
                                             <form method="POST" class="coupon-apply-form">
                                                 <input type="hidden" name="action" value="<?php echo !empty($coupon_status['coupon']) ? 'remove_coupon' : 'apply_coupon'; ?>">
                                                 <input type="text" name="coupon_code" class="form-input coupon-input" placeholder="輸入優惠券代碼"
-                                                       value="<?php echo !empty($coupon_status['coupon']) ? htmlspecialchars($coupon_status['coupon']['coupon_code']) : ''; ?>">
+                                                       value="<?php echo htmlspecialchars($coupon_input_value); ?>">
                                                 <button type="submit" class="<?php echo !empty($coupon_status['coupon']) ? 'btn-secondary' : 'btn-primary'; ?>">
                                                     <?php echo !empty($coupon_status['coupon']) ? '移除優惠券' : '套用優惠券'; ?>
                                                 </button>
                                             </form>
                                         </div>
-                                        <?php if (!empty($coupon_panel_message)): ?>
-                                            <div class="cart-message <?php echo htmlspecialchars($coupon_panel_message_type); ?>">
-                                                <?php echo htmlspecialchars($coupon_panel_message); ?>
+
+                                        <?php if (!empty($cart_applicable_coupons)): ?>
+                                            <div class="cart-available-coupons" aria-label="可用優惠券">
+                                                <div class="cart-available-coupons-title">可用優惠券</div>
+                                                <ul class="cart-available-coupons-list">
+                                                    <?php foreach ($cart_applicable_coupons as $ac): ?>
+                                                        <li class="cart-available-coupon-card">
+                                                            <div class="cart-available-coupon-name"><?php echo htmlspecialchars($ac['name']); ?></div>
+                                                            <div class="cart-available-coupon-offer"><?php echo htmlspecialchars($ac['offer_line']); ?></div>
+                                                            <div class="cart-available-coupon-code"><?php echo htmlspecialchars($ac['coupon_code']); ?></div>
+                                                            <form method="POST" class="cart-available-coupon-form">
+                                                                <input type="hidden" name="action" value="apply_coupon">
+                                                                <input type="hidden" name="coupon_code" value="<?php echo htmlspecialchars($ac['coupon_code']); ?>">
+                                                                <button type="submit" class="cart-available-coupon-btn">套用</button>
+                                                            </form>
+                                                        </li>
+                                                    <?php endforeach; ?>
+                                                </ul>
                                             </div>
                                         <?php endif; ?>
                                     </div>
@@ -447,8 +494,8 @@ $is_logged_in = isset($_SESSION['user_id']);
                     <h3 class="footer-title">顧客服務</h3>
                     <ul class="footer-links">
                         <li><a href="guide.php">購物指南</a></li>
-                        <li><a href="faq.php">常見問題</a></li>
-                        <li><a href="return.php">退換貨政策</a></li>
+                        <li><a href="faq.php">常見問題 FAQ</a></li>
+                        <li><a href="return.php">退貨政策</a></li>
                         <li><a href="shipping.php">運送說明</a></li>
                     </ul>
                 </div>
@@ -473,6 +520,39 @@ $is_logged_in = isset($_SESSION['user_id']);
     </footer>
 
     <script>
+        (function () {
+            var cartPageToastPayload = <?php echo $cart_coupon_toast_json; ?>;
+            var cartPageToastHideTimer = null;
+            function showCartPageCouponToast(message, type) {
+                var toast = document.getElementById('cart-page-toast');
+                var toastMessage = document.getElementById('cart-page-toast-message');
+                if (!toast || !toastMessage || !message) return;
+                if (cartPageToastHideTimer) {
+                    clearTimeout(cartPageToastHideTimer);
+                    cartPageToastHideTimer = null;
+                }
+                toastMessage.textContent = message;
+                toast.classList.remove('hidden', 'is-hiding', 'is-error');
+                if (type === 'error') {
+                    toast.classList.add('is-error');
+                }
+                void toast.offsetWidth;
+                toast.classList.add('is-visible');
+                cartPageToastHideTimer = setTimeout(function () {
+                    toast.classList.remove('is-visible');
+                    toast.classList.add('is-hiding');
+                    setTimeout(function () {
+                        toast.classList.add('hidden');
+                        toast.classList.remove('is-hiding', 'is-error');
+                        cartPageToastHideTimer = null;
+                    }, 280);
+                }, 3000);
+            }
+            if (cartPageToastPayload && cartPageToastPayload.message) {
+                showCartPageCouponToast(cartPageToastPayload.message, cartPageToastPayload.type || 'success');
+            }
+        })();
+
         // 更新數量
         function updateQuantity(cartId, change) {
             const input = document.getElementById('quantity_' + cartId);

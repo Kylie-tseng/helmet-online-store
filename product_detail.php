@@ -14,7 +14,8 @@ $error_message = '';
 
 if ($product_id > 0) {
     try {
-        $stmt = $pdo->prepare("SELECT p.*, c.name AS category_name
+        $stmt = $pdo->prepare("SELECT p.*, c.name AS category_name,
+                                      " . primaryImageSubquery('p', 'pi') . " AS primary_image
                                FROM products p
                                INNER JOIN categories c ON p.category_id = c.id
                                WHERE p.id = :product_id AND p.status = 'active'");
@@ -84,72 +85,167 @@ if ($product) {
     }
 }
 
-// 相關商品推薦（最多 4 筆）：先同分類同風格，不足再補同分類
+// 相關商品推薦（最多 4 筆）：①同風格+同類型 → ②同風格 → ③同類型 → ④其他 active；排除自己、不重複
 $related_products = [];
+$related_header_eyebrow = '';
+$related_header_subtitle = '';
+$related_limit = 4;
+
+$related_pick_curated_line = static function (array $lines, int $seed): string {
+    if ($lines === []) {
+        return '';
+    }
+    return $lines[abs(crc32((string)$seed)) % count($lines)];
+};
+
 if ($product) {
     try {
         $current_id = (int)$product['id'];
         $category_id = (int)$product['category_id'];
         $style_value = trim((string)($product['style'] ?? ''));
+        $img_select = primaryImageSubquery('p', 'pi') . ' AS primary_image';
 
-        $first_sql = "SELECT p.id, p.name, p.price, p.category_id,
-                             " . primaryImageSubquery('p', 'pi') . " AS primary_image
-                      FROM products p
-                      WHERE p.status = 'active'
-                        AND p.id <> :current_id
-                        AND p.category_id = :category_id";
-        $first_params = [
-            ':current_id' => $current_id,
-            ':category_id' => $category_id
-        ];
+        $picked = [];
+        $picked_ids = [$current_id];
+        $c_both = 0;
+        $c_style_cross = 0;
+        $c_cat_only = 0;
+        $c_other = 0;
 
+        $merge_rows = static function (array $rows, string $tier, array &$picked, array &$picked_ids, int $limit, int &$c_both, int &$c_style_cross, int &$c_cat_only, int &$c_other): void {
+            foreach ($rows as $row) {
+                if (count($picked) >= $limit) {
+                    break;
+                }
+                $rid = (int)($row['id'] ?? 0);
+                if ($rid <= 0 || in_array($rid, $picked_ids, true)) {
+                    continue;
+                }
+                $picked[] = $row;
+                $picked_ids[] = $rid;
+                if ($tier === 'both') {
+                    $c_both++;
+                } elseif ($tier === 'style_cross') {
+                    $c_style_cross++;
+                } elseif ($tier === 'cat_only') {
+                    $c_cat_only++;
+                } else {
+                    $c_other++;
+                }
+            }
+        };
+
+        // ① 同風格 + 同類型（最貼近）
         if ($style_value !== '') {
-            $first_sql .= " AND p.style = :style";
-            $first_params[':style'] = $style_value;
-        } else {
-            $first_sql .= " AND (p.style IS NULL OR p.style = '')";
+            $sql_both = "SELECT p.id, p.name, p.price, p.category_id, {$img_select}
+                         FROM products p
+                         WHERE p.status = 'active'
+                           AND p.id <> :current_id
+                           AND p.style = :style
+                           AND p.category_id = :category_id
+                         ORDER BY p.id DESC
+                         LIMIT " . (int)$related_limit;
+            $stmt = $pdo->prepare($sql_both);
+            $stmt->execute([
+                ':current_id' => $current_id,
+                ':style' => $style_value,
+                ':category_id' => $category_id,
+            ]);
+            $merge_rows($stmt->fetchAll(PDO::FETCH_ASSOC), 'both', $picked, $picked_ids, $related_limit, $c_both, $c_style_cross, $c_cat_only, $c_other);
         }
 
-        $first_sql .= " ORDER BY p.id DESC LIMIT 4";
-        $stmt = $pdo->prepare($first_sql);
-        $stmt->execute($first_params);
-        $first_batch = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        // ② 同風格（其他帽型）
+        if ($style_value !== '' && count($picked) < $related_limit) {
+            $needed = $related_limit - count($picked);
+            $ph = implode(',', array_fill(0, count($picked_ids), '?'));
+            $sql_style = "SELECT p.id, p.name, p.price, p.category_id, {$img_select}
+                          FROM products p
+                          WHERE p.status = 'active'
+                            AND p.style = ?
+                            AND p.id NOT IN ({$ph})
+                          ORDER BY (p.category_id = ?) DESC, p.id DESC
+                          LIMIT " . (int)$needed;
+            $stmt = $pdo->prepare($sql_style);
+            $stmt->execute(array_merge([$style_value], $picked_ids, [$category_id]));
+            $merge_rows($stmt->fetchAll(PDO::FETCH_ASSOC), 'style_cross', $picked, $picked_ids, $related_limit, $c_both, $c_style_cross, $c_cat_only, $c_other);
+        }
 
-        $related_products = $first_batch ?: [];
-        $picked_ids = array_map('intval', array_column($related_products, 'id'));
+        // ③ 同類型（分類），不含已選
+        if (count($picked) < $related_limit) {
+            $needed = $related_limit - count($picked);
+            $ph = implode(',', array_fill(0, count($picked_ids), '?'));
+            $sql_cat = "SELECT p.id, p.name, p.price, p.category_id, {$img_select}
+                        FROM products p
+                        WHERE p.status = 'active'
+                          AND p.category_id = ?
+                          AND p.id NOT IN ({$ph})
+                        ORDER BY p.id DESC
+                        LIMIT " . (int)$needed;
+            $stmt = $pdo->prepare($sql_cat);
+            $stmt->execute(array_merge([$category_id], $picked_ids));
+            $merge_rows($stmt->fetchAll(PDO::FETCH_ASSOC), 'cat_only', $picked, $picked_ids, $related_limit, $c_both, $c_style_cross, $c_cat_only, $c_other);
+        }
 
-        if (count($related_products) < 4) {
-            $needed = 4 - count($related_products);
-            $exclude_ids = array_merge([$current_id], $picked_ids);
-            $exclude_ids = array_values(array_unique(array_map('intval', $exclude_ids)));
+        // ④ 其他上架商品
+        if (count($picked) < $related_limit) {
+            $needed = $related_limit - count($picked);
+            $ph = implode(',', array_fill(0, count($picked_ids), '?'));
+            $sql_other = "SELECT p.id, p.name, p.price, p.category_id, {$img_select}
+                          FROM products p
+                          WHERE p.status = 'active'
+                            AND p.id NOT IN ({$ph})
+                          ORDER BY p.id DESC
+                          LIMIT " . (int)$needed;
+            $stmt = $pdo->prepare($sql_other);
+            $stmt->execute($picked_ids);
+            $merge_rows($stmt->fetchAll(PDO::FETCH_ASSOC), 'other', $picked, $picked_ids, $related_limit, $c_both, $c_style_cross, $c_cat_only, $c_other);
+        }
 
-            $exclude_placeholders = implode(',', array_fill(0, count($exclude_ids), '?'));
-            $second_sql = "SELECT p.id, p.name, p.price, p.category_id,
-                                  " . primaryImageSubquery('p', 'pi') . " AS primary_image
-                           FROM products p
-                           WHERE p.status = 'active'
-                             AND p.category_id = ?
-                             AND p.id NOT IN ($exclude_placeholders)
-                           ORDER BY p.id DESC
-                           LIMIT $needed";
-            $second_params = array_merge([$category_id], $exclude_ids);
-            $stmt = $pdo->prepare($second_sql);
-            $stmt->execute($second_params);
-            $second_batch = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            if (!empty($second_batch)) {
-                $related_products = array_merge($related_products, $second_batch);
-            }
+        $related_products = $picked;
+
+        $n_style_axis = $c_both + $c_style_cross;
+        $n_rest = $c_cat_only + $c_other;
+        $n_same_hat = $c_both + $c_cat_only;
+
+        $style_led = $style_value !== '' && $n_style_axis > 0 && $n_style_axis >= $n_rest;
+        $category_led = !$style_led && $n_same_hat > 0;
+        $explore_led = !$style_led && !$category_led;
+
+        $seed = $current_id * 31 + ($style_led ? 1 : 0) + ($category_led ? 2 : 0);
+
+        if ($style_led) {
+            $related_header_eyebrow = $related_pick_curated_line(['RELATED PICKS', 'IN YOUR STYLE', 'CURATED FOR YOU'], $seed);
+            $related_header_subtitle = $related_pick_curated_line([
+                '延續你喜歡的風格，探索更多相同調性的帽款',
+                '以相同騎乘風格為主軸，推薦你可能也會喜歡的選擇',
+                '同樣的風格語言，更多值得比較的帽款',
+            ], $seed + 17);
+        } elseif ($category_led) {
+            $related_header_eyebrow = $related_pick_curated_line(['SAME LINEUP', 'CURATED FOR YOU', 'RELATED PICKS'], $seed);
+            $related_header_subtitle = $related_pick_curated_line([
+                '從相同帽型出發，找到更多適合你的選擇',
+                '同類型帽款推薦，讓你更容易找到最適合的一頂',
+                '精選相同帽型商品，延伸更多實用選擇',
+            ], $seed + 19);
+        } else {
+            $related_header_eyebrow = $related_pick_curated_line(['MORE TO EXPLORE', 'RELATED PICKS', 'CURATED FOR YOU'], $seed);
+            $related_header_subtitle = $related_pick_curated_line([
+                '為你精選更多值得延伸比較的帽款',
+                '也推薦你看看這些熱門帽款',
+                '延伸逛逛更多站內人氣選擇',
+            ], $seed + 23);
         }
     } catch (PDOException $e) {
         $related_products = [];
+        $related_header_eyebrow = '';
+        $related_header_subtitle = '';
     }
 }
 
-// 商品多圖（product_images）：SELECT *，ORDER BY sort_order ASC, id ASC；第一張為主圖
+// 商品多圖（product_images）：依 sort_order ASC, id ASC；第一張為主圖
 $images = [];
 $product_gallery_urls = [];
-$gallery_images_dir = 'assets/images/products/';
-$gallery_default = $gallery_images_dir . 'default.jpg';
+$gallery_default = resolve_product_card_image_src(null);
 
 if ($product) {
     try {
@@ -159,16 +255,8 @@ if ($product) {
         $img_stmt->execute([':product_id' => $product_id]);
         $images = $img_stmt->fetchAll(PDO::FETCH_ASSOC);
         foreach ($images as $img_row) {
-            $rel = trim((string)($img_row['image_url'] ?? ''));
-            if ($rel === '') {
-                continue;
-            }
-            $rel = str_replace('\\', '/', $rel);
-            if (strpos($rel, '..') !== false) {
-                continue;
-            }
-            $rel = ltrim($rel, '/');
-            $product_gallery_urls[] = $gallery_images_dir . $rel;
+            $resolved = resolve_product_card_image_src($img_row['image_url'] ?? null);
+            $product_gallery_urls[] = $resolved;
         }
     } catch (PDOException $e) {
         $images = [];
@@ -176,9 +264,17 @@ if ($product) {
     }
 
     if (empty($product_gallery_urls)) {
+        $product_gallery_urls[] = resolve_product_card_image_src($product['primary_image'] ?? null);
+    }
+
+    if (empty($product_gallery_urls)) {
         $product_gallery_urls[] = $gallery_default;
     }
 }
+
+$product_images = array_map(static function ($url) {
+    return ['image_url' => $url];
+}, $product_gallery_urls);
 
 ?>
 <!DOCTYPE html>
@@ -202,37 +298,30 @@ if ($product) {
                     <a href="products.php" class="btn-primary">返回商品總覽</a>
                 </div>
             <?php elseif ($product): ?>
+                <?php
+                $show_cart_toast_shell = $is_logged_in && (
+                    ($show_helmet_size_block && $sizes_in_stock)
+                    || (!$show_helmet_size_block && $product)
+                );
+                ?>
+                <?php if ($show_cart_toast_shell): ?>
+                    <div id="cart-toast" class="toast product-detail-cart-toast hidden" role="status" aria-live="polite"><span id="cart-toast-message"></span></div>
+                <?php endif; ?>
                 <div class="product-detail-wrapper product-detail-layout">
-                    <!-- 左側：縮圖列表 + 右側：主圖（多圖切換） -->
-                    <?php
-                    $gallery_count = count($product_gallery_urls);
-                    $main_image_src = $product_gallery_urls[0];
-                    $gallery_single_class = $gallery_count <= 1 ? ' product-detail-gallery--single' : '';
-                    ?>
-                    <div class="product-detail-gallery product-left product-image-gallery<?php echo $gallery_single_class; ?>">
-                        <div class="product-detail-main-image product-detail-image product-image-box product-main-image">
-                            <img
-                                id="mainProductImage"
-                                src="<?php echo htmlspecialchars($main_image_src, ENT_QUOTES); ?>"
-                                alt="<?php echo htmlspecialchars($product['name']); ?>"
-                            >
+                    <div class="product-images-wrapper product-left">
+
+                        <!-- 主圖 -->
+                        <div class="product-main-image">
+                            <img src="<?= htmlspecialchars($product_images[0]['image_url'] ?? '', ENT_QUOTES) ?>" id="mainImage" alt="<?php echo htmlspecialchars($product['name']); ?>">
                         </div>
-                        <?php if ($gallery_count > 1): ?>
-                            <div class="product-detail-thumbs product-thumbnails" role="tablist" aria-label="商品圖片縮圖">
-                                <?php foreach ($product_gallery_urls as $gi => $gurl): ?>
-                                    <button
-                                        type="button"
-                                        class="product-detail-thumb<?php echo $gi === 0 ? ' is-active' : ''; ?>"
-                                        data-src="<?php echo htmlspecialchars($gurl, ENT_QUOTES); ?>"
-                                        onclick="document.getElementById('mainProductImage').src=this.dataset.src;"
-                                        aria-label="檢視圖片 <?php echo (int)($gi + 1); ?>"
-                                        aria-pressed="<?php echo $gi === 0 ? 'true' : 'false'; ?>"
-                                    >
-                                        <img class="thumbnail-img" src="<?php echo htmlspecialchars($gurl, ENT_QUOTES); ?>" alt="" loading="lazy">
-                                    </button>
-                                <?php endforeach; ?>
-                            </div>
-                        <?php endif; ?>
+
+                        <!-- 縮圖（主圖下方橫向） -->
+                        <div class="product-thumbnails">
+                            <?php foreach ($product_images as $img): ?>
+                                <img src="<?= htmlspecialchars($img['image_url'], ENT_QUOTES) ?>" alt="" class="thumb-img" loading="lazy">
+                            <?php endforeach; ?>
+                        </div>
+
                     </div>
 
                     <!-- 右側資訊區 -->
@@ -358,20 +447,32 @@ if ($product) {
                                 <?php endif; ?>
 
                                 <?php if ($show_helmet_size_block && $sizes_in_stock || (!$show_helmet_size_block && $product)): ?>
-                                    <!-- Toast 訊息（有加入購物車表單時顯示） -->
-                                    <div id="cartToast" class="cart-toast" style="display: none;">
-                                        <span id="cartToastMessage"></span>
-                                    </div>
-                                    
                                     <script>
+                                        var cartToastHideTimer = null;
                                         function showToast(message, type) {
-                                            var toast = document.getElementById('cartToast');
-                                            var toastMessage = document.getElementById('cartToastMessage');
+                                            var toast = document.getElementById('cart-toast');
+                                            var toastMessage = document.getElementById('cart-toast-message');
                                             if (!toast || !toastMessage) return;
+                                            if (cartToastHideTimer) {
+                                                clearTimeout(cartToastHideTimer);
+                                                cartToastHideTimer = null;
+                                            }
                                             toastMessage.textContent = message;
-                                            toast.className = 'cart-toast ' + type;
-                                            toast.style.display = 'block';
-                                            setTimeout(function() { toast.style.display = 'none'; }, 3000);
+                                            toast.classList.remove('hidden', 'is-hiding', 'is-error');
+                                            if (type === 'error') {
+                                                toast.classList.add('is-error');
+                                            }
+                                            void toast.offsetWidth;
+                                            toast.classList.add('is-visible');
+                                            cartToastHideTimer = setTimeout(function () {
+                                                toast.classList.remove('is-visible');
+                                                toast.classList.add('is-hiding');
+                                                setTimeout(function () {
+                                                    toast.classList.add('hidden');
+                                                    toast.classList.remove('is-hiding', 'is-error');
+                                                    cartToastHideTimer = null;
+                                                }, 280);
+                                            }, 3000);
                                         }
 
                                         function bindAddToCartForm(formId, qtyResetId) {
@@ -407,7 +508,7 @@ if ($product) {
                                                         var q = document.getElementById(qtyResetId);
                                                         if (q) q.value = 1;
                                                         if (buyNow) {
-                                                            window.location.href = 'checkout.php';
+                                                            window.location.href = 'cart.php';
                                                             return;
                                                         }
                                                     } else {
@@ -547,26 +648,33 @@ if ($product) {
                 </div>
 
                 <?php if (!empty($related_products)): ?>
-                    <section class="product-related-section" aria-label="相關商品推薦">
-                        <div class="product-related-header">
+                    <section class="product-related-section product-related-section--theme" aria-label="相關商品推薦">
+                        <header class="product-related-theme-head">
+                            <?php if ($related_header_eyebrow !== ''): ?>
+                                <p class="product-related-theme-eyebrow"><?php echo htmlspecialchars($related_header_eyebrow); ?></p>
+                            <?php endif; ?>
                             <h2 class="product-related-title">相關商品推薦</h2>
-                            <p class="product-related-subtitle">依目前商品類型推薦相似商品</p>
-                        </div>
-                        <div class="product-related-grid">
+                            <?php if ($related_header_subtitle !== ''): ?>
+                                <p class="product-related-subtitle product-related-subtitle--theme"><?php echo htmlspecialchars($related_header_subtitle); ?></p>
+                            <?php endif; ?>
+                        </header>
+                        <div class="product-related-theme-grid" role="list">
                             <?php foreach ($related_products as $rp): ?>
-                                <?php $rp_img = resolve_product_card_image_src($rp['primary_image'] ?? null); ?>
-                                <article class="product-related-card">
-                                    <a class="product-related-image-link" href="product_detail.php?id=<?php echo (int)$rp['id']; ?>">
-                                        <img class="product-related-image" src="<?php echo htmlspecialchars($rp_img, ENT_QUOTES); ?>" alt="<?php echo htmlspecialchars((string)$rp['name']); ?>">
-                                    </a>
-                                    <div class="product-related-body">
-                                        <h3 class="product-related-name">
-                                            <a href="product_detail.php?id=<?php echo (int)$rp['id']; ?>"><?php echo htmlspecialchars((string)$rp['name']); ?></a>
-                                        </h3>
-                                        <p class="product-related-price">NT$ <?php echo number_format((float)$rp['price'], 0); ?></p>
-                                        <a class="product-related-link" href="product_detail.php?id=<?php echo (int)$rp['id']; ?>">查看詳情</a>
+                                <?php
+                                $rp_img = resolve_product_card_image_src($rp['primary_image'] ?? null);
+                                $rp_id = (int)$rp['id'];
+                                $rp_href = 'product_detail.php?id=' . $rp_id;
+                                $bg_css = 'background-image: url(' . json_encode($rp_img, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ')';
+                                ?>
+                                <a class="product-related-theme-card" href="<?php echo htmlspecialchars($rp_href); ?>" role="listitem">
+                                    <span class="product-related-theme-card__bg" style="<?php echo htmlspecialchars($bg_css, ENT_QUOTES, 'UTF-8'); ?>" aria-hidden="true"></span>
+                                    <span class="product-related-theme-card__mask" aria-hidden="true"></span>
+                                    <div class="product-related-theme-card__content">
+                                        <h3 class="product-related-theme-card__title"><?php echo htmlspecialchars((string)$rp['name']); ?></h3>
+                                        <p class="product-related-theme-card__price">NT$ <?php echo number_format((float)$rp['price'], 0); ?></p>
+                                        <span class="product-related-theme-card__cta">查看詳情 <span aria-hidden="true">→</span></span>
                                     </div>
-                                </article>
+                                </a>
                             <?php endforeach; ?>
                         </div>
                     </section>
@@ -591,8 +699,8 @@ if ($product) {
                     <h3 class="footer-title">顧客服務</h3>
                     <ul class="footer-links">
                         <li><a href="guide.php">購物指南</a></li>
-                        <li><a href="faq.php">常見問題</a></li>
-                        <li><a href="return.php">退換貨政策</a></li>
+                        <li><a href="faq.php">常見問題 FAQ</a></li>
+                        <li><a href="return.php">退貨政策</a></li>
                         <li><a href="shipping.php">運送說明</a></li>
                     </ul>
                 </div>
@@ -671,26 +779,50 @@ if ($product) {
                 });
             }
         })();
+    </script>
 
-        // 商品詳情：縮圖切換主圖
-        (function() {
-            const mainImg = document.getElementById('mainProductImage');
-            if (!mainImg) return;
-            document.querySelectorAll('.product-detail-thumb').forEach(function(btn) {
-                btn.addEventListener('click', function() {
-                    const src = btn.getAttribute('data-src');
-                    if (src) {
-                        mainImg.src = src;
-                    }
-                    document.querySelectorAll('.product-detail-thumb').forEach(function(b) {
-                        b.classList.remove('is-active');
-                        b.setAttribute('aria-pressed', 'false');
-                    });
-                    btn.classList.add('is-active');
-                    btn.setAttribute('aria-pressed', 'true');
-                });
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const mainImage = document.getElementById('mainImage');
+        const thumbs = document.querySelectorAll('.product-thumbnails img, .product-thumb-list img, .product-thumbnails .thumb-img, .product-thumb-list .thumb-img');
+
+        if (!mainImage || !thumbs.length) return;
+
+        thumbs.forEach((thumb, index) => {
+            if (index === 0) {
+                thumb.classList.add('is-active');
+            }
+
+            thumb.addEventListener('click', function () {
+                const newSrc = this.getAttribute('src');
+                if (!newSrc) return;
+
+                /* 同一張就不重切，避免閃爍 */
+                if (mainImage.getAttribute('src') === newSrc) {
+                    thumbs.forEach(t => t.classList.remove('is-active'));
+                    this.classList.add('is-active');
+                    return;
+                }
+
+                thumbs.forEach(t => t.classList.remove('is-active'));
+                this.classList.add('is-active');
+
+                mainImage.classList.add('is-switching');
+
+                const tempImg = new Image();
+                tempImg.onload = function () {
+                    setTimeout(function () {
+                        mainImage.setAttribute('src', newSrc);
+                        mainImage.classList.remove('is-switching');
+                    }, 120);
+                };
+                tempImg.onerror = function () {
+                    mainImage.classList.remove('is-switching');
+                };
+                tempImg.src = newSrc;
             });
-        })();
+        });
+    });
     </script>
 </body>
 </html>

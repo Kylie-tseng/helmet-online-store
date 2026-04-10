@@ -35,10 +35,11 @@ try {
 
     <main class="return-policy-shell">
         <div class="container return-policy-container">
-            <header class="return-policy-header page-hero-header">
-                <h1 class="page-hero-title">退貨政策</h1>
-                <p class="page-hero-subtitle">為保障您的購物權益，以下為 HelmetVRse 退換貨與退款說明，請於申請前先行閱讀。</p>
-            </header>
+            <div class="section-header">
+                <div class="section-eyebrow">RETURN POLICY</div>
+                <h1 class="section-title">退貨政策</h1>
+                <p class="section-subtitle">為保障您的購物權益，以下為 HelmetVRse 退換貨與退款說明，請於申請前先行閱讀。</p>
+            </div>
 
             <section class="return-policy-panel" aria-label="退換貨政策內容">
                 <article class="return-policy-item">
@@ -102,7 +103,7 @@ try {
                     <h3 class="footer-title">顧客服務</h3>
                     <ul class="footer-links">
                         <li><a href="guide.php">購物指南</a></li>
-                        <li><a href="faq.php">常見問題</a></li>
+                        <li><a href="faq.php">常見問題 FAQ</a></li>
                         <li><a href="return_policy.php">退貨政策</a></li>
                         <li><a href="shipping.php">運送說明</a></li>
                     </ul>

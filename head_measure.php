@@ -35,10 +35,11 @@ try {
 
     <main class="measure-shell">
         <div class="container">
-            <header class="measure-hero page-hero-header">
-                <h1 class="page-hero-title">頭圍量測教學</h1>
-                <p class="page-hero-subtitle">選擇正確的尺寸是安全的第一步，請參考以下步驟進行測量。</p>
-            </header>
+            <div class="section-header">
+                <div class="section-eyebrow">HEAD MEASURE</div>
+                <h1 class="section-title">頭圍量測教學</h1>
+                <p class="section-subtitle">選擇正確的尺寸是安全的第一步，請參考以下步驟進行測量。</p>
+            </div>
 
             <div class="measure-content">
                 <div class="measure-steps-grid">

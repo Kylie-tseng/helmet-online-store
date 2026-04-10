@@ -35,10 +35,11 @@ try {
 
     <main class="faq-shell">
         <div class="container">
-            <header class="faq-hero page-hero-header">
-                <h1 class="page-hero-title">常見問題 FAQ</h1>
-                <p class="page-hero-subtitle">整理購買、尺寸、保養與售後相關問題，快速找到你需要的答案。</p>
-            </header>
+            <div class="section-header">
+                <div class="section-eyebrow">FAQ</div>
+                <h1 class="section-title">常見問題 FAQ</h1>
+                <p class="section-subtitle">整理購買、尺寸、保養與售後相關問題，快速找到你需要的答案。</p>
+            </div>
 
             <div class="faq-content">
                 <section class="faq-section">

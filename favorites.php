@@ -47,6 +47,44 @@ try {
     $favorites = [];
 }
 
+$favorite_sizes_map = [];
+if (!empty($favorites)) {
+    $favorite_product_ids = array_values(array_unique(array_map(static function ($row) {
+        return (int)($row['id'] ?? 0);
+    }, $favorites)));
+    $favorite_product_ids = array_values(array_filter($favorite_product_ids, static function ($id) {
+        return $id > 0;
+    }));
+
+    if (!empty($favorite_product_ids)) {
+        try {
+            $placeholders = implode(',', array_fill(0, count($favorite_product_ids), '?'));
+            $sql = "SELECT product_id, size, stock
+                    FROM product_sizes
+                    WHERE product_id IN ($placeholders)
+                    ORDER BY product_id ASC, FIELD(size, 'S', 'M', 'L', 'XL'), size ASC";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($favorite_product_ids);
+            $size_rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($size_rows as $size_row) {
+                $pid = (int)($size_row['product_id'] ?? 0);
+                if ($pid <= 0) {
+                    continue;
+                }
+                if (!isset($favorite_sizes_map[$pid])) {
+                    $favorite_sizes_map[$pid] = [];
+                }
+                $favorite_sizes_map[$pid][] = [
+                    'size' => (string)($size_row['size'] ?? ''),
+                    'stock' => (int)($size_row['stock'] ?? 0),
+                ];
+            }
+        } catch (PDOException $e) {
+            $favorite_sizes_map = [];
+        }
+    }
+}
+
 if (!isset($_SESSION['compare_list']) || !is_array($_SESSION['compare_list'])) {
     $_SESSION['compare_list'] = [];
 }
@@ -131,10 +169,43 @@ unset($_SESSION['compare_flash']);
                                 </div>
 
                                 <div class="favorite-card-actions">
-                                    <button type="button" class="btn-add-cart btn-primary" data-id="<?php echo (int)$item['id']; ?>">加入購物車</button>
-                                    <a href="product_detail.php?id=<?php echo (int)$item['id']; ?>" class="btn-secondary">查看詳情</a>
+                                    <?php
+                                    $size_options = $favorite_sizes_map[(int)$item['id']] ?? [];
+                                    $requires_size = !empty($size_options);
+                                    ?>
+                                    <div
+                                        class="favorite-size-row"
+                                        data-selected-size="<?php echo $requires_size ? '' : '__NONE__'; ?>"
+                                        data-requires-size="<?php echo $requires_size ? '1' : '0'; ?>"
+                                    >
+                                        <?php if ($requires_size): ?>
+                                            <?php foreach ($size_options as $opt): ?>
+                                                <?php
+                                                $size_label = trim((string)($opt['size'] ?? ''));
+                                                $is_disabled = ((int)($opt['stock'] ?? 0) <= 0);
+                                                if ($size_label === '') {
+                                                    continue;
+                                                }
+                                                ?>
+                                                <button
+                                                    type="button"
+                                                    class="favorite-size-btn <?php echo $is_disabled ? 'is-disabled' : ''; ?>"
+                                                    data-size="<?php echo htmlspecialchars($size_label); ?>"
+                                                    <?php echo $is_disabled ? 'disabled' : ''; ?>
+                                                >
+                                                    <?php echo htmlspecialchars($size_label); ?>
+                                                </button>
+                                            <?php endforeach; ?>
+                                        <?php else: ?>
+                                            <button type="button" class="favorite-size-btn is-selected" data-size="__NONE__">統一尺寸</button>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="favorite-action-row">
+                                        <button type="button" class="btn-add-cart btn-primary" data-id="<?php echo (int)$item['id']; ?>">加入購物車</button>
+                                        <a href="product_detail.php?id=<?php echo (int)$item['id']; ?>" class="btn-secondary">查看詳情</a>
+                                    </div>
                                 </div>
-                                <form action="compare_actions.php" method="POST" class="favorite-compare-form">
+                                <form action="compare_actions.php" method="POST" class="favorite-compare-form favorite-compare-row">
                                     <input type="hidden" name="product_id" value="<?php echo (int)$item['id']; ?>">
                                     <input type="hidden" name="redirect" value="favorites.php">
                                     <button
@@ -184,12 +255,36 @@ unset($_SESSION['compare_flash']);
             setTimeout(function () { t.remove(); }, 2000);
         }
 
+        document.querySelectorAll('.favorite-size-row').forEach(function (row) {
+            row.querySelectorAll('.favorite-size-btn').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    if (btn.classList.contains('is-disabled') || btn.disabled) return;
+                    row.querySelectorAll('.favorite-size-btn').forEach(function (peer) {
+                        peer.classList.remove('is-selected');
+                    });
+                    btn.classList.add('is-selected');
+                    row.dataset.selectedSize = btn.getAttribute('data-size') || '';
+                });
+            });
+        });
+
         document.querySelectorAll('.btn-add-cart').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 var id = this.dataset.id;
+                var card = this.closest('.favorite-card');
+                var sizeRow = card ? card.querySelector('.favorite-size-row') : null;
+                var selectedSize = sizeRow ? String(sizeRow.dataset.selectedSize || '') : '';
+                var requiresSize = sizeRow ? String(sizeRow.dataset.requiresSize || '0') === '1' : false;
+                if (requiresSize && !selectedSize) {
+                    showToast('請選擇尺寸');
+                    return;
+                }
                 var fd = new FormData();
                 fd.append('product_id', id);
                 fd.append('quantity', '1');
+                if (selectedSize && selectedSize !== '__NONE__') {
+                    fd.append('size', selectedSize);
+                }
                 fetch('api/add_to_cart.php', {
                     method: 'POST',
                     body: fd

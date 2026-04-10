@@ -17,8 +17,8 @@ $active_tab = isset($_GET['tab']) ? (string)$_GET['tab'] : 'info'; // 預設顯�
 
 // 設定頁籤分頁內的篩選條件（使用者端）
 $order_q = trim((string)($_GET['order_q'] ?? ''));
-$order_status_filter = trim((string)($_GET['order_status'] ?? '')); // pending/shipped/completed/cancelled
-$allowedOrderStatusFilters = ['', 'pending', 'shipped', 'completed', 'cancelled'];
+$order_status_filter = trim((string)($_GET['order_status'] ?? ''));
+$allowedOrderStatusFilters = member_order_status_filter_whitelist();
 if ($order_status_filter !== '' && !in_array($order_status_filter, $allowedOrderStatusFilters, true)) {
     $order_status_filter = '';
 }
@@ -186,7 +186,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             if (!$order) {
                 $error = '找不到此訂單';
             } else {
-                $allowedReturnOrderStatuses = ['completed', 'shipped'];
+                $allowedReturnOrderStatuses = ['completed'];
                 $currentStatus = (string)($order['status'] ?? '');
                 if (!in_array($currentStatus, $allowedReturnOrderStatuses, true)) {
                     $error = '此訂單目前不可申請退貨';
@@ -270,14 +270,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                             $sql = "INSERT INTO return_requests (" . implode(', ', $insertCols) . ")
                                     VALUES (" . implode(', ', $insertVals) . ")";
 
+                            $pdo->beginTransaction();
                             $istmt = $pdo->prepare($sql);
                             $istmt->execute($insertParams);
-                            $success = '退貨申請已送出';
+
+                            // 送出退貨申請後，同步標記訂單為「退貨申請中」
+                            $ostmt = $pdo->prepare("UPDATE orders SET status = 'return_requested', updated_at = NOW() WHERE id = :id AND user_id = :user_id");
+                            $ostmt->execute([':id' => $order_id, ':user_id' => $user_id]);
+
+                            $pdo->commit();
+                            $success = '退貨申請已送出，訂單已更新為退貨申請中';
                         }
                     }
                 }
             }
         } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             $error = '送出退貨申請時發生錯誤：' . $e->getMessage();
         }
     }
@@ -367,30 +377,24 @@ try {
 
 // 查詢訂單資料（訂單管理分頁）
 $orders = [];
+$member_orders_total_count = 0;
 if ($active_tab === 'orders') {
     try {
+        // 不顯示舊流程「尚未完成信用卡付款」的 pending 訂單（新流程在付款前不寫入 orders）
+        $orders_exclude_abandoned_cc = " AND NOT (LOWER(TRIM(COALESCE(payment_method,''))) = 'credit_card' AND LOWER(TRIM(COALESCE(status,''))) = 'pending')";
+
+        $cntStmt = $pdo->prepare("SELECT COUNT(*) FROM orders WHERE user_id = :user_id" . $orders_exclude_abandoned_cc);
+        $cntStmt->execute([':user_id' => $user_id]);
+        $member_orders_total_count = (int)$cntStmt->fetchColumn();
+
         $sql = "SELECT id, coupon_id, total_amount, discount_amount, final_amount, status, payment_method, shipping_method, shipping_address, pickup_store, staff_note, created_at, updated_at
                 FROM orders
-                WHERE user_id = :user_id";
+                WHERE user_id = :user_id" . $orders_exclude_abandoned_cc;
 
         $params = [':user_id' => $user_id];
 
-        // 訂單狀態篩選（前後台統一：待處理/已出貨/已完成/已取消）
-        if ($order_status_filter !== '') {
-            if ($order_status_filter === 'pending') {
-                $sql .= " AND status IN ('pending', 'pending_payment', 'paid', 'processing', 'progress')";
-            } else {
-                $map = [
-                    'shipped' => 'shipped',
-                    'completed' => 'completed',
-                    'cancelled' => 'cancelled'
-                ];
-                if (isset($map[$order_status_filter])) {
-                    $sql .= " AND status = :status";
-                    $params[':status'] = $map[$order_status_filter];
-                }
-            }
-        }
+        // 訂單狀態篩選：與 get_order_status_key / badge「待處理」等分組一致（prepared + 白名單）
+        $sql .= member_order_list_status_filter_sql($order_status_filter, $params);
 
         // 訂單編號搜尋
         if ($order_q !== '') {
@@ -406,10 +410,11 @@ if ($active_tab === 'orders') {
         
         // 為每個訂單查詢明細（包含尺寸）
         foreach ($orders as &$order) {
-            $stmt = $pdo->prepare("SELECT oi.id, oi.product_id, oi.quantity, oi.unit_price, oi.subtotal, oi.size, p.name AS product_name,
+            $stmt = $pdo->prepare("SELECT oi.id, oi.product_id, oi.quantity, oi.unit_price, oi.subtotal, oi.size,
+                                          COALESCE(NULLIF(p.name, ''), CONCAT('商品 #', oi.product_id, '（可能已下架）')) AS product_name,
                                           " . primaryImageSubquery('p', 'pi') . " AS primary_image
                                    FROM order_items oi
-                                   INNER JOIN products p ON oi.product_id = p.id
+                                   LEFT JOIN products p ON oi.product_id = p.id
                                    WHERE oi.order_id = :order_id");
             $stmt->execute([':order_id' => $order['id']]);
             $order['items'] = $stmt->fetchAll();
@@ -440,6 +445,7 @@ if ($active_tab === 'coupons') {
         $claimedAtSelect = $hasUserCouponsClaimedAtColumn ? "uc.claimed_at" : "NULL";
 
         $stmt = $pdo->prepare("SELECT uc.id,
+                                       c.id AS coupon_id,
                                        c.coupon_code,
                                        uc.status,
                                        uc.created_at,
@@ -453,6 +459,8 @@ if ($active_tab === 'coupons') {
         $stmt->execute([':user_id' => $user_id]);
         $rows = $stmt->fetchAll();
 
+        $consumedCouponDates = getUserCouponConsumedDatesMap($pdo, (int)$user_id);
+
         $nowDate = date('Y-m-d');
         $couponStatusLabels = [
             'unused' => '可使用',
@@ -461,15 +469,18 @@ if ($active_tab === 'coupons') {
         ];
 
         // 把資料轉成「可顯示」的狀態與 badge class，同時套用篩選
+        // 「已使用」僅依 orders：完成態訂單且 coupon_id 相符（不依 session／購物車暫套／user_coupons.status）
         $user_coupons = [];
         foreach ($rows as $row) {
-            $rawStatus = (string)($row['status'] ?? '');
             $expireDate = (string)($row['expire_date'] ?? '');
+            $couponId = (int)($row['coupon_id'] ?? 0);
 
-            if ($rawStatus === 'used') {
+            if ($couponId > 0 && array_key_exists($couponId, $consumedCouponDates)) {
                 $effectiveStatus = 'used';
+            } elseif ($expireDate !== '' && $nowDate > $expireDate) {
+                $effectiveStatus = 'expired';
             } else {
-                $effectiveStatus = ($expireDate !== '' && $nowDate > $expireDate) ? 'expired' : 'unused';
+                $effectiveStatus = 'unused';
             }
 
             if ($coupon_status_filter !== 'all' && $effectiveStatus !== $coupon_status_filter) {
@@ -485,9 +496,7 @@ if ($active_tab === 'coupons') {
 
             $displayDate = '';
             if ($effectiveStatus === 'used') {
-                $claimedAt = $row['claimed_at'] ?? null;
-                $ts = $claimedAt ? strtotime((string)$claimedAt) : (strtotime((string)($row['created_at'] ?? '')) ?: null);
-                $displayDate = $ts ? date('Y-m-d', $ts) : '';
+                $displayDate = (string)($consumedCouponDates[$couponId] ?? '');
             } else {
                 $ts = $expireDate ? strtotime($expireDate) : null;
                 $displayDate = $ts ? date('Y-m-d', $ts) : '';
@@ -719,6 +728,7 @@ try {
                                             <option value="pending" <?php echo $order_status_filter === 'pending' ? 'selected' : ''; ?>>待處理</option>
                                             <option value="shipped" <?php echo $order_status_filter === 'shipped' ? 'selected' : ''; ?>>已出貨</option>
                                             <option value="completed" <?php echo $order_status_filter === 'completed' ? 'selected' : ''; ?>>已完成</option>
+                                            <option value="return_requested" <?php echo $order_status_filter === 'return_requested' ? 'selected' : ''; ?>>退貨申請中</option>
                                             <option value="cancelled" <?php echo $order_status_filter === 'cancelled' ? 'selected' : ''; ?>>已取消</option>
                                         </select>
 
@@ -739,7 +749,7 @@ try {
 
                         <div class="member-list-card account-orders-shell">
                             <?php if (empty($orders)): ?>
-                                <div class="member-empty-message">目前尚未有任何訂單。</div>
+                                <div class="member-empty-message"><?php echo htmlspecialchars(member_orders_empty_message($member_orders_total_count, $order_status_filter, $order_q)); ?></div>
                             <?php else: ?>
                                 <div class="member-orders-list member-orders account-orders-list">
                                     <?php foreach ($orders as $order): ?>
@@ -889,7 +899,7 @@ try {
                                                             <?php endforeach; ?>
                                                         </div>
                                                     <?php else: ?>
-                                                        <?php $canApplyReturn = in_array((string)($order['status'] ?? ''), ['completed', 'shipped'], true); ?>
+                                                        <?php $canApplyReturn = ((string)($order['status'] ?? '') === 'completed'); ?>
                                                         <?php if ($canApplyReturn): ?>
                                                             <form method="POST" action="profile.php?tab=orders" class="member-return-apply-form">
                                                                 <input type="hidden" name="action" value="request_return">
@@ -953,7 +963,7 @@ try {
                             <div class="member-feedback member-feedback--error"><?php echo htmlspecialchars($error); ?></div>
                         <?php endif; ?>
 
-                        <div class="member-list-card">
+                        <div class="member-list-card member-list-card--coupons">
                             <?php if (empty($user_coupons)): ?>
                                 <div class="member-empty-message">目前尚未領取任何優惠券。</div>
                             <?php else: ?>
@@ -969,30 +979,44 @@ try {
                                         ?>
 
                                         <div class="member-coupon-card">
-                                            <div class="member-coupon-head">
-                                                <div class="member-coupon-title">
-                                                    <?php echo htmlspecialchars((string)($meta['name'] ?? ($coupon['coupon_code'] ?? ''))); ?>
-                                                    <span class="member-coupon-code"><?php echo htmlspecialchars((string)($coupon['coupon_code'] ?? '')); ?></span>
+                                            <div class="member-coupon-body">
+                                                <div class="member-coupon-head">
+                                                    <div class="member-coupon-head-main">
+                                                        <h3 class="member-coupon-title"><?php echo htmlspecialchars((string)($meta['name'] ?? ($coupon['coupon_code'] ?? ''))); ?></h3>
+                                                        <div class="member-coupon-code"><?php echo htmlspecialchars((string)($coupon['coupon_code'] ?? '')); ?></div>
+                                                    </div>
+                                                    <div class="member-coupon-aside">
+                                                        <span class="member-badge <?php echo htmlspecialchars($badgeKey); ?>">
+                                                            <?php echo htmlspecialchars($badgeLabel); ?>
+                                                        </span>
+                                                        <?php if ($effectiveStatus === 'unused'): ?>
+                                                            <a href="cart.php?coupon=<?php echo urlencode((string)($coupon['coupon_code'] ?? '')); ?>" class="member-coupon-use-link">前往使用</a>
+                                                        <?php endif; ?>
+                                                    </div>
                                                 </div>
-                                                <span class="member-badge <?php echo htmlspecialchars($badgeKey); ?>">
-                                                    <?php echo htmlspecialchars($badgeLabel); ?>
-                                                </span>
-                                            </div>
 
-                                            <div class="member-coupon-content">
-                                                <?php echo htmlspecialchars((string)($meta['content'] ?? '')); ?>
-                                            </div>
+                                                <p class="member-coupon-desc"><?php echo htmlspecialchars((string)($meta['content'] ?? '')); ?></p>
 
-                                            <div class="member-coupon-meta">
-                                                <?php if ($effectiveStatus === 'used'): ?>
-                                                    <div class="member-coupon-date">使用日期：<?php echo htmlspecialchars($displayDate); ?></div>
-                                                <?php else: ?>
-                                                    <div class="member-coupon-date">到期日：<?php echo htmlspecialchars($displayDate); ?></div>
-                                                <?php endif; ?>
+                                                <div class="member-coupon-meta-rows">
+                                                    <?php if ($effectiveStatus === 'used'): ?>
+                                                        <div class="member-coupon-meta-row">
+                                                            <span class="member-coupon-meta-label">使用日期</span>
+                                                            <span class="member-coupon-meta-value"><?php echo htmlspecialchars($displayDate); ?></span>
+                                                        </div>
+                                                    <?php else: ?>
+                                                        <div class="member-coupon-meta-row">
+                                                            <span class="member-coupon-meta-label">到期日</span>
+                                                            <span class="member-coupon-meta-value"><?php echo htmlspecialchars($displayDate); ?></span>
+                                                        </div>
+                                                    <?php endif; ?>
 
-                                                <?php if ($minAmount > 0): ?>
-                                                    <div class="member-coupon-threshold">門檻：單筆滿 NT$ <?php echo number_format($minAmount, 0); ?> 才可使用</div>
-                                                <?php endif; ?>
+                                                    <?php if ($minAmount > 0): ?>
+                                                        <div class="member-coupon-meta-row">
+                                                            <span class="member-coupon-meta-label">門檻</span>
+                                                            <span class="member-coupon-meta-value">單筆滿 NT$ <?php echo number_format($minAmount, 0); ?> 才可使用</span>
+                                                        </div>
+                                                    <?php endif; ?>
+                                                </div>
                                             </div>
                                         </div>
                                     <?php endforeach; ?>
@@ -1021,8 +1045,8 @@ try {
                     <h3 class="footer-title">顧客服務</h3>
                     <ul class="footer-links">
                         <li><a href="guide.php">購物指南</a></li>
-                        <li><a href="faq.php">常見問題</a></li>
-                        <li><a href="return.php">退換貨政策</a></li>
+                        <li><a href="faq.php">常見問題 FAQ</a></li>
+                        <li><a href="return.php">退貨政策</a></li>
                         <li><a href="shipping.php">運送說明</a></li>
                     </ul>
                 </div>

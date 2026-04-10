@@ -35,10 +35,11 @@ try {
 
     <main class="care-shell">
         <div class="container">
-            <header class="care-hero page-hero-header">
-                <h1 class="page-hero-title">安全帽保養教學</h1>
-                <p class="page-hero-subtitle">良好的保養習慣不僅維持衛生，更能延長安全帽的使用壽命。</p>
-            </header>
+            <div class="section-header">
+                <div class="section-eyebrow">HELMET CARE</div>
+                <h1 class="section-title">安全帽保養教學</h1>
+                <p class="section-subtitle">良好的保養習慣不僅維持衛生，更能延長安全帽的使用壽命。</p>
+            </div>
 
             <div class="care-content">
                 <section class="care-section">

@@ -134,12 +134,16 @@ try {
 <?php renderNavbar($pdo, $categories, $parts_category_id); ?>
 
     <main class="coupon-page-shell">
+        <section class="coupon-page-hero" aria-label="優惠券專區標題">
+            <div class="container">
+                <div class="section-header section-header--hero-lines">
+                    <div class="section-eyebrow">COUPONS</div>
+                    <h1 class="section-title">優惠券專區</h1>
+                    <p class="section-subtitle">一次掌握目前所有活動優惠與折扣資訊</p>
+                </div>
+            </div>
+        </section>
         <div class="page-container coupon-page-container">
-            <section class="coupon-page-header page-hero-header">
-                <h1 class="page-hero-title">優惠券專區</h1>
-                <p class="page-hero-subtitle">一次掌握目前所有活動優惠與折扣資訊</p>
-            </section>
-
             <section class="coupon-list-panel" aria-label="優惠券總覽列表">
                 <?php foreach ($coupon_activities as $activity): ?>
                     <article class="coupon-card">
@@ -211,8 +215,8 @@ try {
                     <h3 class="footer-title">顧客服務</h3>
                     <ul class="footer-links">
                         <li><a href="guide.php">購物指南</a></li>
-                        <li><a href="faq.php">常見問題</a></li>
-                        <li><a href="return.php">退換貨政策</a></li>
+                        <li><a href="faq.php">常見問題 FAQ</a></li>
+                        <li><a href="return.php">退貨政策</a></li>
                         <li><a href="shipping.php">運送說明</a></li>
                     </ul>
                 </div>

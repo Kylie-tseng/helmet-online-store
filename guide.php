@@ -29,7 +29,7 @@ $guide_cards = [
         'href' => 'helmet_knowledge.php',
     ],
     [
-        'title' => '頭圍測量教學',
+        'title' => '頭圍量測教學',
         'desc' => '了解正確測量方式，找到更適合自己的尺寸。',
         'href' => 'head_measure.php',
     ],
@@ -49,7 +49,7 @@ $guide_cards = [
         'href' => 'return_policy.php',
     ],
     [
-        'title' => '常見問題',
+        'title' => '常見問題 FAQ',
         'desc' => '整理購買前後最常遇到的問題與解答。',
         'href' => 'faq.php',
     ],
@@ -68,10 +68,11 @@ $guide_cards = [
 
     <section class="guide-hero">
         <div class="container">
-            <header class="guide-hero-inner page-hero-header">
-                <h1 class="guide-hero-title page-hero-title">購物指南</h1>
-                <p class="guide-hero-subtitle page-hero-subtitle">從挑選安全帽到日常保養，快速找到你需要的資訊。</p>
-            </header>
+            <div class="section-header section-header--hero-lines">
+                <div class="section-eyebrow">GUIDE</div>
+                <h1 class="section-title">購物指南</h1>
+                <p class="section-subtitle">從挑選安全帽到日常保養，快速找到你需要的資訊。</p>
+            </div>
         </div>
     </section>
 
@@ -108,7 +109,7 @@ $guide_cards = [
                     <h3 class="footer-title">顧客服務</h3>
                     <ul class="footer-links">
                         <li><a href="guide.php">購物指南</a></li>
-                        <li><a href="faq.php">常見問題</a></li>
+                        <li><a href="faq.php">常見問題 FAQ</a></li>
                         <li><a href="return_policy.php">退貨政策</a></li>
                         <li><a href="shipping.php">運送說明</a></li>
                     </ul>

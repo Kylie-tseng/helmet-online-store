@@ -163,7 +163,7 @@ $index2AboutImgVer = (string)(@filemtime(__DIR__ . '/assets/images/index2.jpg') 
                     <h3 class="footer-title">顧客服務</h3>
                     <ul class="footer-links">
                         <li><a href="guide.php">購物指南</a></li>
-                        <li><a href="faq.php">常見問題</a></li>
+                        <li><a href="faq.php">常見問題 FAQ</a></li>
                         <li><a href="return_policy.php">退貨政策</a></li>
                         <li><a href="shipping.php">運送說明</a></li>
                     </ul>

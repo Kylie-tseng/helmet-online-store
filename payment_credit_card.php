@@ -2,102 +2,176 @@
 require_once 'config.php';
 require_once 'includes/cart_functions.php';
 require_once 'includes/product_query_helpers.php';
+require_once 'includes/credit_card_payment_validate.php';
 
-// 檢查是否已登入
 if (!isset($_SESSION['user_id'])) {
     header('Location: login.php?redirect=' . urlencode('payment_credit_card.php'));
     exit;
 }
 
-$user_id = $_SESSION['user_id'];
+$user_id = (int)$_SESSION['user_id'];
 
-// 檢查是否有待付款的訂單
-if (!isset($_SESSION['pending_order_id'])) {
+unset($_SESSION['pending_order_id']);
+
+$checkout_data = isset($_SESSION['checkout_data']) && is_array($_SESSION['checkout_data']) ? $_SESSION['checkout_data'] : null;
+if ($checkout_data === null || trim((string)($checkout_data['payment_method'] ?? '')) !== 'credit_card') {
     header('Location: checkout.php');
     exit;
 }
 
-$order_id = $_SESSION['pending_order_id'];
+$shipping_method = trim((string)($checkout_data['shipping_method'] ?? ''));
+$shipping_address = trim((string)($checkout_data['shipping_address'] ?? ''));
+$pickup_store = trim((string)($checkout_data['pickup_store'] ?? ''));
 
-// 查詢訂單資料
-try {
-    $stmt = $pdo->prepare("SELECT * FROM orders WHERE id = :order_id AND user_id = :user_id AND payment_method = 'credit_card' AND status = 'pending'");
-    $stmt->execute([':order_id' => $order_id, ':user_id' => $user_id]);
-    $order = $stmt->fetch();
-    
-    if (!$order) {
-        unset($_SESSION['pending_order_id']);
-        header('Location: checkout.php');
-        exit;
-    }
-} catch (PDOException $e) {
+if (!in_array($shipping_method, ['pickup', 'home'], true)) {
     header('Location: checkout.php');
     exit;
 }
 
-// 查詢訂單明細
-try {
-    $stmt = $pdo->prepare("SELECT oi.*, p.name AS product_name,
-                          " . primaryImageSubquery('p', 'pi') . " AS primary_image
-                          FROM order_items oi
-                          INNER JOIN products p ON oi.product_id = p.id
-                          WHERE oi.order_id = :order_id");
-    $stmt->execute([':order_id' => $order_id]);
-    $order_items = $stmt->fetchAll();
-} catch (PDOException $e) {
-    $order_items = [];
+$shipping_row = [
+    'shipping_method' => $shipping_method,
+    'shipping_address' => $shipping_address,
+    'pickup_store' => $pickup_store,
+];
+if (!credit_card_order_has_complete_shipping($shipping_row)) {
+    header('Location: checkout.php');
+    exit;
 }
 
-// 處理付款表單提交
 $payment_error = '';
+$repop_card_name = '';
+$repop_card_expiry = '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_payment'])) {
-    $card_number = isset($_POST['card_number']) ? trim($_POST['card_number']) : '';
-    $card_name = isset($_POST['card_name']) ? trim($_POST['card_name']) : '';
-    $card_expiry = isset($_POST['card_expiry']) ? trim($_POST['card_expiry']) : '';
-    $card_cvv = isset($_POST['card_cvv']) ? trim($_POST['card_cvv']) : '';
-    
-    $errors = [];
-    $card_number_clean = preg_replace('/\s+/', '', $card_number);
-    if (!preg_match('/^\d{16}$/', $card_number_clean)) {
-        $errors[] = '請輸入有效的16位信用卡號';
-    }
-    if (empty($card_name)) {
-        $errors[] = '請輸入持卡人姓名';
-    }
-    if (!preg_match('/^\d{2}\/\d{2}$/', $card_expiry)) {
-        $errors[] = '請輸入有效的有效期限（格式：MM/YY）';
-    }
-    if (!preg_match('/^\d{3}$/', $card_cvv)) {
-        $errors[] = '請輸入有效的安全碼（3位數字）';
-    }
-    
-    if (empty($errors)) {
-        $payment_updated = false;
-        try {
-            $stmt = $pdo->prepare("UPDATE orders SET status = 'paid', updated_at = NOW() WHERE id = :order_id AND user_id = :user_id");
-            $stmt->execute([':order_id' => $order_id, ':user_id' => $user_id]);
-            $payment_updated = true;
-        } catch (PDOException $e) {
-            $payment_error = '付款處理時發生錯誤：' . $e->getMessage();
-        }
-        if ($payment_updated) {
-            include __DIR__ . '/send_order.php';
-            $stmt = $pdo->prepare("DELETE FROM cart WHERE user_id = :user_id");
-            $stmt->execute([':user_id' => $user_id]);
-            unset($_SESSION['pending_order_id']);
-            unset($_SESSION['checkout_data']);
-            if (function_exists('clearAppliedCoupon')) {
-                clearAppliedCoupon();
-            }
-            $success_oid = (int)$order_id;
-            echo '<!DOCTYPE html><html lang="zh-TW"><head><meta charset="UTF-8"><meta http-equiv="refresh" content="0;url=order_success.php?order_id=' . $success_oid . '"><script>window.location.href=\'order_success.php?order_id=' . $success_oid . '\';</script></head><body></body></html>';
-            exit;
-        }
+// 注意：前端若用 HTMLFormElement.prototype.submit() 送出，submit 按鈕不會進 POST，必須靠 hidden 的 confirm_payment
+$is_payment_post = $_SERVER['REQUEST_METHOD'] === 'POST'
+    && (isset($_POST['confirm_payment']) || (array_key_exists('card_number', $_POST) && array_key_exists('card_name', $_POST)));
+
+if ($is_payment_post) {
+    $repop_card_name = isset($_POST['card_name']) ? trim((string)$_POST['card_name']) : '';
+    $repop_card_expiry = isset($_POST['card_expiry']) ? trim((string)$_POST['card_expiry']) : '';
+
+    $cart_items_post = getCartItems($pdo, $user_id);
+    $coupon_status_post = getAppliedCouponStatus($pdo, $cart_items_post);
+    $coupon_notice_post = !empty($coupon_status_post['message']) ? (string)$coupon_status_post['message'] : '';
+
+    if ($cart_items_post === []) {
+        $payment_error = '購物車是空的，無法建立訂單。';
+    } elseif ($coupon_notice_post !== '') {
+        $payment_error = '無法完成付款：' . htmlspecialchars($coupon_notice_post, ENT_QUOTES, 'UTF-8');
+    } elseif (!credit_card_order_has_complete_shipping($shipping_row)) {
+        $payment_error = '配送資料不完整，請返回結帳頁補齊。';
     } else {
-        $payment_error = implode('<br>', $errors);
+        $fieldCheck = validate_credit_card_payment_submission($_POST);
+        if (!$fieldCheck['ok']) {
+            $payment_error = implode('<br>', $fieldCheck['errors']);
+        } else {
+            $order_summary_post = calculateOrderSummary($cart_items_post, $shipping_method, $coupon_status_post['coupon']);
+            if ((float)($order_summary_post['final_total'] ?? 0) <= 0) {
+                $payment_error = '訂單金額異常，無法建立訂單。';
+            } else {
+                $order_amounts = build_orders_amount_fields($order_summary_post);
+                $order_coupon_id = !empty($coupon_status_post['coupon']['id']) ? (int)$coupon_status_post['coupon']['id'] : null;
+
+                try {
+                    $pdo->beginTransaction();
+
+                    $stmt = $pdo->prepare("INSERT INTO orders (user_id, coupon_id, total_amount, discount_amount, final_amount, status, payment_method, shipping_method, shipping_address, pickup_store)
+                         VALUES (:user_id, :coupon_id, :total_amount, :discount_amount, :final_amount, 'paid', 'credit_card', :shipping_method, :shipping_address, :pickup_store)");
+                    $stmt->execute([
+                        ':user_id' => $user_id,
+                        ':coupon_id' => $order_coupon_id,
+                        ':total_amount' => $order_amounts['total_amount'],
+                        ':discount_amount' => $order_amounts['discount_amount'],
+                        ':final_amount' => $order_amounts['final_amount'],
+                        ':shipping_method' => $shipping_method,
+                        ':shipping_address' => $shipping_method === 'home' ? $shipping_address : null,
+                        ':pickup_store' => $shipping_method === 'pickup' ? $pickup_store : null,
+                    ]);
+
+                    $order_id = (int)$pdo->lastInsertId();
+                    if ($order_id <= 0) {
+                        $pdo->rollBack();
+                        $payment_error = '建立訂單失敗，請稍後再試。';
+                    } else {
+                        foreach ($cart_items_post as $item) {
+                            $line_subtotal = (float)$item['price'] * (int)$item['quantity'];
+                            $cs = (string)($item['size'] ?? '');
+                            $order_item_size = ($cs === '' || $cs === getCartSizeNoneValue() || $cs === 'N') ? null : $item['size'];
+                            $stmt = $pdo->prepare("INSERT INTO order_items (order_id, product_id, size, quantity, unit_price, subtotal)
+                                                 VALUES (:order_id, :product_id, :size, :quantity, :unit_price, :subtotal)");
+                            $stmt->execute([
+                                ':order_id' => $order_id,
+                                ':product_id' => $item['product_id'],
+                                ':size' => $order_item_size,
+                                ':quantity' => $item['quantity'],
+                                ':unit_price' => $item['price'],
+                                ':subtotal' => $line_subtotal,
+                            ]);
+                        }
+
+                        $stmt = $pdo->prepare('SELECT COUNT(*) FROM order_items WHERE order_id = ?');
+                        $stmt->execute([$order_id]);
+                        $items_written = (int)$stmt->fetchColumn();
+                        if ($items_written !== count($cart_items_post)) {
+                            $pdo->rollBack();
+                            $payment_error = '訂單明細寫入異常，訂單未成立。';
+                        } else {
+                            markUserCouponUsedAfterOrderStatusChange($pdo, $order_id, 'paid');
+                            $stmt = $pdo->prepare('DELETE FROM cart WHERE user_id = :uid');
+                            $stmt->execute([':uid' => $user_id]);
+                            $pdo->commit();
+
+                            unset($_SESSION['checkout_data'], $_SESSION['pending_order_id']);
+                            if (function_exists('clearAppliedCoupon')) {
+                                clearAppliedCoupon();
+                            }
+                            unset($_SESSION['coupon_code_prefill']);
+
+                            $stmt = $pdo->prepare('SELECT * FROM orders WHERE id = :oid AND user_id = :uid LIMIT 1');
+                            $stmt->execute([':oid' => $order_id, ':uid' => $user_id]);
+                            $order = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                            $stmt = $pdo->prepare("SELECT oi.*,
+                              COALESCE(NULLIF(p.name, ''), CONCAT('商品 #', oi.product_id, '（可能已下架）')) AS product_name,
+                              " . primaryImageSubquery('p', 'pi') . " AS primary_image
+                              FROM order_items oi
+                              LEFT JOIN products p ON oi.product_id = p.id
+                              WHERE oi.order_id = :order_id");
+                            $stmt->execute([':order_id' => $order_id]);
+                            $order_items = $stmt->fetchAll();
+
+                            include __DIR__ . '/send_order.php';
+
+                            session_write_close();
+                            header('Location: order_success.php?order_id=' . (int)$order_id, true, 303);
+                            exit;
+                        }
+                    }
+                } catch (PDOException $e) {
+                    if ($pdo->inTransaction()) {
+                        $pdo->rollBack();
+                    }
+                    error_log('payment_credit_card PDO: ' . $e->getMessage());
+                    $payment_error = '付款處理時發生錯誤，請稍後再試。若問題持續，請聯絡客服。';
+                }
+            }
+        }
     }
 }
+
+$cart_items = getCartItems($pdo, $user_id);
+if ($cart_items === []) {
+    header('Location: cart.php');
+    exit;
+}
+
+$coupon_status = getAppliedCouponStatus($pdo, $cart_items);
+$coupon_notice = !empty($coupon_status['message']) ? (string)$coupon_status['message'] : '';
+$order_summary = calculateOrderSummary($cart_items, $shipping_method, $coupon_status['coupon']);
+$order_ready_for_payment = ($coupon_notice === '');
+
+$order_items = $cart_items;
+$order_items_count = count($order_items);
 
 // 導覽列分類查詢
 try {
@@ -134,78 +208,105 @@ require_once 'includes/navbar.php';
                     <div class="order-summary">
                         <div class="summary-row">
                             <span class="summary-label">訂單編號：</span>
-                            <span class="summary-value">#<?php echo htmlspecialchars($order_id); ?></span>
+                            <span class="summary-value">付款完成後成立</span>
                         </div>
                         <div class="summary-row">
-                            <span class="summary-label">訂單總金額：</span>
-                            <span class="summary-value summary-total">NT$ <?php echo number_format(get_order_payable_amount($order), 0); ?></span>
+                            <span class="summary-label">應付總額：</span>
+                            <span class="summary-value summary-total">NT$ <?php echo number_format((float)$order_summary['final_total'], 0); ?></span>
                         </div>
                     </div>
 
-                    <button
-                        type="button"
-                        class="checkout-summary-items-toggle"
-                        data-checkout-items-toggle="1"
-                        data-checkout-items-target="paymentItemsList"
-                        aria-expanded="false"
-                    >
-                        <span>查看商品清單</span>
-                        <svg class="checkout-summary-items-chevron" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                            <path d="M6 9L12 15L18 9" stroke="#333333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                        </svg>
-                    </button>
+                    <!-- 與 checkout.php「查看商品清單」同結構 / 同 class（僅顯示，資料仍為 $order_items） -->
+                    <div class="checkout-order-toggle" role="region" aria-label="查看商品清單">
+                        <button
+                            type="button"
+                            class="checkout-order-toggle-header"
+                            data-checkout-items-toggle="1"
+                            data-checkout-items-target="paymentItemsList"
+                            aria-expanded="false"
+                        >
+                            <span class="checkout-order-toggle-header-text">查看商品清單</span>
+                            <svg class="checkout-order-toggle-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                <path d="M6 9L12 15L18 9" stroke="#333333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
 
-                    <div id="paymentItemsList" class="checkout-summary-items" aria-hidden="true">
-                        <div class="checkout-summary-items-inner">
-                            <?php foreach ($order_items as $oi): 
-                                $oi_subtotal = isset($oi['subtotal']) ? (float)$oi['subtotal'] : ((float)$oi['unit_price'] * (int)$oi['quantity']);
-                            ?>
-                                <div class="checkout-summary-items-row">
-                                    <div class="checkout-summary-items-left">
-                                        <div class="checkout-summary-items-name"><?php echo htmlspecialchars($oi['product_name']); ?></div>
-                                        <div class="checkout-summary-items-meta">
-                                            <?php echo htmlspecialchars(formatCartSizeForDisplay($oi['size'] ?? '')); ?>
-                                            &nbsp;|&nbsp; Qty: <?php echo (int)$oi['quantity']; ?>
+                        <div id="paymentItemsList" class="checkout-order-toggle-body" aria-hidden="true">
+                            <div class="checkout-summary-items-inner">
+                                <?php foreach ($order_items as $oi):
+                                    $line_unit = (float)($oi['price'] ?? $oi['unit_price'] ?? 0);
+                                    $line_qty = (int)($oi['quantity'] ?? 0);
+                                    $oi_subtotal = isset($oi['subtotal']) ? (float)$oi['subtotal'] : ($line_unit * $line_qty);
+                                    $oi_img_src = resolve_product_card_image_src($oi['primary_image'] ?? null);
+                                ?>
+                                    <div class="checkout-summary-items-row">
+                                        <div class="checkout-summary-items-media">
+                                            <img
+                                                src="<?php echo htmlspecialchars($oi_img_src, ENT_QUOTES); ?>"
+                                                alt="<?php echo htmlspecialchars((string)($oi['product_name'] ?? '')); ?>"
+                                            >
+                                        </div>
+
+                                        <div class="checkout-summary-items-left">
+                                            <div class="checkout-summary-items-name"><?php echo htmlspecialchars((string)($oi['product_name'] ?? '')); ?></div>
+                                            <div class="checkout-summary-items-meta">
+                                                <?php echo htmlspecialchars((string)($oi['category_name'] ?? '')); ?>
+                                                &nbsp;&nbsp; 尺寸：<?php echo htmlspecialchars(formatCartSizeForDisplay($oi['size'] ?? '')); ?>
+                                            </div>
+                                            <div class="checkout-summary-items-unit-price">
+                                                單價 NT$ <?php echo number_format($line_unit, 0); ?>
+                                            </div>
+                                        </div>
+
+                                        <div class="checkout-summary-items-right">
+                                            <div class="checkout-summary-items-amount">
+                                                小計 NT$ <?php echo number_format($oi_subtotal, 0); ?>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div class="checkout-summary-items-right">
-                                        <div class="checkout-summary-items-amount">NT$ <?php echo number_format($oi_subtotal, 0); ?></div>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
+                                <?php endforeach; ?>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="payment-form-wrapper">
+                <div class="payment-form-wrapper credit-card-box">
                     <h2 class="section-title">信用卡資訊</h2>
-                    <?php if ($payment_error): ?>
-                        <div class="error-message"><?php echo $payment_error; ?></div>
+                    <?php if (!$order_ready_for_payment): ?>
+                        <div class="error-message" role="alert">目前無法進行信用卡付款（例如優惠券狀態異常）。請返回結帳頁確認後再試。</div>
                     <?php endif; ?>
+                    <?php if ($payment_error !== ''): ?>
+                        <div class="error-message" role="alert"><?php echo $payment_error; ?></div>
+                    <?php endif; ?>
+                    <div id="payment-client-error" class="error-message" style="display: none;" role="alert"></div>
 
-                    <form method="POST" action="payment_credit_card.php" class="payment-form">
+                    <form method="POST" action="payment_credit_card.php" class="payment-form payment-card-form" id="creditCardPaymentForm" novalidate>
+                        <?php /* 放在 fieldset 外：disabled fieldset 內的欄位不會被 POST；prototype.submit() 也不會帶到 submit 按鈕 */ ?>
+                        <input type="hidden" name="confirm_payment" value="1">
+                        <fieldset class="payment-form-fieldset" <?php echo $order_ready_for_payment ? '' : 'disabled'; ?>>
                         <div class="form-group">
-                            <label class="form-label">卡號 <span class="required">*</span></label>
-                            <input type="text" name="card_number" class="form-input" placeholder="0000 0000 0000 0000" maxlength="19" required>
+                            <label class="form-label" for="cc_card_number">卡號 <span class="required">*</span></label>
+                            <input type="text" name="card_number" id="cc_card_number" class="form-input" placeholder="0000 0000 0000 0000" maxlength="19" inputmode="numeric" autocomplete="cc-number">
                         </div>
                         <div class="form-group">
-                            <label class="form-label">持卡人姓名 <span class="required">*</span></label>
-                            <input type="text" name="card_name" class="form-input" placeholder="請輸入持卡人姓名" required>
+                            <label class="form-label" for="cc_card_name">持卡人姓名 <span class="required">*</span></label>
+                            <input type="text" name="card_name" id="cc_card_name" class="form-input" placeholder="請輸入持卡人姓名" autocomplete="cc-name" value="<?php echo htmlspecialchars($repop_card_name, ENT_QUOTES, 'UTF-8'); ?>">
                         </div>
                         <div class="form-row">
                             <div class="form-group">
-                                <label class="form-label">有效期限 <span class="required">*</span></label>
-                                <input type="text" name="card_expiry" class="form-input" placeholder="MM/YY" maxlength="5" required>
+                                <label class="form-label" for="cc_card_expiry">有效期限 <span class="required">*</span></label>
+                                <input type="text" name="card_expiry" id="cc_card_expiry" class="form-input" placeholder="MM/YY" autocomplete="cc-exp" value="<?php echo htmlspecialchars($repop_card_expiry, ENT_QUOTES, 'UTF-8'); ?>">
                             </div>
                             <div class="form-group">
-                                <label class="form-label">安全碼 <span class="required">*</span></label>
-                                <input type="text" name="card_cvv" class="form-input" placeholder="000" maxlength="3" required>
+                                <label class="form-label" for="cc_card_cvv">安全碼 <span class="required">*</span></label>
+                                <input type="text" name="card_cvv" id="cc_card_cvv" class="form-input" placeholder="000" autocomplete="cc-csc">
                             </div>
                         </div>
                         <div class="form-actions">
                             <a href="checkout.php" class="btn-secondary">返回修改</a>
-                            <button type="submit" name="confirm_payment" class="btn-primary">確認付款</button>
+                            <button type="submit" name="confirm_payment" value="1" class="btn-primary">確認付款</button>
                         </div>
+                        </fieldset>
                     </form>
                 </div>
         </div>
@@ -220,20 +321,69 @@ require_once 'includes/navbar.php';
     </footer>
 
     <script>
-        // 自動格式化邏輯保持不變...
-        document.querySelector('input[name="card_number"]')?.addEventListener('input', function(e) {
-            let value = e.target.value.replace(/\s/g, '');
-            let formatted = value.match(/.{1,4}/g)?.join(' ') || value;
-            e.target.value = formatted;
-        });
-        document.querySelector('input[name="card_expiry"]')?.addEventListener('input', function(e) {
-            let value = e.target.value.replace(/\D/g, '');
-            if (value.length >= 2) value = value.substring(0, 2) + '/' + value.substring(2, 4);
-            e.target.value = value;
-        });
-        document.querySelector('input[name="card_cvv"]')?.addEventListener('input', function(e) {
-            e.target.value = e.target.value.replace(/\D/g, '');
-        });
+        (function () {
+            var form = document.getElementById('creditCardPaymentForm');
+            var errBox = document.getElementById('payment-client-error');
+            var cardNumber = document.getElementById('cc_card_number');
+            var cardName = document.getElementById('cc_card_name');
+            var cardExpiry = document.getElementById('cc_card_expiry');
+            var cardCvv = document.getElementById('cc_card_cvv');
+
+            function showClientErr(msg) {
+                if (!errBox) return;
+                errBox.textContent = msg;
+                errBox.style.display = msg ? 'block' : 'none';
+            }
+
+            function formatCardNumberInput(el) {
+                if (!el) return;
+                var digits = String(el.value).replace(/\D/g, '').slice(0, 16);
+                el.value = digits.length ? digits.match(/.{1,4}/g).join(' ') : '';
+            }
+
+            cardNumber?.addEventListener('input', function (e) {
+                formatCardNumberInput(e.target);
+            });
+            cardNumber?.addEventListener('paste', function (e) {
+                e.preventDefault();
+                var t = (e.clipboardData || window.clipboardData).getData('text') || '';
+                var el = cardNumber;
+                var start = typeof el.selectionStart === 'number' ? el.selectionStart : el.value.length;
+                var end = typeof el.selectionEnd === 'number' ? el.selectionEnd : el.value.length;
+                el.value = el.value.slice(0, start) + t + el.value.slice(end);
+                formatCardNumberInput(el);
+            });
+            cardExpiry?.addEventListener('input', function (e) {
+                var value = e.target.value.replace(/\D/g, '');
+                if (value.length >= 2) value = value.substring(0, 2) + '/' + value.substring(2, 4);
+                e.target.value = value;
+            });
+            form?.addEventListener('submit', function (e) {
+                e.preventDefault();
+                var fs = form.querySelector('fieldset.payment-form-fieldset');
+                if (fs && fs.disabled) {
+                    return;
+                }
+                showClientErr('');
+                if (!String(cardNumber?.value || '').trim()) {
+                    showClientErr('請輸入信用卡卡號');
+                    return;
+                }
+                if (!String(cardName?.value || '').trim()) {
+                    showClientErr('請輸入持卡人姓名');
+                    return;
+                }
+                if (!String(cardExpiry?.value || '').trim()) {
+                    showClientErr('請輸入有效期限');
+                    return;
+                }
+                if (!String(cardCvv?.value || '').trim()) {
+                    showClientErr('請輸入信用卡安全碼（CVV）');
+                    return;
+                }
+                HTMLFormElement.prototype.submit.call(form);
+            });
+        })();
 
         // 摘要：查看商品清單（收合/展開）
         (function () {

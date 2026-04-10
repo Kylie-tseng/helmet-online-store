@@ -16,7 +16,7 @@ $status = trim($_GET['status'] ?? '');
 $flashMessage = (string)($_SESSION['admin_orders_flash'] ?? '');
 unset($_SESSION['admin_orders_flash']);
 
-$allowedStatuses = ['pending', 'shipped', 'completed', 'cancelled'];
+$allowedStatuses = ['pending', 'shipped', 'completed', 'return_requested', 'cancelled'];
 $lockedStatuses = ['completed', 'cancelled'];
 if ($status !== '' && !in_array($status, $allowedStatuses, true)) {
     $status = '';
@@ -87,6 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $stmt = $pdo->prepare("UPDATE orders SET status = :status, updated_at = NOW() WHERE id = :id");
             $stmt->execute([':status' => $newStatus, ':id' => $orderId]);
+            markUserCouponUsedAfterOrderStatusChange($pdo, $orderId, $newStatus);
             adminOrdersRedirectWithFlash('訂單狀態已更新。');
         } catch (Throwable $e) {
             adminOrdersRedirectWithFlash('更新失敗，請稍後再試。');

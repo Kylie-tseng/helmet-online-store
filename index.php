@@ -396,13 +396,20 @@ if (is_array($promo_offers) && !empty($promo_offers)) {
                     <?php foreach ($split_categories as $item): ?>
                         <?php
                         $name = $item['name'];
+                        $card_class_map = [
+                            '全罩式安全帽' => 'split-cat-fullface',
+                            '半罩式安全帽' => 'split-cat-half',
+                            '3/4罩安全帽' => 'split-cat-threequarter',
+                            '周邊與配件' => 'split-cat-accessory',
+                        ];
+                        $item_class = $card_class_map[$name] ?? 'split-cat-default';
                         $norm = normalize_product_category_label($name);
                         $resolved = $split_category_lookup[$name] ?? $split_category_lookup[$norm] ?? null;
                         $target = $resolved
                             ? 'products.php?category=' . (int)$resolved['id']
                             : 'products.php?category=' . rawurlencode($name);
                         ?>
-                        <div class="split-category-item">
+                        <div class="split-category-item <?php echo htmlspecialchars($item_class); ?>">
                             <h3 class="split-category-title"><?php echo htmlspecialchars($name); ?></h3>
                             <p class="split-category-text"><?php echo htmlspecialchars($item['description']); ?></p>
                             <a href="<?php echo htmlspecialchars($target); ?>" class="split-category-link">前往選購 <span aria-hidden="true">→</span></a>
@@ -591,8 +598,8 @@ if (is_array($promo_offers) && !empty($promo_offers)) {
                     <h3 class="footer-title">顧客服務</h3>
                     <ul class="footer-links">
                         <li><a href="guide.php">購物指南</a></li>
-                        <li><a href="faq.php">常見問題</a></li>
-                        <li><a href="return.php">退換貨政策</a></li>
+                        <li><a href="faq.php">常見問題 FAQ</a></li>
+                        <li><a href="return.php">退貨政策</a></li>
                         <li><a href="shipping.php">運送說明</a></li>
                     </ul>
                 </div>

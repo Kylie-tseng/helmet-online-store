@@ -71,8 +71,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_order'])) {
             ':pickup_store' => $shipping_method === 'pickup' ? $pickup_store : null
         ]);
         
-        $order_id = $pdo->lastInsertId();
-        
+        $order_id = (int)$pdo->lastInsertId();
+
         foreach ($cart_items as $item) {
             $subtotal = $item['price'] * $item['quantity'];
             $cs = (string)($item['size'] ?? '');
@@ -88,10 +88,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_order'])) {
                 ':subtotal' => $subtotal
             ]);
         }
-        
-        $pdo->commit();
-        $cod_order_committed = true;
-        
+
+        if ($order_id <= 0) {
+            $pdo->rollBack();
+            $error_message = '建立訂單失敗，請稍後再試。';
+        } else {
+            $stmt = $pdo->prepare('SELECT COUNT(*) FROM order_items WHERE order_id = ?');
+            $stmt->execute([$order_id]);
+            $items_written = (int)$stmt->fetchColumn();
+            if ($items_written !== count($cart_items)) {
+                $pdo->rollBack();
+                $error_message = '訂單明細寫入異常，請稍後再試。';
+            } else {
+                $pdo->commit();
+                $cod_order_committed = true;
+            }
+        }
+
     } catch (PDOException $e) {
         $pdo->rollBack();
         $error_message = '建立訂單時發生錯誤：' . $e->getMessage();
@@ -105,6 +118,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_order'])) {
         if (function_exists('clearAppliedCoupon')) {
             clearAppliedCoupon();
         }
+        unset($_SESSION['coupon_code_prefill']);
         $success_oid = (int)$order_id;
         echo '<!DOCTYPE html><html lang="zh-TW"><head><meta charset="UTF-8"><meta http-equiv="refresh" content="0;url=order_success.php?order_id=' . $success_oid . '"><script>window.location.href=\'order_success.php?order_id=' . $success_oid . '\';</script></head><body></body></html>';
         exit;
@@ -172,38 +186,51 @@ require_once 'includes/navbar.php';
             <?php endif; ?>
             <?php if (!isset($error_message)): ?>
                 <div class="order-confirm-wrapper">
-                    <!-- 商品列表 -->
-                    <div class="order-section">
-                        <h2 class="section-title">訂單商品</h2>
+                    <!-- 商品列表（沿用 checkout.php 同款結構） -->
+                    <div class="checkout-order-toggle order-section" role="region" aria-label="查看商品清單">
                         <button
                             type="button"
-                            class="checkout-summary-items-toggle"
+                            class="checkout-order-toggle-header"
                             data-checkout-items-toggle="1"
                             data-checkout-items-target="orderConfirmItemsList"
                             aria-expanded="false"
                         >
-                            <span>查看商品清單</span>
-                            <svg class="checkout-summary-items-chevron" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                            <span class="checkout-order-toggle-header-text">查看商品清單</span>
+                            <svg class="checkout-order-toggle-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                                 <path d="M6 9L12 15L18 9" stroke="#333333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                             </svg>
                         </button>
 
-                        <div id="orderConfirmItemsList" class="checkout-summary-items" aria-hidden="true">
+                        <div id="orderConfirmItemsList" class="checkout-order-toggle-body" aria-hidden="true">
                             <div class="checkout-summary-items-inner">
-                                <?php foreach ($cart_items as $item): 
+                                <?php foreach ($cart_items as $item):
                                     $subtotal = (float)$item['price'] * (int)$item['quantity'];
+                                    $item_img_src = resolve_product_card_image_src($item['primary_image'] ?? null);
                                 ?>
                                     <div class="checkout-summary-items-row">
+                                        <div class="checkout-summary-items-media">
+                                            <img
+                                                src="<?php echo htmlspecialchars($item_img_src, ENT_QUOTES); ?>"
+                                                alt="<?php echo htmlspecialchars($item['product_name']); ?>"
+                                            >
+                                        </div>
+
                                         <div class="checkout-summary-items-left">
                                             <div class="checkout-summary-items-name"><?php echo htmlspecialchars($item['product_name']); ?></div>
                                             <div class="checkout-summary-items-meta">
                                                 <?php echo htmlspecialchars($item['category_name']); ?>
-                                                &nbsp;|&nbsp; 尺寸：<?php echo htmlspecialchars(formatCartSizeForDisplay($item['size'] ?? '')); ?>
-                                                &nbsp;|&nbsp; Qty: <?php echo (int)$item['quantity']; ?>
+                                                &nbsp;&nbsp; 尺寸：<?php echo htmlspecialchars(formatCartSizeForDisplay($item['size'] ?? '')); ?>
+                                                &nbsp;&nbsp; 數量：<?php echo (int)$item['quantity']; ?>
+                                            </div>
+                                            <div class="checkout-summary-items-unit-price">
+                                                單價 NT$ <?php echo number_format((float)$item['price'], 0); ?>
                                             </div>
                                         </div>
+
                                         <div class="checkout-summary-items-right">
-                                            <div class="checkout-summary-items-amount">NT$ <?php echo number_format($subtotal, 0); ?></div>
+                                            <div class="checkout-summary-items-amount">
+                                                小計 NT$ <?php echo number_format($subtotal, 0); ?>
+                                            </div>
                                         </div>
                                     </div>
                                 <?php endforeach; ?>
@@ -290,8 +317,8 @@ require_once 'includes/navbar.php';
                     <h3 class="footer-title">顧客服務</h3>
                     <ul class="footer-links">
                         <li><a href="guide.php">購物指南</a></li>
-                        <li><a href="faq.php">常見問題</a></li>
-                        <li><a href="return.php">退換貨政策</a></li>
+                        <li><a href="faq.php">常見問題 FAQ</a></li>
+                        <li><a href="return.php">退貨政策</a></li>
                         <li><a href="shipping.php">運送說明</a></li>
                     </ul>
                 </div>

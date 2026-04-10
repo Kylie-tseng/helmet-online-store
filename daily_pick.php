@@ -73,7 +73,7 @@ $destiny_mapping = destiny_get_copy_mapping();
 <main class="destiny-modal-shell">
     <header class="destiny-header">
         <h1>今日命定帽款</h1>
-        <p>抽一支籤，看看今天與你有緣的是哪一頂帽</p>
+        <p>不知道選哪頂？抽一張看看今天和你有緣的是哪一款</p>
     </header>
 
     <?php if ($error_message !== null): ?>
@@ -83,9 +83,14 @@ $destiny_mapping = destiny_get_copy_mapping();
     <?php else: ?>
         <section class="destiny-stage">
             <article id="destinyShrine" class="destiny-shrine">
-                <p class="shrine-top">今日籤運</p>
-                <p id="rollingText" class="shrine-main">靜心凝神，待籤文顯現</p>
-                <p id="rollingSubText" class="shrine-sub">按下開始抽籤，迎接今日命定之物</p>
+                <p class="shrine-top">命定推薦入口</p>
+                <p id="rollingText" class="shrine-main">今天適合哪一頂安全帽？</p>
+                <p id="rollingSubText" class="shrine-sub">按下開始抽籤，立即揭曉你的今日命定款</p>
+                <div class="shrine-preview">
+                    <span class="shrine-preview-chip">精選上架商品</span>
+                    <span class="shrine-preview-chip">隨機命定推薦</span>
+                    <span class="shrine-preview-chip">可直接查看商品</span>
+                </div>
             </article>
             <button id="startDrawBtn" type="button" class="destiny-draw-btn">開始抽籤</button>
         </section>
@@ -98,24 +103,14 @@ $destiny_mapping = destiny_get_copy_mapping();
         <button id="closeModalBtn" type="button" class="destiny-close-btn" aria-label="關閉">×</button>
 
         <header class="modal-card-head">
-            <p id="modalTitle" class="modal-main-title">今日命定帽款</p>
-            <p id="modalSlipNo" class="modal-slip-no">第 000 籤</p>
+            <p id="modalTitle" class="modal-main-title">今日命定結果</p>
+            <p id="modalResultBadge" class="modal-result-badge">今日命定</p>
             <span id="modalTier" class="modal-tier">中籤</span>
+            <p id="modalTagline" class="modal-tagline">今天就從這頂開始你的騎行風格</p>
+            <p id="modalSlipNo" class="modal-slip-no">第 000 籤</p>
         </header>
 
         <div class="modal-card-divider"></div>
-
-        <section class="modal-poem">
-            <p id="modalPoem1">天意今朝自有憑</p>
-            <p id="modalPoem2">有緣裝備已相逢</p>
-            <p id="modalPoem3">穩中帶勁行無礙</p>
-            <p id="modalPoem4">平安順遂伴君行</p>
-        </section>
-
-        <section class="modal-meaning">
-            <p class="modal-label">解籤</p>
-            <p id="modalMeaningText">今日宜選穩定貼合的帽款，能讓你在路上更安心從容。</p>
-        </section>
 
         <section class="modal-product">
             <div class="modal-product-image-wrap">
@@ -124,6 +119,7 @@ $destiny_mapping = destiny_get_copy_mapping();
             <p id="modalProductName" class="modal-product-name">命定帽款待揭曉</p>
             <p id="modalProductCategory" class="modal-product-meta">分類：—</p>
             <p id="modalProductPrice" class="modal-product-meta">價格：NT$ —</p>
+            <p id="modalReasonText" class="modal-reason-text">推薦理由：今天適合穩定百搭、好上手的帽款。</p>
         </section>
 
         <footer class="modal-actions">
@@ -151,16 +147,14 @@ $destiny_mapping = destiny_get_copy_mapping();
         const viewProductBtn = document.getElementById('viewProductBtn');
 
         const modalSlipNo = document.getElementById('modalSlipNo');
+        const modalResultBadge = document.getElementById('modalResultBadge');
+        const modalTagline = document.getElementById('modalTagline');
         const modalTier = document.getElementById('modalTier');
-        const modalPoem1 = document.getElementById('modalPoem1');
-        const modalPoem2 = document.getElementById('modalPoem2');
-        const modalPoem3 = document.getElementById('modalPoem3');
-        const modalPoem4 = document.getElementById('modalPoem4');
-        const modalMeaningText = document.getElementById('modalMeaningText');
         const modalProductImage = document.getElementById('modalProductImage');
         const modalProductName = document.getElementById('modalProductName');
         const modalProductCategory = document.getElementById('modalProductCategory');
         const modalProductPrice = document.getElementById('modalProductPrice');
+        const modalReasonText = document.getElementById('modalReasonText');
 
         if (!Array.isArray(products) || products.length === 0 || !startBtn) return;
 
@@ -240,21 +234,25 @@ $destiny_mapping = destiny_get_copy_mapping();
             document.body.classList.remove('oracle-modal-open');
         };
 
-        const renderModalContent = function (product) {
+        const renderModalContent = function (product, opts) {
+            const options = opts || {};
+            const isRollingPreview = !!options.isRollingPreview;
             const copy = pickDestinyCopy(product);
             const poem = Array.isArray(copy.poem) ? copy.poem : [];
             const slipNo = String(product.id || 0).padStart(3, '0');
             const tier = String(copy.tier || '中籤');
+            const shortLine = poem[0] || '今日與你有緣的帽款已出現';
+            const reason = String(copy.interpretation || '').trim();
 
-            modalSlipNo.textContent = '第 ' + slipNo + ' 籤';
+            modalSlipNo.textContent = isRollingPreview ? '命運抽選中' : ('第 ' + slipNo + ' 籤');
+            modalResultBadge.textContent = isRollingPreview ? '抽選中' : '今日命定';
             modalTier.textContent = tier;
             modalTier.className = 'modal-tier tier-' + tier;
+            modalTagline.textContent = isRollingPreview ? '正在為你挑選命定帽款...' : shortLine;
 
-            modalPoem1.textContent = poem[0] || '天意今朝自有憑';
-            modalPoem2.textContent = poem[1] || '有緣裝備已相逢';
-            modalPoem3.textContent = poem[2] || '穩中帶勁行無礙';
-            modalPoem4.textContent = poem[3] || '平安順遂伴君行';
-            modalMeaningText.textContent = copy.interpretation || '今日宜選穩定貼合的帽款，能讓你在路上更安心從容。';
+            modalReasonText.textContent = isRollingPreview
+                ? '推薦理由：命運抽選中，請稍候揭曉。'
+                : ('推薦理由：' + (reason || '今天適合穩定貼合、通勤到出遊都好搭的帽款。'));
 
             modalProductImage.src = product.image_url || 'assets/images/products/default.jpg';
             modalProductImage.alt = (product.name || '命定商品') + ' 圖片';
@@ -264,10 +262,37 @@ $destiny_mapping = destiny_get_copy_mapping();
             viewProductBtn.href = product.detail_url || 'products.php';
         };
 
+        const runModalShuffle = function () {
+            if (isDrawing) return;
+            setDrawingState(true);
+            modalCard.classList.add('is-rolling');
+
+            const steps = 10;
+            const interval = 140;
+            let count = 0;
+            let finalProduct = pickProduct(lastProductId);
+
+            rollingTimer = window.setInterval(function () {
+                const current = pickProduct(lastProductId);
+                renderModalContent(current, { isRollingPreview: true });
+                finalProduct = current;
+                count += 1;
+
+                if (count >= steps) {
+                    window.clearInterval(rollingTimer);
+                    rollingTimer = null;
+                    lastProductId = Number(finalProduct.id || 0);
+                    renderModalContent(finalProduct, { isRollingPreview: false });
+                    modalCard.classList.remove('is-rolling');
+                    setDrawingState(false);
+                }
+            }, interval);
+        };
+
         const runDraw = function () {
             if (isDrawing) return;
             setDrawingState(true);
-            const duration = 1650;
+            const duration = 900;
             const interval = 100;
             const startedAt = Date.now();
             let finalProduct = pickProduct(lastProductId);
@@ -282,7 +307,7 @@ $destiny_mapping = destiny_get_copy_mapping();
                     window.clearInterval(rollingTimer);
                     rollingTimer = null;
                     lastProductId = Number(finalProduct.id || 0);
-                    renderModalContent(finalProduct);
+                    renderModalContent(finalProduct, { isRollingPreview: false });
                     setDrawingState(false);
                     openModal();
                     rollingText.textContent = '籤文已現';
@@ -292,7 +317,13 @@ $destiny_mapping = destiny_get_copy_mapping();
         };
 
         startBtn.addEventListener('click', runDraw);
-        drawAgainBtn.addEventListener('click', runDraw);
+        drawAgainBtn.addEventListener('click', function () {
+            if (!overlay.classList.contains('is-open')) {
+                runDraw();
+                return;
+            }
+            runModalShuffle();
+        });
         closeModalBtn.addEventListener('click', closeModal);
         closeFooterBtn.addEventListener('click', closeModal);
 
