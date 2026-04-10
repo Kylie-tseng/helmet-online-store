@@ -35,10 +35,11 @@ try {
 
     <main class="knowledge-shell">
         <div class="container">
-            <header class="knowledge-hero page-hero-header">
-                <h1 class="page-hero-title">安全帽知識</h1>
-                <p class="page-hero-subtitle">從帽型、認證到尺寸挑選，快速掌握選購安全帽的重要重點。</p>
-            </header>
+            <div class="section-header">
+                <div class="section-eyebrow">HELMET GUIDE</div>
+                <h1 class="section-title">安全帽知識</h1>
+                <p class="section-subtitle">從帽型、認證到尺寸挑選，快速掌握選購安全帽的重要重點。</p>
+            </div>
 
             <div class="knowledge-content">
                 <div class="knowledge-grid">

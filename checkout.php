@@ -63,63 +63,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'coupon_code' => !empty($coupon_status['coupon']) ? $coupon_status['coupon']['coupon_code'] : null
         ];
         
-        // 如果選擇信用卡，先建立訂單再導向信用卡繳費頁
+        // 信用卡：僅暫存 checkout_data（已於上方寫入 session），不建立 orders／order_items；正式建單在付款頁送出時
         if ($payment_method === 'credit_card') {
-            // 計算金額
-            $order_summary = calculateOrderSummary($cart_items, $shipping_method, $coupon_status['coupon']);
-            $order_amounts = build_orders_amount_fields($order_summary);
-            $order_coupon_id = !empty($coupon_status['coupon']['id']) ? (int)$coupon_status['coupon']['id'] : null;
-            
-            $credit_checkout_ok = false;
-            try {
-                $pdo->beginTransaction();
-                
-                // 建立訂單（狀態為 pending，付款完成後才改為已付款等）
-                $stmt = $pdo->prepare("INSERT INTO orders (user_id, coupon_id, total_amount, discount_amount, final_amount, status, payment_method, shipping_method, shipping_address, pickup_store) 
-                     VALUES (:user_id, :coupon_id, :total_amount, :discount_amount, :final_amount, 'pending', :payment_method, :shipping_method, :shipping_address, :pickup_store)");
-                $stmt->execute([
-                    ':user_id' => $user_id,
-                    ':coupon_id' => $order_coupon_id,
-                    ':total_amount' => $order_amounts['total_amount'],
-                    ':discount_amount' => $order_amounts['discount_amount'],
-                    ':final_amount' => $order_amounts['final_amount'],
-                    ':payment_method' => $payment_method,
-                    ':shipping_method' => $shipping_method,
-                    ':shipping_address' => $shipping_method === 'home' ? $shipping_address : null,
-                    ':pickup_store' => $shipping_method === 'pickup' ? $pickup_store : null
-                ]);
-                
-                $order_id = $pdo->lastInsertId();
-                
-                // 建立訂單明細
-                foreach ($cart_items as $item) {
-                    $subtotal = $item['price'] * $item['quantity'];
-                    $cs = (string)($item['size'] ?? '');
-                    $order_item_size = ($cs === '' || $cs === getCartSizeNoneValue() || $cs === 'N') ? null : $item['size'];
-                    $stmt = $pdo->prepare("INSERT INTO order_items (order_id, product_id, size, quantity, unit_price, subtotal) 
-                                         VALUES (:order_id, :product_id, :size, :quantity, :unit_price, :subtotal)");
-                    $stmt->execute([
-                        ':order_id' => $order_id,
-                        ':product_id' => $item['product_id'],
-                        ':size' => $order_item_size,
-                        ':quantity' => $item['quantity'],
-                        ':unit_price' => $item['price'],
-                        ':subtotal' => $subtotal
-                    ]);
-                }
-                
-                $pdo->commit();
-                $_SESSION['pending_order_id'] = $order_id;
-                $credit_checkout_ok = true;
-            } catch (PDOException $e) {
-                $pdo->rollBack();
-                $errors[] = '建立訂單時發生錯誤：' . $e->getMessage();
-            }
-            if ($credit_checkout_ok) {
-                session_write_close();
-                header('Location: payment_credit_card.php', true, 303);
-                exit;
-            }
+            unset($_SESSION['pending_order_id']);
+            session_write_close();
+            header('Location: payment_credit_card.php', true, 303);
+            exit;
         } else {
             session_write_close();
             header('Location: order_confirm.php', true, 303);
@@ -386,8 +335,8 @@ require_once 'includes/navbar.php';
                     <h3 class="footer-title">顧客服務</h3>
                     <ul class="footer-links">
                         <li><a href="guide.php">購物指南</a></li>
-                        <li><a href="faq.php">常見問題</a></li>
-                        <li><a href="return.php">退換貨政策</a></li>
+                        <li><a href="faq.php">常見問題 FAQ</a></li>
+                        <li><a href="return.php">退貨政策</a></li>
                         <li><a href="shipping.php">運送說明</a></li>
                     </ul>
                 </div>

@@ -10,7 +10,7 @@ $status = trim($_GET['status'] ?? '');
 $flashMessage = (string)($_SESSION['staff_orders_flash'] ?? '');
 unset($_SESSION['staff_orders_flash']);
 
-$allowedStatuses = ['pending', 'shipped', 'completed', 'cancelled'];
+$allowedStatuses = ['pending', 'shipped', 'completed', 'return_requested', 'cancelled'];
 $lockedStatuses = ['completed', 'cancelled'];
 if ($status !== '' && !in_array($status, $allowedStatuses, true)) {
     $status = '';
@@ -75,6 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $stmt = $pdo->prepare("UPDATE orders SET status = :status, updated_at = NOW() WHERE id = :id");
             $stmt->execute([':status' => $newStatus, ':id' => $orderId]);
+            markUserCouponUsedAfterOrderStatusChange($pdo, $orderId, $newStatus);
             staffOrdersRedirectWithFlash('訂單狀態已更新。');
         } catch (Throwable $e) {
             staffOrdersRedirectWithFlash('更新失敗，請稍後再試。');
@@ -129,9 +130,10 @@ try {
     $stmt->execute($params);
     $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
     foreach ($orders as &$order) {
-        $detailStmt = $pdo->prepare("SELECT oi.product_id, oi.quantity, oi.unit_price, oi.subtotal, oi.size, p.name AS product_name
+        $detailStmt = $pdo->prepare("SELECT oi.product_id, oi.quantity, oi.unit_price, oi.subtotal, oi.size,
+                                            COALESCE(NULLIF(p.name, ''), CONCAT('商品 #', oi.product_id, '（可能已下架）')) AS product_name
                                      FROM order_items oi
-                                     INNER JOIN products p ON oi.product_id = p.id
+                                     LEFT JOIN products p ON oi.product_id = p.id
                                      WHERE oi.order_id = :order_id");
         $detailStmt->execute([':order_id' => (int)$order['id']]);
         $order['items'] = $detailStmt->fetchAll(PDO::FETCH_ASSOC);

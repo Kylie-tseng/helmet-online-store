@@ -10,12 +10,14 @@ if (!isset($_SESSION['user_id'])) {
 $user_id = (int)$_SESSION['user_id'];
 
 $display_order_id = null;
+$order_success_verified = false;
 if (isset($_GET['order_id']) && (int)$_GET['order_id'] > 0) {
     $oid = (int)$_GET['order_id'];
     $stmt = $pdo->prepare('SELECT id FROM orders WHERE id = ? AND user_id = ? LIMIT 1');
     $stmt->execute([$oid, $user_id]);
-    if ($stmt->fetch()) {
+    if ($stmt->fetch(PDO::FETCH_ASSOC)) {
         $display_order_id = $oid;
+        $order_success_verified = true;
     }
 }
 
@@ -52,21 +54,31 @@ require_once 'includes/navbar.php';
 
     <div class="checkout-container">
         <div class="container" style="max-width: 640px; margin: 0 auto; padding: 2rem 1rem 4rem;">
+            <?php if ($order_success_verified): ?>
             <h1 class="checkout-page-title" style="text-align: center; margin-bottom: 1.5rem;">訂單送出完成</h1>
             <div class="order-section" style="text-align: center; line-height: 1.7;">
                 <p>感謝您的訂購。</p>
                 <p>我們已收到您的訂單。</p>
                 <p>訂單確認信已寄至您的信箱（若您有填寫 Email）。</p>
-                <?php if ($display_order_id !== null): ?>
-                    <p style="margin-top: 1.25rem;">
-                        <strong>訂單編號：</strong>#<?php echo (int)$display_order_id; ?>
-                    </p>
-                <?php endif; ?>
+                <p style="margin-top: 1.25rem;">
+                    <strong>訂單編號：</strong>#<?php echo (int)$display_order_id; ?>
+                </p>
             </div>
             <div class="form-actions" style="justify-content: center; flex-wrap: wrap; gap: 1rem; margin-top: 2rem;">
                 <a href="profile.php?tab=orders" class="btn-primary">查看訂單管理</a>
                 <a href="index.php" class="btn-secondary">繼續購物</a>
             </div>
+            <?php else: ?>
+            <h1 class="checkout-page-title" style="text-align: center; margin-bottom: 1.5rem;">無法確認訂單</h1>
+            <div class="order-section" style="text-align: center; line-height: 1.7;">
+                <p>找不到與您帳號相符的訂單編號，或連結已失效。</p>
+                <p>若您剛完成付款，請至「訂單管理」查看是否已有新訂單。</p>
+            </div>
+            <div class="form-actions" style="justify-content: center; flex-wrap: wrap; gap: 1rem; margin-top: 2rem;">
+                <a href="profile.php?tab=orders" class="btn-primary">前往訂單管理</a>
+                <a href="index.php" class="btn-secondary">返回首頁</a>
+            </div>
+            <?php endif; ?>
         </div>
     </div>
 

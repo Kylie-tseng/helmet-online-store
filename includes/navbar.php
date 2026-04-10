@@ -58,7 +58,7 @@ function renderNavbar($pdo, $categories, $parts_category_id, $current_page = '')
                 <li class="helmet-menu nav-item has-mega-menu">
                     <a href="guide.php" id="guideMenuToggle">購物指南 <span class="dropdown-arrow">▾</span></a>
                     <ul class="helmet-submenu">
-                        <li><a href="guide.php">購物指南總覽</a></li>
+                        <li><a href="guide.php">購物指南</a></li>
                         <li><a href="about.php">關於我們</a></li>
                         <li><a href="coupons.php">優惠券專區</a></li>
                         <li><a href="return_policy.php">退貨政策</a></li>
@@ -71,13 +71,13 @@ function renderNavbar($pdo, $categories, $parts_category_id, $current_page = '')
                         <div class="mega-links">
                             <div class="mega-column">
                                 <h4>購物指南</h4>
-                                <a href="guide.php">購物指南總覽</a>
+                                <a href="guide.php">購物指南</a>
                                 <a href="about.php">關於我們</a>
                                 <a href="coupons.php">優惠券專區</a>
                                 <a href="return_policy.php">退貨政策</a>
                             </div>
                             <div class="mega-column">
-                                <h4>更多資訊</h4>
+                                <h4>相關資訊</h4>
                                 <a href="helmet_knowledge.php">安全帽知識</a>
                                 <a href="head_measure.php">頭圍量測教學</a>
                                 <a href="helmet_care.php">安全帽保養教學</a>
