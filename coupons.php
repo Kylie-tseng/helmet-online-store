@@ -235,6 +235,9 @@ try {
         </div>
     </footer>
 
+    <?php require_once __DIR__ . '/includes/app_modal.php';
+    app_modal_render(); ?>
+
     <script>
         (function () {
             function toFormUrlEncoded(obj) {
@@ -287,12 +290,16 @@ try {
 
                                 btn.disabled = false;
                                 btn.textContent = originalText || '立即領取優惠';
-                                alert(result.message || '領取失敗，請稍後再試');
+                                if (window.AppModal && AppModal.alert) {
+                                    AppModal.alert({ title: '領取失敗', message: result.message || '領取失敗，請稍後再試' });
+                                }
                             })
                             .catch(function () {
                                 btn.disabled = false;
                                 btn.textContent = originalText || '立即領取優惠';
-                                alert('系統錯誤，請稍後再試');
+                                if (window.AppModal && AppModal.alert) {
+                                    AppModal.alert({ title: '系統錯誤', message: '系統錯誤，請稍後再試' });
+                                }
                             });
                     });
                 });

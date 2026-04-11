@@ -1,6 +1,7 @@
 <?php
 require_once '../config.php';
 require_once __DIR__ . '/includes/staff_layout.php';
+require_once __DIR__ . '/../includes/staff_style_labels.php';
 
 staffRequireAuth();
 
@@ -27,7 +28,79 @@ $form = [
     'style' => '',
 ];
 $stocks = ['S' => 0, 'M' => 0, 'L' => 0, 'XL' => 0];
-$allowed_styles = ['復古', '通勤', '競速'];
+$allowed_styles = staff_style_labels_names_for_form($pdo);
+
+/**
+ * 將上傳圖寫入 product_images（與「商品圖片管理」區塊相同規則：檔名存 assets/images/products/、sort_order 遞增）。
+ *
+ * @return array{errors: string[], saved: int}
+ */
+function staff_product_form_save_uploaded_images(PDO $pdo, int $productId, array $fileField): array
+{
+    $errors = [];
+    $saved = 0;
+    if ($productId <= 0 || empty($fileField['name'])) {
+        return ['errors' => $errors, 'saved' => $saved];
+    }
+
+    $names = $fileField['name'];
+    $tmps = $fileField['tmp_name'] ?? [];
+    $errs = $fileField['error'] ?? [];
+    if (!is_array($names)) {
+        $names = [$names];
+        $tmps = [$tmps];
+        $errs = [$errs];
+    }
+
+    $allowed = ['jpg', 'jpeg', 'png', 'webp'];
+    $targetDir = __DIR__ . '/../assets/images/products/';
+    if (!is_dir($targetDir)) {
+        @mkdir($targetDir, 0775, true);
+    }
+
+    foreach ($names as $i => $original) {
+        $original = (string)$original;
+        $err = (int)($errs[$i] ?? UPLOAD_ERR_NO_FILE);
+        if ($err === UPLOAD_ERR_NO_FILE) {
+            continue;
+        }
+        if ($err !== UPLOAD_ERR_OK) {
+            $errors[] = '「' . ($original !== '' ? $original : '未命名') . '」上傳失敗（錯誤代碼 ' . $err . '）。';
+            continue;
+        }
+        $tmp = (string)($tmps[$i] ?? '');
+        if ($tmp === '' || !is_uploaded_file($tmp)) {
+            $errors[] = '「' . ($original !== '' ? $original : '未命名') . '」無法讀取暫存檔。';
+            continue;
+        }
+        $ext = strtolower(pathinfo($original, PATHINFO_EXTENSION));
+        if (!in_array($ext, $allowed, true)) {
+            $errors[] = '「' . $original . '」格式不支援，僅接受 jpg / jpeg / png / webp。';
+            continue;
+        }
+        $filename = 'p' . $productId . '_' . date('YmdHis') . '_' . bin2hex(random_bytes(3)) . '.' . $ext;
+        $targetPath = $targetDir . $filename;
+        if (!@move_uploaded_file($tmp, $targetPath)) {
+            $errors[] = '「' . $original . '」儲存失敗。';
+            continue;
+        }
+        try {
+            $sortStmt = $pdo->prepare('SELECT COALESCE(MAX(sort_order), 0) FROM product_images WHERE product_id = :pid');
+            $sortStmt->execute([':pid' => $productId]);
+            $sort = ((int)$sortStmt->fetchColumn()) + 1;
+            $ins = $pdo->prepare('INSERT INTO product_images (product_id, image_url, sort_order) VALUES (:pid, :img, :sort)');
+            $ins->execute([':pid' => $productId, ':img' => $filename, ':sort' => $sort]);
+            $saved++;
+        } catch (Throwable $e) {
+            if (is_file($targetPath)) {
+                @unlink($targetPath);
+            }
+            $errors[] = '「' . $original . '」寫入資料庫失敗。';
+        }
+    }
+
+    return ['errors' => $errors, 'saved' => $saved];
+}
 
 if ($isEdit) {
     try {
@@ -44,7 +117,10 @@ if ($isEdit) {
             $form['status'] = (string)$row['status'];
             $form['description'] = (string)($row['description'] ?? '');
             $loadedStyle = trim((string)($row['style'] ?? ''));
-            $form['style'] = in_array($loadedStyle, $allowed_styles, true) ? $loadedStyle : '';
+            if ($loadedStyle !== '' && !in_array($loadedStyle, $allowed_styles, true)) {
+                $allowed_styles[] = $loadedStyle;
+            }
+            $form['style'] = $loadedStyle;
         }
     } catch (Throwable $e) {
         $error = '讀取商品資料失敗。';
@@ -202,6 +278,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $pdo->commit();
                 $message = '商品資料已儲存。';
+
+                if (isset($_FILES['product_images'])) {
+                    try {
+                        $imgResult = staff_product_form_save_uploaded_images($pdo, $productId, $_FILES['product_images']);
+                        if ($imgResult['saved'] > 0) {
+                            $message .= ' 已上傳 ' . $imgResult['saved'] . ' 張圖片。';
+                        }
+                        if (!empty($imgResult['errors'])) {
+                            $error = '圖片上傳失敗或部分失敗（商品資料已保留）：' . implode(' ', $imgResult['errors']);
+                        }
+                    } catch (Throwable $e) {
+                        $error = '圖片處理時發生錯誤（商品資料已保留），請稍後在「商品圖片管理」重新上傳。';
+                    }
+                }
             } catch (Throwable $e) {
                 if ($pdo->inTransaction()) {
                     $pdo->rollBack();
@@ -225,17 +315,66 @@ if ($isEdit) {
     }
 }
 
+if ($message !== '') {
+    staffSetToastSuccess($message);
+    $message = '';
+}
+
 staffPageStart($pdo, $isEdit ? '編輯商品' : '新增商品', 'products');
 ?>
+<style>
+    /* 商品圖 file input：避免 staff-input 撐滿整欄、按鈕跑版 */
+    .staff-page .file-upload-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        max-width: 100%;
+        flex: 0 1 auto;
+        justify-content: flex-start;
+    }
+    .staff-page .staff-toolbar .file-upload-wrapper {
+        flex: 0 0 auto;
+    }
+    .staff-page .file-upload-wrapper .file-input {
+        font-size: 14px;
+        max-width: 400px;
+        width: auto;
+        min-width: 0;
+        flex: 0 1 auto;
+    }
+    .staff-page .file-upload-wrapper .file-input::file-selector-button {
+        background: #222;
+        color: #fff;
+        border: none;
+        padding: 8px 14px;
+        border-radius: 8px;
+        cursor: pointer;
+        margin-right: 10px;
+        font-weight: 600;
+    }
+    .staff-page .file-upload-wrapper .file-input::file-selector-button:hover {
+        background: #444;
+    }
+    .staff-page .file-upload-wrapper .file-input::-webkit-file-upload-button {
+        background: #222;
+        color: #fff;
+        border: none;
+        padding: 8px 14px;
+        border-radius: 8px;
+        cursor: pointer;
+        margin-right: 10px;
+        font-weight: 600;
+    }
+    .staff-page .file-upload-wrapper .file-input::-webkit-file-upload-button:hover {
+        background: #444;
+    }
+</style>
 <section class="staff-panel">
-    <?php if ($message !== ''): ?>
-        <div class="staff-notice"><?php echo htmlspecialchars($message); ?></div>
-    <?php endif; ?>
     <?php if ($error !== ''): ?>
         <div class="staff-empty-hint"><?php echo htmlspecialchars($error); ?></div>
     <?php endif; ?>
 
-    <form method="POST" class="staff-form-grid">
+    <form method="POST" enctype="multipart/form-data" class="staff-form-grid">
         <input type="hidden" name="action" value="save_basic">
         <label class="staff-field">
             <span>商品名稱</span>
@@ -287,11 +426,31 @@ staffPageStart($pdo, $isEdit ? '編輯商品' : '新增商品', 'products');
             </div>
         </div>
 
+        <?php if (!$isEdit): ?>
+            <div class="staff-field staff-field-wide">
+                <div class="staff-panel-head"><h2>商品圖片管理</h2></div>
+                <div class="staff-toolbar">
+                    <div class="file-upload-wrapper">
+                        <input
+                            type="file"
+                            name="product_images[]"
+                            class="file-input staff-file-input"
+                            accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                            multiple
+                        >
+                    </div>
+                    <button type="submit" class="staff-btn">上傳圖片</button>
+                </div>
+                <p style="margin:10px 0 0;font-size:13px;color:#6b7280;">可多選 jpg / png / webp。「上傳圖片」與下方「儲存商品」皆會送出表單並建立商品；有選檔案時將一併寫入圖片。</p>
+                <div class="staff-empty-hint" style="margin-top:14px;">建立完成後，將於此區顯示圖片預覽與刪除選項。</div>
+            </div>
+        <?php endif; ?>
+
         <div class="staff-form-actions staff-field-wide">
             <button type="submit" class="staff-btn">儲存商品</button>
             <?php
                 $role = (string)($_SESSION['role'] ?? 'staff');
-                $backToProductsHref = $role === 'admin' ? '../admin/products.php' : 'products.php';
+                $backToProductsHref = $role === 'admin' ? '../admin/products.php' : 'product_catalog.php';
             ?>
             <a href="<?php echo htmlspecialchars($backToProductsHref); ?>" class="staff-btn staff-btn-soft">返回商品管理</a>
         </div>
@@ -303,7 +462,9 @@ staffPageStart($pdo, $isEdit ? '編輯商品' : '新增商品', 'products');
     <div class="staff-panel-head"><h2>商品圖片管理</h2></div>
     <form method="POST" enctype="multipart/form-data" class="staff-toolbar">
         <input type="hidden" name="action" value="upload_image">
-        <input type="file" name="image_file" accept=".jpg,.jpeg,.png,.webp" class="staff-input staff-file-input">
+        <div class="file-upload-wrapper">
+            <input type="file" name="image_file" accept=".jpg,.jpeg,.png,.webp" class="file-input staff-file-input">
+        </div>
         <button type="submit" class="staff-btn">上傳圖片</button>
     </form>
 
@@ -316,7 +477,7 @@ staffPageStart($pdo, $isEdit ? '編輯商品' : '新增商品', 'products');
                     <img src="../assets/images/products/<?php echo htmlspecialchars((string)$img['image_url']); ?>" alt="" class="staff-image-thumb" onerror="this.style.display='none'">
                     <div class="staff-image-actions">
                         <span class="staff-badge pending" title="前台主圖依 sort_order 由小到大，第一張為主圖">排序 <?php echo (int)($img['sort_order'] ?? 0); ?></span>
-                        <form method="POST" class="staff-inline-form" onsubmit="return confirm('確定刪除此圖片？');">
+                        <form method="POST" class="staff-inline-form" data-app-confirm-title="刪除圖片" data-app-confirm="確定刪除此圖片？">
                             <input type="hidden" name="action" value="delete_image">
                             <input type="hidden" name="image_id" value="<?php echo (int)$img['id']; ?>">
                             <button type="submit" class="staff-action-btn staff-action-btn-muted">刪除</button>

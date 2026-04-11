@@ -324,7 +324,7 @@ if (!empty($cart_coupon_toast) && !empty($cart_coupon_toast['message'])) {
                                                 <span class="cart-item-subtotal-value">NT$ <?php echo number_format($subtotal, 0); ?></span>
                                             </div>
 
-                                            <form method="POST" onsubmit="return confirm('確定要刪除此商品嗎？');" class="cart-item-delete-form">
+                                            <form method="POST" class="cart-item-delete-form" data-app-confirm-title="移除商品" data-app-confirm="確定要刪除此商品嗎？">
                                                 <input type="hidden" name="action" value="delete_item">
                                                 <input type="hidden" name="cart_id" value="<?php echo htmlspecialchars($item['cart_id']); ?>">
                                                 <button type="submit" class="btn-delete">刪除</button>
@@ -519,6 +519,9 @@ if (!empty($cart_coupon_toast) && !empty($cart_coupon_toast['message'])) {
         </div>
     </footer>
 
+    <?php require_once __DIR__ . '/includes/app_modal.php';
+    app_modal_render(); ?>
+
     <script>
         (function () {
             var cartPageToastPayload = <?php echo $cart_coupon_toast_json; ?>;
@@ -565,15 +568,27 @@ if (!empty($cart_coupon_toast) && !empty($cart_coupon_toast['message'])) {
 
         function submitQuantity(cartId, quantity) {
             if (quantity < 1) {
-                if (confirm('確定要刪除此商品嗎？')) {
+                var input = document.getElementById('quantity_' + cartId);
+                var doRemove = function (ok) {
+                    if (!ok) {
+                        if (input) input.value = 1;
+                        return;
+                    }
                     quantity = 0;
-                } else {
-                    const input = document.getElementById('quantity_' + cartId);
-                    if (input) input.value = 1;
+                    submitQuantityPost(cartId, quantity);
+                };
+                if (window.AppModal && typeof AppModal.confirm === 'function') {
+                    AppModal.confirm({ title: '移除商品', message: '確定要刪除此商品嗎？' }).then(doRemove);
                     return;
                 }
+                doRemove(false);
+                return;
             }
-            
+
+            submitQuantityPost(cartId, quantity);
+        }
+
+        function submitQuantityPost(cartId, quantity) {
             const form = document.createElement('form');
             form.method = 'POST';
             form.innerHTML = `

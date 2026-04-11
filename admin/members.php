@@ -225,7 +225,7 @@ staffPageStart($pdo, '會員管理', 'members');
                                 <?php if ($statusColumn === ''): ?>
                                     <span class="staff-badge pending">無法管理</span>
                                 <?php else: ?>
-                                    <form method="POST" class="staff-inline-form" onsubmit="return confirm('確定要切換此會員帳號狀態嗎？');">
+                                    <form method="POST" class="staff-inline-form" data-app-confirm-title="切換會員狀態" data-app-confirm="確定要切換此會員帳號狀態嗎？">
                                         <input type="hidden" name="action" value="toggle_member">
                                         <input type="hidden" name="member_id" value="<?php echo (int)($m['id'] ?? 0); ?>">
                                         <button type="submit" class="staff-action-btn <?php echo $isActiveBadge ? 'staff-action-btn-danger' : 'staff-action-btn-primary'; ?>" style="padding-left: 10px; padding-right: 10px;">

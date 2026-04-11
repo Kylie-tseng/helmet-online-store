@@ -11,6 +11,5 @@ if (($_SESSION['role'] ?? '') !== 'admin') {
     exit;
 }
 
-// 直接沿用 staff 商品管理邏輯/版型（admin 已被允許進入 staffRequireAuth），
-// 並由 staff/products.php 依 role 自動調整「商品表單」連結返回路徑。
-require_once __DIR__ . '/../staff/products.php';
+// 直接沿用 staff 商品清單／篩選邏輯；商品入口（雙卡片）見 staff/products.php。
+require_once __DIR__ . '/../staff/product_catalog.php';

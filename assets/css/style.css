@@ -5287,6 +5287,48 @@ input[type="button"]:hover,
     color: #2b2b2b;
 }
 
+.refund-method-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 10px 16px;
+    margin-top: 2px;
+    font-size: 14px;
+    color: #2b2b2b;
+}
+
+.refund-method-text {
+    flex: 1 1 0;
+    min-width: 0;
+    line-height: 1.5;
+    padding-right: 4px;
+}
+
+.refund-policy-btn {
+    box-sizing: border-box;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 16px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: normal;
+    text-decoration: none;
+    white-space: nowrap;
+    color: #1c1e21;
+    background: #f0f2f5;
+    border: 1px solid #e2e5ea;
+}
+
+.refund-policy-btn:hover {
+    background: #e8eaef;
+    border-color: #d1d5db;
+    color: #111827;
+}
+
 .member-coupons-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -9524,6 +9566,94 @@ body.staff-page .staff-navbar-logout {
     gap: 14px;
 }
 
+.staff-page .staff-panel--lede {
+    margin-bottom: 0;
+}
+
+.staff-page .staff-panel-head {
+    margin: 0 0 8px;
+}
+
+.staff-page .staff-panel-head h2 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 800;
+    color: #111827;
+}
+
+.staff-page .staff-panel-head--tight-top {
+    margin-top: 14px;
+}
+
+.staff-page .staff-panel-head--split {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.staff-page .staff-panel-head--split .staff-toolbar--compact {
+    margin: 0;
+    flex-shrink: 0;
+}
+
+.staff-page .staff-section-lede {
+    margin: 0 0 12px;
+    font-size: 14px;
+    line-height: 1.65;
+    color: #4b5563;
+}
+
+.staff-page .staff-section-lede--tight {
+    margin-top: -4px;
+    margin-bottom: 10px;
+    font-size: 13px;
+    color: #6b7280;
+}
+
+.staff-page .staff-section-lede code {
+    font-size: 12px;
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: #f3f4f6;
+    color: #374151;
+}
+
+.staff-page .staff-dash-story-list {
+    margin: 0;
+    padding-left: 1.2em;
+    font-size: 14px;
+    line-height: 1.7;
+    color: #374151;
+}
+
+.staff-page .staff-dash-story-list li {
+    margin-bottom: 8px;
+}
+
+.staff-page .staff-dash-story-list a {
+    font-weight: 700;
+    color: #111827;
+}
+
+.staff-page .staff-stats-grid--compact {
+    margin-bottom: 4px;
+}
+
+.staff-page .staff-stats-grid--compact .staff-stat-card {
+    padding: 12px 14px;
+}
+
+.staff-page .staff-stats-grid--compact .staff-stat-value {
+    font-size: 22px;
+}
+
+.staff-page .staff-product-meta-sep {
+    color: #9ca3af;
+    font-weight: 400;
+}
+
 .staff-page .staff-report-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -9634,6 +9764,60 @@ body.staff-page .staff-navbar-logout {
     align-items: center;
     justify-content: space-between;
     gap: 10px;
+}
+
+/* 店員後台：redirect／表單錯誤橫幅（非成功 toast） */
+.staff-page .staff-notice--error,
+.staff-page .staff-flash-banner.staff-notice--error {
+    border-color: #fecaca;
+    background: #fef2f2;
+    color: #991b1b;
+}
+
+/* 店員後台：成功浮動膠囊（對齊前台商品詳情 cart-toast 風格） */
+.staff-page .staff-success-toast {
+    position: fixed;
+    top: 18%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.96);
+    z-index: 100000;
+    min-width: 260px;
+    max-width: min(92vw, 420px);
+    padding: 14px 26px;
+    margin: 0;
+    background: rgba(0, 0, 0, 0.72);
+    color: #fff;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    font-size: 15px;
+    font-weight: 500;
+    text-align: center;
+    line-height: 1.45;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.staff-page .staff-success-toast .staff-success-toast__text {
+    display: block;
+}
+
+.staff-page .staff-success-toast.is-visible {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    animation: toastCenterIn 0.3s ease forwards;
+}
+
+.staff-page .staff-success-toast.is-hiding {
+    opacity: 0 !important;
+    visibility: visible;
+    animation: none !important;
+    transform: translate(-50%, -58%) scale(0.96) !important;
+    transition: opacity 0.25s ease, transform 0.25s ease !important;
 }
 
 .staff-page .staff-toolbar {
@@ -9847,16 +10031,23 @@ body.staff-page .staff-navbar-logout {
 
 .staff-page .staff-product-media {
     width: 100%;
-    height: 148px;
-    min-height: 148px;
+    height: 180px;
+    min-height: 180px;
     background: #f3f4f6;
     overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 12px;
+    box-sizing: border-box;
 }
 
 .staff-page .staff-product-cover {
     width: 100%;
-    height: 100%;
-    object-fit: cover;
+    height: auto;
+    max-height: 100%;
+    max-width: 100%;
+    object-fit: contain;
     display: block;
 }
 
@@ -20092,4 +20283,250 @@ body .product-detail-page .product-detail-section {
   margin: 0 !important;
   padding: 0 !important;
   min-width: 0 !important;
+}
+
+/* =============================================================================
+   Staff 後台專用（僅在 body.staff-page 內生效，不影響前台 index／products／profile／cart／checkout）
+   ============================================================================= */
+
+.staff-page .staff-page-shell {
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 12px 20px;
+  box-sizing: border-box;
+}
+
+.staff-page .staff-section-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 14px 16px 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 6px 18px rgba(17, 24, 39, 0.06);
+  color: #111827;
+}
+
+.staff-page .staff-section-card > .staff-panel-head:first-child,
+.staff-page .staff-section-card > h2:first-child {
+  margin-top: 0;
+}
+
+.staff-page .staff-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  margin-bottom: 12px;
+  width: 100%;
+}
+
+.staff-page .staff-toolbar > .staff-input,
+.staff-page .staff-toolbar > .staff-select,
+.staff-page .staff-toolbar > .staff-btn,
+.staff-page .staff-toolbar > a.staff-btn {
+  min-width: 0;
+}
+
+.staff-page .staff-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.staff-page .staff-filter-row:last-child {
+  margin-bottom: 0;
+}
+
+.staff-page .staff-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+  width: 100%;
+}
+
+.staff-page .staff-summary-card {
+  background: #fafafa;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px 14px;
+  min-width: 0;
+  color: #111827;
+}
+
+.staff-page .staff-summary-card .staff-summary-label,
+.staff-page .staff-summary-card .staff-stat-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #6b7280;
+  margin-bottom: 6px;
+}
+
+.staff-page .staff-summary-card .staff-summary-value,
+.staff-page .staff-summary-card .staff-stat-value {
+  font-size: 22px;
+  font-weight: 800;
+  color: #111827;
+  line-height: 1.2;
+}
+
+.staff-page .staff-summary-card .staff-summary-note,
+.staff-page .staff-summary-card .staff-stat-note {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: #6b7280;
+}
+
+@media (max-width: 960px) {
+  .staff-page .staff-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .staff-page .staff-summary-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .staff-page .staff-page-shell {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+}
+
+.staff-page .staff-empty-state {
+  text-align: center;
+  padding: 24px 14px;
+  margin: 4px 0 8px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #6b7280;
+  background: #f9fafb;
+  border: 1px dashed #d1d5db;
+  border-radius: 12px;
+}
+
+.staff-page .staff-detail-panel {
+  padding: 14px 14px 16px;
+  background: #fafafa;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  color: #374151;
+}
+
+.staff-page .staff-section-card .staff-table-wrap,
+.staff-page .staff-detail-panel .staff-table-wrap {
+  margin-top: 8px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+}
+
+/* ========== 全站共用 AppModal（取代瀏覽器 alert / confirm） ========== */
+body.app-modal-open {
+  overflow: hidden;
+}
+
+.app-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100050;
+  background: rgba(17, 24, 39, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.app-modal-overlay[hidden] {
+  display: none !important;
+}
+
+.app-modal-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 100051;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+.app-modal-dialog[hidden] {
+  display: none !important;
+}
+
+.app-modal-dialog__panel {
+  pointer-events: auto;
+  width: 100%;
+  max-width: 400px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 22px 50px rgba(17, 24, 39, 0.18), 0 0 0 1px rgba(17, 24, 39, 0.06);
+  padding: 22px 22px 18px;
+  box-sizing: border-box;
+}
+
+.app-modal-dialog__title {
+  margin: 0 0 10px;
+  font-size: 17px;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1.35;
+}
+
+.app-modal-dialog__body {
+  margin: 0 0 20px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #4b5563;
+  white-space: pre-wrap;
+}
+
+.app-modal-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.app-modal-btn {
+  min-width: 88px;
+  padding: 9px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 10px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  line-height: 1.3;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.app-modal-btn--primary {
+  background: #111827;
+  color: #fff;
+  border-color: #111827;
+}
+
+.app-modal-btn--primary:hover {
+  background: #000;
+}
+
+.app-modal-btn--ghost {
+  background: #fff;
+  color: #374151;
+  border-color: #d1d5db;
+}
+
+.app-modal-btn--ghost:hover {
+  background: #f9fafb;
 }

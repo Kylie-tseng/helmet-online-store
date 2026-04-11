@@ -396,7 +396,7 @@ staffPageStart($pdo, '員工權限', 'staff_accounts');
                                 </form>
 
                                 <?php if ($statusColumn !== ''): ?>
-                                    <form method="POST" onsubmit="return confirm('確定切換帳號狀態？');">
+                                    <form method="POST" data-app-confirm-title="切換帳號狀態" data-app-confirm="確定切換帳號狀態？">
                                         <input type="hidden" name="action" value="toggle_staff_account">
                                         <input type="hidden" name="user_id" value="<?php echo (int)($m['id'] ?? 0); ?>">
                                         <button type="submit" class="staff-action-btn <?php echo $isActiveBadge ? 'staff-action-btn-danger' : 'staff-action-btn-primary'; ?>">

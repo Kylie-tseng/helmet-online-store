@@ -346,7 +346,7 @@ staffPageStart($pdo, '優惠活動', 'coupons');
                                 <div class="staff-return-actions">
                                     <a href="coupons.php?edit=<?php echo (int)($coupon['id'] ?? 0); ?>" class="staff-action-btn staff-action-btn-muted">修改</a>
 
-                                    <form method="POST" class="staff-inline-form" onsubmit="return confirm('確定要切換此優惠券狀態嗎？');" >
+                                    <form method="POST" class="staff-inline-form" data-app-confirm-title="切換優惠券狀態" data-app-confirm="確定要切換此優惠券狀態嗎？">
                                         <input type="hidden" name="action" value="toggle_coupon">
                                         <input type="hidden" name="coupon_id" value="<?php echo (int)($coupon['id'] ?? 0); ?>">
                                         <input type="hidden" name="is_active" value="<?php echo (int)($coupon['is_active'] ?? 0); ?>">
@@ -355,7 +355,7 @@ staffPageStart($pdo, '優惠活動', 'coupons');
                                         </button>
                                     </form>
 
-                                    <form method="POST" class="staff-inline-form" onsubmit="return confirm('確定要刪除此優惠券嗎？');">
+                                    <form method="POST" class="staff-inline-form" data-app-confirm-title="刪除優惠券" data-app-confirm="確定要刪除此優惠券嗎？">
                                         <input type="hidden" name="action" value="delete_coupon">
                                         <input type="hidden" name="coupon_id" value="<?php echo (int)($coupon['id'] ?? 0); ?>">
                                         <button type="submit" class="staff-action-btn staff-action-btn-danger" style="margin-top: 6px;">刪除</button>
@@ -657,7 +657,7 @@ try {
                                             <button type="submit" class="btn-secondary"><?php echo (int)$coupon['is_active'] === 1 ? '停用' : '啟用'; ?></button>
                                         </form>
 
-                                        <form method="POST" style="display:inline;" onsubmit="return confirm('確定要刪除此優惠券嗎？');">
+                                        <form method="POST" style="display:inline;" data-app-confirm-title="刪除優惠券" data-app-confirm="確定要刪除此優惠券嗎？">
                                             <input type="hidden" name="action" value="delete_coupon">
                                             <input type="hidden" name="coupon_id" value="<?php echo (int)$coupon['id']; ?>">
                                             <button type="submit" class="btn-delete">刪除</button>

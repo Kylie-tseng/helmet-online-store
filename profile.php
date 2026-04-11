@@ -785,7 +785,7 @@ try {
                                                         </button>
 
                                                         <?php if ($cancelable): ?>
-                                                            <form method="POST" class="member-inline-form" onsubmit="return confirm('確定要取消此訂單嗎？');">
+                                                            <form method="POST" class="member-inline-form" data-app-confirm-title="取消訂單" data-app-confirm="確定要取消此訂單嗎？">
                                                                 <input type="hidden" name="action" value="cancel_order">
                                                                 <input type="hidden" name="order_id" value="<?php echo $orderId; ?>">
                                                                     <button type="submit" class="member-btn member-btn--danger-soft member-btn--small account-order-action-primary">
@@ -897,6 +897,12 @@ try {
                                                                     <p class="member-order-return-reason">原因：<?php echo htmlspecialchars((string)$request['reason']); ?></p>
                                                                 <?php endif; ?>
                                                             <?php endforeach; ?>
+                                                            <div class="refund-method-row">
+                                                                <div class="refund-method-text">
+                                                                    退款方式：款項將依原付款方式辦理退回，實際入帳時間依各支付機構作業為準。
+                                                                </div>
+                                                                <a href="return_policy.php" class="refund-policy-btn">前往退貨政策</a>
+                                                            </div>
                                                         </div>
                                                     <?php else: ?>
                                                         <?php $canApplyReturn = ((string)($order['status'] ?? '') === 'completed'); ?>
@@ -1159,5 +1165,7 @@ try {
             }
         })();
     </script>
+    <?php require_once __DIR__ . '/includes/app_modal.php';
+    app_modal_render(); ?>
 </body>
 </html>
