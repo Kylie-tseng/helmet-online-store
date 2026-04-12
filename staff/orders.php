@@ -1,4 +1,5 @@
 <?php
+date_default_timezone_set('Asia/Taipei');
 
 require_once '../config.php';
 
@@ -6,75 +7,17 @@ require_once __DIR__ . '/includes/staff_layout.php';
 
 require_once __DIR__ . '/../includes/cart_functions.php';
 
+require_once __DIR__ . '/../includes/order_status_helpers.php';
+
 
 
 staffRequireAuth();
 
+try {
 
+    $pdo->exec("SET time_zone = '+08:00'");
 
-if (!function_exists('staff_orders_discover_status_enum')) {
-
-    /**
-
-     * 讀取 orders.status 實際 ENUM，避免後台選單與資料庫狀態不一致而誤寫狀態。
-
-     *
-
-     * @return list<string>
-
-     */
-
-    function staff_orders_discover_status_enum(PDO $pdo): array
-
-    {
-
-        static $cache = null;
-
-        if ($cache !== null) {
-
-            return $cache;
-
-        }
-
-        $fallback = ['pending', 'pending_payment', 'paid', 'shipped', 'completed', 'cancelled', 'return_requested'];
-
-        $cache = $fallback;
-
-        try {
-
-            $row = $pdo->query("SHOW COLUMNS FROM `orders` LIKE 'status'")->fetch(PDO::FETCH_ASSOC);
-
-            $type = (string)($row['Type'] ?? '');
-
-            if (preg_match('/^enum\((.+)\)$/i', $type, $m)) {
-
-                $vals = [];
-
-                if (preg_match_all("/'((?:[^'\\\\]|\\\\.)*)'/", $m[1], $mm)) {
-
-                    foreach ($mm[1] as $raw) {
-
-                        $vals[] = str_replace(["\\'", '\\\\'], ["'", '\\'], $raw);
-
-                    }
-
-                }
-
-                if ($vals !== []) {
-
-                    $cache = $vals;
-
-                }
-
-            }
-
-        } catch (Throwable $e) {
-
-        }
-
-        return $cache;
-
-    }
+} catch (Throwable $e) {
 
 }
 
@@ -126,54 +69,6 @@ if (!function_exists('staff_orders_redirect_with_flash')) {
 
 
 
-if (!function_exists('staff_orders_display_status_label')) {
-
-    function staff_orders_display_status_label(string $raw): string
-
-    {
-
-        $s = strtolower(trim($raw));
-
-        if ($s === '' || in_array($s, ['pending', 'pending_payment', 'processing', 'progress', 'return_requested'], true)) {
-
-            return '待處理';
-
-        }
-
-        if ($s === 'paid') {
-
-            return '已付款';
-
-        }
-
-        if ($s === 'shipped') {
-
-            return '已出貨';
-
-        }
-
-        if ($s === 'completed' || $s === 'done') {
-
-            return '已完成';
-
-        }
-
-        if ($s === 'cancelled') {
-
-            return '已取消';
-
-        }
-
-        $t = trim($raw);
-
-        return $t !== '' ? $t : '未知狀態';
-
-    }
-
-}
-
-
-
 if (!function_exists('staff_orders_status_badge_class')) {
 
     function staff_orders_status_badge_class(string $raw): string
@@ -196,35 +91,49 @@ if (!function_exists('staff_orders_status_badge_class')) {
 
 
 
-if (!function_exists('staff_orders_status_option_is_selected')) {
+if (!function_exists('staff_orders_resolve_shipping_display')) {
 
-    function staff_orders_status_option_is_selected(string $currentRaw, string $optionValue): bool
+    /**
+
+     * 配送方式顯示：優先 DB 的 pickup/home；空值時依付款方式推測（與補資料 SQL 邏輯一致）。
+
+     *
+
+     * @param array<string,mixed> $order
+
+     * @param array<string,string> $shippingMap
+
+     * @return array{label:string,from_db:bool}
+
+     */
+
+    function staff_orders_resolve_shipping_display(array $order, array $shippingMap): array
 
     {
 
-        $c = strtolower(trim($currentRaw));
+        $sm = strtolower(trim((string) ($order['shipping_method'] ?? '')));
 
-        $o = strtolower(trim($optionValue));
+        if ($sm !== '') {
 
-        if ($c === $o) {
-
-            return true;
+            return ['label' => ($shippingMap[$sm] ?? $sm), 'from_db' => true];
 
         }
 
-        if (in_array($c, ['', 'pending_payment', 'processing', 'progress', 'return_requested'], true) && $o === 'pending') {
+        $pm = strtolower(trim((string) ($order['payment_method'] ?? '')));
 
-            return true;
+        if ($pm === 'credit_card') {
 
-        }
-
-        if (in_array($c, ['completed', 'done'], true) && in_array($o, ['completed', 'done'], true)) {
-
-            return true;
+            return ['label' => '宅配到府', 'from_db' => false];
 
         }
 
-        return false;
+        if ($pm === 'cod') {
+
+            return ['label' => '超商取貨', 'from_db' => false];
+
+        }
+
+        return ['label' => '', 'from_db' => false];
 
     }
 
@@ -247,7 +156,7 @@ $staffOrderListFilterKeys = ['pending', 'paid', 'shipped', 'completed', 'cancell
 
 
 
-$allowedStatuses = staff_orders_discover_status_enum($pdo);
+$allowedStatuses = app_orders_discover_status_enum($pdo);
 
 /** 結案狀態：不可改為其他 status（含舊資料 done ≈ 已完成） */
 
@@ -364,6 +273,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute([':status' => $newStatus, ':id' => $orderId]);
 
             markUserCouponUsedAfterOrderStatusChange($pdo, $orderId, $newStatus);
+            markUserCouponReleasedAfterOrderStatusChange($pdo, $orderId, $newStatus);
 
             staff_orders_redirect_with_flash('狀態更新成功。');
 
@@ -527,6 +437,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 
 
+$overviewBuckets = app_orders_compute_overview_buckets($pdo, $allowedStatuses);
+
+
+
 $orders = [];
 
 try {
@@ -569,63 +483,11 @@ try {
 
     if ($status !== '') {
 
-        if ($status === 'pending') {
+        [$stSql, $stParams] = app_orders_backoffice_list_status_clause($status, $allowedStatuses, 'o', 'lst');
 
-            $pendingVals = array_values(array_intersect(
+        $sql .= $stSql;
 
-                ['pending', 'pending_payment', 'processing', 'progress'],
-
-                $allowedStatuses
-
-            ));
-
-            if ($pendingVals !== []) {
-
-                $ph = [];
-
-                foreach ($pendingVals as $i => $v) {
-
-                    $k = ':stf' . $i;
-
-                    $ph[] = $k;
-
-                    $params[$k] = $v;
-
-                }
-
-                $sql .= ' AND (o.status IN (' . implode(', ', $ph) . ') OR TRIM(COALESCE(o.status, \'\')) = \'\')';
-
-            }
-
-        } elseif ($status === 'completed') {
-
-            $doneVals = array_values(array_intersect(['completed', 'done'], $allowedStatuses));
-
-            if ($doneVals !== []) {
-
-                $ph = [];
-
-                foreach ($doneVals as $i => $v) {
-
-                    $k = ':std' . $i;
-
-                    $ph[] = $k;
-
-                    $params[$k] = $v;
-
-                }
-
-                $sql .= ' AND o.status IN (' . implode(', ', $ph) . ')';
-
-            }
-
-        } elseif (in_array($status, $allowedStatuses, true)) {
-
-            $sql .= ' AND o.status = :status';
-
-            $params[':status'] = $status;
-
-        }
+        $params = array_merge($params, $stParams);
 
     }
 
@@ -725,84 +587,6 @@ try {
 
 
 
-$orderStats = array_fill_keys($allowedStatuses, 0);
-
-try {
-
-    $stmt = $pdo->query('SELECT status, COUNT(*) AS cnt FROM orders GROUP BY status');
-
-    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-
-        $key = (string)($row['status'] ?? '');
-
-        if (!array_key_exists($key, $orderStats)) {
-
-            $orderStats[$key] = 0;
-
-        }
-
-        $orderStats[$key] += (int)($row['cnt'] ?? 0);
-
-    }
-
-} catch (Throwable $e) {
-
-    $orderStats = array_fill_keys($allowedStatuses, 0);
-
-}
-
-
-
-$overviewBuckets = [
-
-    'pending' => 0,
-
-    'paid' => 0,
-
-    'shipped' => 0,
-
-    'completed' => 0,
-
-    'cancelled' => 0,
-
-];
-
-$pendingLike = ['', 'pending', 'pending_payment', 'processing', 'progress', 'return_requested'];
-
-foreach ($orderStats as $dbKey => $cnt) {
-
-    $k = strtolower(trim((string)$dbKey));
-
-    if (in_array($k, $pendingLike, true)) {
-
-        $overviewBuckets['pending'] += (int)$cnt;
-
-        continue;
-
-    }
-
-    if ($k === 'paid') {
-
-        $overviewBuckets['paid'] += (int)$cnt;
-
-    } elseif ($k === 'shipped') {
-
-        $overviewBuckets['shipped'] += (int)$cnt;
-
-    } elseif (in_array($k, ['completed', 'done'], true)) {
-
-        $overviewBuckets['completed'] += (int)$cnt;
-
-    } elseif ($k === 'cancelled') {
-
-        $overviewBuckets['cancelled'] += (int)$cnt;
-
-    }
-
-}
-
-
-
 $overviewCards = [
 
     ['key' => 'pending', 'label' => '待處理'],
@@ -857,81 +641,7 @@ staffPageStart($pdo, '訂單處理', 'orders');
 
     }
 
-    .staff-page .staff-order-actions-row {
-
-        display: flex;
-
-        flex-direction: row;
-
-        flex-wrap: nowrap;
-
-        align-items: center;
-
-        gap: 14px;
-
-        max-width: 100%;
-
-    }
-
-    .staff-page .staff-order-actions-row .staff-inline-form {
-
-        display: inline-flex;
-
-        flex: 0 1 auto;
-
-        flex-wrap: nowrap;
-
-        align-items: center;
-
-        gap: 8px;
-
-        margin: 0;
-
-    }
-
-    .staff-page .staff-order-actions-row .staff-select--order-row {
-
-        max-width: 118px;
-
-        min-width: 0;
-
-    }
-
-    .staff-page .staff-order-actions-row .staff-input--order-note-row {
-
-        width: 120px;
-
-        min-width: 72px;
-
-        max-width: 140px;
-
-    }
-
-    .staff-page .staff-order-actions-row .staff-action-btn--compact {
-
-        padding: 4px 8px;
-
-        font-size: 12px;
-
-        white-space: nowrap;
-
-    }
-
-    @media (max-width: 1100px) {
-
-        .staff-page .staff-order-actions-row .staff-input--order-note-row {
-
-            width: 88px;
-
-        }
-
-        .staff-page .staff-order-actions-row .staff-select--order-row {
-
-            max-width: 100px;
-
-        }
-
-    }
+    /* staff-order-actions-row 樣式已移至 assets/css/style.css 供訂單／退貨共用 */
 
     .staff-page .staff-order-detail-row .order-detail-product-cell {
 
@@ -1111,7 +821,7 @@ staffPageStart($pdo, '訂單處理', 'orders');
 
                                 <span class="staff-badge <?php echo htmlspecialchars(staff_orders_status_badge_class((string)($order['status'] ?? ''))); ?>">
 
-                                    <?php echo htmlspecialchars(staff_orders_display_status_label((string)($order['status'] ?? ''))); ?>
+                                    <?php echo htmlspecialchars(app_backoffice_order_status_label((string)($order['status'] ?? ''))); ?>
 
                                 </span>
 
@@ -1127,9 +837,11 @@ staffPageStart($pdo, '訂單處理', 'orders');
 
                             <td><?php
 
-                                $smRaw = (string)($order['shipping_method'] ?? '');
+                                $resShipList = staff_orders_resolve_shipping_display($order, $shippingMap);
 
-                                echo htmlspecialchars($smRaw !== '' ? ($shippingMap[$smRaw] ?? $smRaw) : '—');
+                                $shipListText = $resShipList['label'] !== '' ? $resShipList['label'] : '未指定';
+
+                                echo htmlspecialchars($shipListText);
 
                             ?></td>
 
@@ -1153,9 +865,9 @@ staffPageStart($pdo, '訂單處理', 'orders');
 
                                             <?php foreach ($allowedStatuses as $item): ?>
 
-                                                <option value="<?php echo htmlspecialchars($item); ?>" <?php echo staff_orders_status_option_is_selected((string)($order['status'] ?? ''), (string)$item) ? 'selected' : ''; ?>>
+                                                <option value="<?php echo htmlspecialchars($item); ?>" <?php echo app_orders_status_option_is_selected((string)($order['status'] ?? ''), (string)$item) ? 'selected' : ''; ?>>
 
-                                                    <?php echo htmlspecialchars(staff_orders_display_status_label((string)$item)); ?>
+                                                    <?php echo htmlspecialchars(app_backoffice_order_status_label((string)$item)); ?>
 
                                                 </option>
 
@@ -1315,7 +1027,9 @@ staffPageStart($pdo, '訂單處理', 'orders');
 
                                         $dTrk = $hasTrackingNumber ? trim((string)($order['tracking_number'] ?? '')) : '';
 
-                                        $shipLabel = $dShip !== '' ? ($shippingMap[$dShip] ?? $dShip) : '';
+                                        $resShipDetail = staff_orders_resolve_shipping_display($order, $shippingMap);
+
+                                        $shipLabel = $resShipDetail['label'];
 
                                         $recvAllEmpty = ($shipLabel === '' && $dAddr === '' && $dPick === '' && $dCo === '' && $dTrk === '');
 
@@ -1329,7 +1043,7 @@ staffPageStart($pdo, '訂單處理', 'orders');
 
                                     <div class="order-detail-grid staff-field-wide">
 
-                                        <p><strong>配送方式：</strong><?php echo htmlspecialchars($shipLabel !== '' ? $shipLabel : '—'); ?></p>
+                                        <p><strong>配送方式：</strong><?php echo htmlspecialchars($shipLabel !== '' ? $shipLabel : '未指定'); ?></p>
 
                                         <p><strong>收件地址：</strong><?php echo htmlspecialchars($dAddr !== '' ? $dAddr : '—'); ?></p>
 

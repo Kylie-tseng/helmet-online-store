@@ -9,34 +9,41 @@ if (($_SESSION['role'] ?? '') !== 'admin') {
     exit;
 }
 
-// 檢查 users 表可用狀態欄位（is_active / status）
+// 檢查 users 表可用狀態欄位（優先 is_active；否則字串 status）
 $statusColumn = '';
-$hasIsActive = false;
-$hasStatus = false;
-$statusActiveValue = 1;
-$statusInactiveValue = 0;
-$statusLabelActive = '啟用';
-$statusLabelInactive = '停用';
 
-try {
-    $cols = $pdo->query("SHOW COLUMNS FROM users")->fetchAll(PDO::FETCH_ASSOC);
-    $colNames = [];
-    foreach ($cols as $c) {
-        $colNames[(string)($c['Field'] ?? '')] = true;
+$resolveUserStatusColumn = static function (PDO $pdo): array {
+    $out = ['column' => '', 'is_active' => false, 'is_status' => false];
+    try {
+        $cols = $pdo->query('SHOW COLUMNS FROM users')->fetchAll(PDO::FETCH_ASSOC);
+        $colNames = [];
+        foreach ($cols as $c) {
+            $colNames[(string)($c['Field'] ?? '')] = true;
+        }
+        if (!empty($colNames['is_active'])) {
+            $out['column'] = 'is_active';
+            $out['is_active'] = true;
+        } elseif (!empty($colNames['status'])) {
+            $out['column'] = 'status';
+            $out['is_status'] = true;
+        }
+    } catch (Throwable $e) {
     }
-    if (!empty($colNames['is_active'])) {
-        $statusColumn = 'is_active';
-        $hasIsActive = true;
-        $statusActiveValue = 1;
-        $statusInactiveValue = 0;
-    } elseif (!empty($colNames['status'])) {
-        $statusColumn = 'status';
-        $hasStatus = true;
-        $statusActiveValue = 'active';
-        $statusInactiveValue = 'inactive';
+    return $out;
+};
+
+$st = $resolveUserStatusColumn($pdo);
+$statusColumn = $st['column'];
+
+// 舊版 schema 無欄位時：管理者進入本頁時以最小方式補 is_active（失敗則維持無法管理提示）
+if ($statusColumn === '') {
+    try {
+        $pdo->exec("ALTER TABLE `users` ADD COLUMN `is_active` tinyint(1) NOT NULL DEFAULT 1 COMMENT '1=可使用 0=已停用' AFTER `role`");
+    } catch (Throwable $e) {
+        // 無權限／已手動新增等
     }
-} catch (Throwable $e) {
-    $statusColumn = '';
+    $st = $resolveUserStatusColumn($pdo);
+    $statusColumn = $st['column'];
 }
 
 $q = trim($_GET['q'] ?? '');
@@ -57,14 +64,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $current = $stmt->fetch(PDO::FETCH_ASSOC);
             if ($current) {
                 $currentVal = $current[$statusColumn] ?? null;
-                $newVal = $currentVal ? 0 : 1;
                 if ($statusColumn === 'status') {
-                    // status：字串 active/inactive
                     $newVal = ((string)$currentVal === 'active') ? 'inactive' : 'active';
-                } elseif ($statusColumn === 'is_active') {
+                } else {
                     $newVal = ((int)$currentVal === 1) ? 0 : 1;
                 }
-                $upd = $pdo->prepare("UPDATE users SET {$statusColumn} = :v, updated_at = NOW() WHERE id = :id");
+                $upd = $pdo->prepare("UPDATE users SET {$statusColumn} = :v, updated_at = NOW() WHERE id = :id AND role = 'member'");
                 $upd->execute([':v' => $newVal, ':id' => $memberId]);
                 $flashMessage = '帳號狀態已更新。';
             } else {
@@ -76,7 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $flashType = 'error';
         }
     } elseif ($memberId > 0 && $statusColumn === '') {
-        $flashMessage = '目前資料表沒有可用狀態欄位（is_active/status），無法停用/恢復。';
+        $flashMessage = '目前資料表沒有可用狀態欄位，且無法自動補欄位（請確認資料庫權限或手動執行 db/add_users_is_active.sql）。';
         $flashType = 'error';
     }
 }
@@ -163,8 +168,8 @@ staffPageStart($pdo, '會員管理', 'members');
         >
         <select name="status" class="staff-select">
             <option value="all">全部狀態</option>
-            <option value="active" <?php echo $statusFilter === 'active' ? 'selected' : ''; ?>>啟用</option>
-            <option value="inactive" <?php echo $statusFilter === 'inactive' ? 'selected' : ''; ?>>停用</option>
+            <option value="active" <?php echo $statusFilter === 'active' ? 'selected' : ''; ?>>可使用</option>
+            <option value="inactive" <?php echo $statusFilter === 'inactive' ? 'selected' : ''; ?>>已停用</option>
         </select>
         <button type="submit" class="staff-btn">套用篩選</button>
     </form>
@@ -214,10 +219,10 @@ staffPageStart($pdo, '會員管理', 'members');
                             <td><?php echo htmlspecialchars(staffCurrency((float)($m['total_spent'] ?? 0))); ?></td>
                             <td>
                                 <?php if ($statusColumn === ''): ?>
-                                    <span class="staff-badge pending">未知</span>
+                                    <span class="staff-badge pending">無法管理</span>
                                 <?php else: ?>
                                     <span class="staff-badge <?php echo $isActiveBadge ? 'done' : 'danger'; ?>">
-                                        <?php echo $isActiveBadge ? '啟用' : '停用'; ?>
+                                        <?php echo $isActiveBadge ? '可使用' : '已停用'; ?>
                                     </span>
                                 <?php endif; ?>
                             </td>
@@ -225,11 +230,16 @@ staffPageStart($pdo, '會員管理', 'members');
                                 <?php if ($statusColumn === ''): ?>
                                     <span class="staff-badge pending">無法管理</span>
                                 <?php else: ?>
-                                    <form method="POST" class="staff-inline-form" data-app-confirm-title="切換會員狀態" data-app-confirm="確定要切換此會員帳號狀態嗎？">
+                                    <form
+                                        method="POST"
+                                        class="staff-inline-form"
+                                        data-app-confirm-title="<?php echo $isActiveBadge ? '停用帳號' : '啟用帳號'; ?>"
+                                        data-app-confirm="<?php echo $isActiveBadge ? '確定要停用此會員帳號嗎？停用後對方將無法登入。' : '確定要啟用此會員帳號嗎？'; ?>"
+                                    >
                                         <input type="hidden" name="action" value="toggle_member">
                                         <input type="hidden" name="member_id" value="<?php echo (int)($m['id'] ?? 0); ?>">
                                         <button type="submit" class="staff-action-btn <?php echo $isActiveBadge ? 'staff-action-btn-danger' : 'staff-action-btn-primary'; ?>" style="padding-left: 10px; padding-right: 10px;">
-                                            <?php echo $isActiveBadge ? '停用' : '恢復'; ?>
+                                            <?php echo $isActiveBadge ? '停用帳號' : '啟用帳號'; ?>
                                         </button>
                                     </form>
                                 <?php endif; ?>

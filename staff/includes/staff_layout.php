@@ -23,16 +23,16 @@ if (!function_exists('staffNavItems')) {
 
         // admin：進階版管理導覽列（與 staff 版型共用）
         if ($role === 'admin') {
+            // 順序對應文件：帳號管理 → 商品與訂單監控 → 營運與銷售分析 → 促銷管理 → 其他設定（不含退貨，退貨由店員處理）
             return [
                 'dashboard' => ['label' => '工作入口', 'href' => 'dashboard.php'],
-                'orders' => ['label' => '訂單與營運', 'href' => 'orders.php'],
-                'products' => ['label' => '商品與分類', 'href' => 'products.php'],
-                'sales' => ['label' => '銷售統計', 'href' => 'sales.php'],
-                'returns' => ['label' => '退貨申請', 'href' => 'returns.php'],
-                'coupons' => ['label' => '優惠活動', 'href' => 'coupons.php'],
                 'members' => ['label' => '會員管理', 'href' => 'members.php'],
                 'staff_accounts' => ['label' => '員工權限', 'href' => 'staff_accounts.php'],
-                'settings' => ['label' => '系統設定', 'href' => 'settings.php'],
+                'products' => ['label' => '商品與分類', 'href' => 'products.php'],
+                'orders' => ['label' => '訂單與營運', 'href' => 'orders.php'],
+                'sales' => ['label' => '銷售統計', 'href' => 'sales.php'],
+                'coupons' => ['label' => '優惠活動', 'href' => 'coupons.php'],
+                'settings' => ['label' => '其他設定', 'href' => 'settings.php'],
             ];
         }
 

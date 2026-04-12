@@ -44,28 +44,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
     if ($action === 'create_staff_account') {
         $username = strtoupper(trim((string)($_POST['username'] ?? '')));
-        $name = trim((string)($_POST['name'] ?? ''));
-        $email = trim((string)($_POST['email'] ?? ''));
-        $password = (string)($_POST['password'] ?? '');
-        $role = trim((string)($_POST['role'] ?? 'staff'));
-
-        $phone = trim((string)($_POST['phone'] ?? ''));
-        $address = trim((string)($_POST['address'] ?? ''));
+        $password = (string) ($_POST['password'] ?? '');
+        $role = trim((string) ($_POST['role'] ?? 'staff'));
 
         $allowedRoles = ['admin', 'staff'];
         $errors = [];
-        if ($username === '') $errors[] = '請輸入帳號';
-        if ($name === '') $errors[] = '請輸入姓名';
-        if ($email === '') $errors[] = '請輸入 Email';
-        if ($password === '' || strlen($password) < 6) $errors[] = '密碼至少 6 碼';
-        if (!in_array($role, $allowedRoles, true)) $errors[] = '角色不正確';
+        if ($username === '') {
+            $errors[] = '請輸入帳號';
+        }
+        if ($password === '' || strlen($password) < 6) {
+            $errors[] = '密碼至少 6 碼';
+        }
+        if (!in_array($role, $allowedRoles, true)) {
+            $errors[] = '角色不正確';
+        }
 
-        // 動態欄位：phone/address 是否存在
+        // 動態欄位：phone/address/is_active 是否存在
         $colNames = [];
         try {
-            $cols = $pdo->query("SHOW COLUMNS FROM users")->fetchAll(PDO::FETCH_ASSOC);
+            $cols = $pdo->query('SHOW COLUMNS FROM users')->fetchAll(PDO::FETCH_ASSOC);
             foreach ($cols as $c) {
-                $colNames[(string)($c['Field'] ?? '')] = true;
+                $colNames[(string) ($c['Field'] ?? '')] = true;
             }
         } catch (Throwable $e) {
             $colNames = [];
@@ -73,9 +72,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
         $usePhone = !empty($colNames['phone']);
         $useAddress = !empty($colNames['address']);
-        $useUpdatedAt = !empty($colNames['updated_at']);
+        $useIsActive = !empty($colNames['is_active']);
 
         if (empty($errors)) {
+            // 表單不收集：name 用帳號；email 內部唯一占位；phone/address 用空字串滿足 NOT NULL
+            $name = $username;
+            $email = 'staff+' . bin2hex(random_bytes(10)) . '@noreply.local';
+            if (strlen($email) > 100) {
+                $email = 'staff+' . bin2hex(random_bytes(8)) . '@noreply.local';
+            }
+            $phoneVal = '';
+            $addressVal = '';
+
             try {
                 $hashed = password_hash($password, PASSWORD_DEFAULT);
 
@@ -92,22 +100,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 if ($usePhone) {
                     $fields[] = 'phone';
                     $placeholders[] = ':phone';
-                    $params[':phone'] = $phone;
+                    $params[':phone'] = $phoneVal;
                 }
                 if ($useAddress) {
                     $fields[] = 'address';
                     $placeholders[] = ':address';
-                    $params[':address'] = $address;
+                    $params[':address'] = $addressVal;
+                }
+                if ($useIsActive) {
+                    $fields[] = 'is_active';
+                    $placeholders[] = ':is_active';
+                    $params[':is_active'] = 1;
                 }
 
-                $sql = "INSERT INTO users (" . implode(', ', $fields) . ")
-                        VALUES (" . implode(', ', $placeholders) . ")";
+                $sql = 'INSERT INTO users (' . implode(', ', $fields) . ')
+                        VALUES (' . implode(', ', $placeholders) . ')';
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute($params);
 
                 $flashMessage = '店員帳號已建立。';
             } catch (Throwable $e) {
-                $flashMessage = '建立失敗：帳號/Email 可能已存在。';
+                $flashMessage = '建立失敗：帳號可能已存在，請換一組帳號再試。';
                 $flashType = 'error';
             }
         } else {
@@ -247,10 +260,6 @@ try {
     $members = [];
 }
 
-// 取新增表單欄位存在性（phone/address）
-$canPhone = $maybePhone;
-$canAddress = $maybeAddress;
-
 staffPageStart($pdo, '員工權限', 'staff_accounts');
 ?>
 <section class="staff-panel">
@@ -262,45 +271,21 @@ staffPageStart($pdo, '員工權限', 'staff_accounts');
 
     <div class="staff-panel-head" style="margin-bottom: 12px;">
         <h2>新增店員帳號</h2>
-        <p class="staff-panel-subtitle">建立管理者/店員帳號（不影響會員系統登入邏輯）</p>
+        <p class="staff-panel-subtitle">僅需帳號、密碼與角色（不影響會員系統）</p>
     </div>
 
     <form method="POST" class="staff-form-grid">
         <input type="hidden" name="action" value="create_staff_account">
 
         <label class="staff-field">
-            <span>帳號（username）</span>
-            <input type="text" name="username" class="staff-input" required>
+            <span>帳號</span>
+            <input type="text" name="username" class="staff-input" required autocomplete="username">
         </label>
 
         <label class="staff-field">
             <span>密碼</span>
-            <input type="password" name="password" class="staff-input" required>
+            <input type="password" name="password" class="staff-input" required autocomplete="new-password" minlength="6">
         </label>
-
-        <label class="staff-field">
-            <span>姓名</span>
-            <input type="text" name="name" class="staff-input" required>
-        </label>
-
-        <label class="staff-field">
-            <span>Email</span>
-            <input type="email" name="email" class="staff-input" required>
-        </label>
-
-        <?php if ($canPhone): ?>
-            <label class="staff-field">
-                <span>電話（可選）</span>
-                <input type="text" name="phone" class="staff-input">
-            </label>
-        <?php endif; ?>
-
-        <?php if ($canAddress): ?>
-            <label class="staff-field staff-field-wide">
-                <span>地址（可選）</span>
-                <input type="text" name="address" class="staff-input">
-            </label>
-        <?php endif; ?>
 
         <label class="staff-field staff-field-wide">
             <span>角色</span>

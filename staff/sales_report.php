@@ -1,39 +1,201 @@
 <?php
+date_default_timezone_set('Asia/Taipei');
+
 require_once '../config.php';
 require_once __DIR__ . '/includes/staff_layout.php';
 
 staffRequireAuth();
 
-$range = trim($_GET['range'] ?? 'month');
-if (!in_array($range, ['today', 'month', 'all'], true)) {
-    $range = 'month';
+// 與 PHP 日曆／單日查詢一致：本連線以台灣時區解讀 TIMESTAMP（不變更資料表結構）
+try {
+    $pdo->exec("SET time_zone = '+08:00'");
+} catch (Throwable $e) {
+    // 無權限時略過，仍依 PHP 端 Asia/Taipei
 }
 
-$dateClause = '';
-$dateParams = [];
-if ($range === 'today') {
-    $dateClause = ' AND DATE(o.created_at) = CURDATE()';
-} elseif ($range === 'month') {
-    $dateClause = " AND DATE_FORMAT(o.created_at, '%Y-%m') = DATE_FORMAT(CURDATE(), '%Y-%m')";
+$today = date('Y-m-d');
+
+/** 本月 KPI／日曆「有效銷售」：已付款／已出貨／已完成（不含 cancelled） */
+$validOrderStatuses = "('paid', 'shipped', 'completed')";
+
+/** 店員銷售頁：可切換月份（2025-09 ～ 2026-06） */
+$staffSalesAllowedMonths = [
+    '2025-09', '2025-10', '2025-11', '2025-12',
+    '2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06',
+];
+
+/** 錨點 hash（與 HTML id 一致；所有 reload 連結請經 staff_sales_build_url） */
+const STAFF_SALES_HASH_CALENDAR = 'sales-calendar';
+const STAFF_SALES_HASH_DAILY = 'daily-detail';
+
+/**
+ * @param array<int, string> $allowedMonths
+ */
+function staff_sales_resolve_month(array $allowedMonths): string
+{
+    $raw = trim((string)($_GET['month'] ?? ''));
+    if (preg_match('/^\d{4}-\d{2}$/', $raw) && in_array($raw, $allowedMonths, true)) {
+        return $raw;
+    }
+    $nowYm = date('Y-m');
+    if (in_array($nowYm, $allowedMonths, true)) {
+        return $nowYm;
+    }
+
+    return $allowedMonths[count($allowedMonths) - 1];
 }
+
+/**
+ * 該月最後可選日期（字串 Y-m-d）。
+ */
+function staff_sales_last_selectable_day(string $ym): string
+{
+    $tz = new DateTimeZone('Asia/Taipei');
+    $first = new DateTimeImmutable($ym . '-01', $tz);
+
+    return $first->format('Y-m-t');
+}
+
+/**
+ * 選取日期邏輯（與 $_GET 對齊）：
+ * - 僅在「未帶 date」（鍵不存在或空字串）時，預設為今天（台灣時間）；今天不在當前 month 則該月 1 日。
+ * - 只要有傳非空 date，就以該參數為主；合法且屬於 $ym 則採用；否則絕不用「今天」覆蓋，改為該月 1 日。
+ */
+function staff_sales_resolve_selected_date(string $ym): string
+{
+    $tz = new DateTimeZone('Asia/Taipei');
+    $cap = staff_sales_last_selectable_day($ym);
+    $dateKeyMissing = !array_key_exists('date', $_GET);
+    $raw = $dateKeyMissing ? '' : trim((string)$_GET['date']);
+
+    if ($dateKeyMissing || $raw === '') {
+        $today = date('Y-m-d');
+        if (substr($today, 0, 7) === $ym) {
+            return strcmp($today, $cap) <= 0 ? $today : $cap;
+        }
+        $first = $ym . '-01';
+
+        return strcmp($first, $cap) <= 0 ? $first : $cap;
+    }
+
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $raw)) {
+        $try = DateTimeImmutable::createFromFormat('!Y-m-d', $raw, $tz);
+        if ($try instanceof DateTimeImmutable && $try->format('Y-m') === $ym) {
+            $last = (int)$try->format('t');
+            $dom = (int)$try->format('j');
+            if ($dom >= 1 && $dom <= $last) {
+                $picked = $try->format('Y-m-d');
+
+                return strcmp($picked, $cap) <= 0 ? $picked : $cap;
+            }
+        }
+    }
+
+    $first = $ym . '-01';
+
+    return strcmp($first, $cap) <= 0 ? $first : $cap;
+}
+
+/**
+ * @param array<int, string> $allowedMonths
+ */
+function staff_sales_month_index(string $ym, array $allowedMonths): int
+{
+    $idx = array_search($ym, $allowedMonths, true);
+
+    return $idx === false ? 0 : $idx;
+}
+
+/**
+ * 所有會重新載入的連結一律帶 hash，避免捲動位置亂跳。
+ *
+ * @param string $hash 請使用 STAFF_SALES_HASH_CALENDAR、STAFF_SALES_HASH_DAILY 或 ''
+ */
+function staff_sales_build_url(string $monthYm, string $dateYmd, string $hash): string
+{
+    $q = http_build_query([
+        'month' => $monthYm,
+        'date' => $dateYmd,
+    ]);
+    $base = 'sales_report.php?' . $q;
+    if ($hash !== '') {
+        $base .= '#' . ltrim($hash, '#');
+    }
+
+    return $base;
+}
+
+/**
+ * 上一月／下一月：只帶 month，不帶 date，避免舊 date 套到錯誤月份。
+ *
+ * @param string $hash 請使用 STAFF_SALES_HASH_CALENDAR、STAFF_SALES_HASH_DAILY 或 ''
+ */
+function staff_sales_build_month_only_url(string $monthYm, string $hash): string
+{
+    $q = http_build_query(['month' => $monthYm]);
+    $base = 'sales_report.php?' . $q;
+    if ($hash !== '') {
+        $base .= '#' . ltrim($hash, '#');
+    }
+
+    return $base;
+}
+
+$calendarYm = staff_sales_resolve_month($staffSalesAllowedMonths);
+[$calendarYStr, $calendarMStr] = explode('-', $calendarYm);
+$calendarYear = (int)$calendarYStr;
+$calendarMonth = (int)$calendarMStr;
+
+$monthIdx = staff_sales_month_index($calendarYm, $staffSalesAllowedMonths);
+$prevYm = $monthIdx > 0 ? $staffSalesAllowedMonths[$monthIdx - 1] : null;
+$nextYm = $monthIdx < count($staffSalesAllowedMonths) - 1 ? $staffSalesAllowedMonths[$monthIdx + 1] : null;
+
+$monthRangeTz = new DateTimeZone('Asia/Taipei');
+$monthRangeStart = new DateTimeImmutable(sprintf('%04d-%02d-01', $calendarYear, $calendarMonth), $monthRangeTz);
+$monthRangeEndEx = $monthRangeStart->modify('+1 month');
+$monthClause = ' AND o.created_at >= :ym_start AND o.created_at < :ym_end';
+
+// 有傳非空 date 時，單日詳情標題字串以 GET 為準；單日／日曆統計一律綁定解析後的 $selectedDate（不以 $today 取代）
+$dateParamMissingOrEmpty = !array_key_exists('date', $_GET) || trim((string)$_GET['date']) === '';
+$selectedDate = staff_sales_resolve_selected_date($calendarYm);
+$displayDateYmd = $dateParamMissingOrEmpty
+    ? $selectedDate
+    : trim((string)$_GET['date']);
 
 $summary = [
     'sales' => 0.0,
     'orders_count' => 0,
     'avg_order' => 0.0,
-    'units_sold' => 0,
 ];
-$topProducts = [];
-$categorySales = [];
-$recentOrders = [];
-$trendRows = [];
+
+$daysInMonth = (int)(new DateTimeImmutable(sprintf('%04d-%02d-01', $calendarYear, $calendarMonth), new DateTimeZone('Asia/Taipei')))->format('t');
+
+$dailyStats = [];
+for ($d = 1; $d <= $daysInMonth; $d++) {
+    $key = sprintf('%04d-%02d-%02d', $calendarYear, $calendarMonth, $d);
+    $dailyStats[$key] = ['revenue' => 0.0, 'orders' => 0];
+}
+
+$dayDetail = [
+    'revenue' => 0.0,
+    'orders' => 0,
+    'units' => 0,
+    'pending' => 0,
+    'shipped' => 0,
+    'completed' => 0,
+];
+
+$paramsYm = [
+    ':ym_start' => $monthRangeStart->format('Y-m-d H:i:s'),
+    ':ym_end' => $monthRangeEndEx->format('Y-m-d H:i:s'),
+];
 
 try {
     $sql = "SELECT COALESCE(SUM(o.final_amount), 0) AS total_sales, COUNT(*) AS total_orders
             FROM orders o
-            WHERE o.status IN ('paid', 'shipped', 'completed') {$dateClause}";
+            WHERE o.status IN {$validOrderStatuses} {$monthClause}";
     $stmt = $pdo->prepare($sql);
-    $stmt->execute($dateParams);
+    $stmt->execute($paramsYm);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
     $summary['sales'] = (float)($row['total_sales'] ?? 0);
     $summary['orders_count'] = (int)($row['total_orders'] ?? 0);
@@ -43,344 +205,217 @@ try {
 }
 
 try {
-    $sql = "SELECT COALESCE(SUM(oi.quantity), 0) AS units_sold
-            FROM order_items oi
-            INNER JOIN orders o ON o.id = oi.order_id
-            WHERE o.status IN ('paid', 'shipped', 'completed') {$dateClause}";
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute($dateParams);
-    $summary['units_sold'] = (int)$stmt->fetchColumn();
-} catch (Throwable $e) {
-    $summary['units_sold'] = 0;
-}
-
-try {
-    $sql = "SELECT p.name,
-                   c.name AS category_name,
-                   SUM(oi.quantity) AS sold_qty,
-                   SUM(oi.subtotal) AS sold_amount
-            FROM order_items oi
-            INNER JOIN products p ON p.id = oi.product_id
-            LEFT JOIN categories c ON c.id = p.category_id
-            INNER JOIN orders o ON o.id = oi.order_id
-            WHERE o.status IN ('paid', 'shipped', 'completed') {$dateClause}
-            GROUP BY oi.product_id, p.name, c.name
-            ORDER BY sold_qty DESC, sold_amount DESC
-            LIMIT 5";
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute($dateParams);
-    $topProducts = $stmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (Throwable $e) {
-    $topProducts = [];
-}
-
-try {
-    $sql = "SELECT c.id AS category_id,
-                   c.name AS category_name,
-                   COALESCE(agg.sold_qty, 0) AS sold_qty,
-                   COALESCE(agg.sold_amount, 0) AS sold_amount
-            FROM categories c
-            LEFT JOIN (
-                SELECT p.category_id AS cid,
-                       SUM(oi.quantity) AS sold_qty,
-                       SUM(oi.subtotal) AS sold_amount
-                FROM order_items oi
-                INNER JOIN orders o ON o.id = oi.order_id
-                    AND o.status IN ('paid', 'shipped', 'completed')
-                    {$dateClause}
-                INNER JOIN products p ON p.id = oi.product_id
-                WHERE p.category_id IS NOT NULL
-                GROUP BY p.category_id
-            ) agg ON agg.cid = c.id
-            ORDER BY c.name ASC";
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute($dateParams);
-    $categorySales = $stmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (Throwable $e) {
-    $categorySales = [];
-}
-
-try {
-    $sql = "SELECT o.id, o.final_amount, o.status, o.created_at, u.name AS user_name
-            FROM orders o
-            LEFT JOIN users u ON u.id = o.user_id
-            WHERE o.status IN ('paid', 'shipped', 'completed') {$dateClause}
-            ORDER BY o.created_at DESC
-            LIMIT 10";
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute($dateParams);
-    $recentOrders = $stmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (Throwable $e) {
-    $recentOrders = [];
-}
-
-try {
     $sql = "SELECT DATE(o.created_at) AS order_date,
-                   COUNT(*) AS order_count,
-                   COALESCE(SUM(o.final_amount), 0) AS sales_amount
+                   COALESCE(SUM(CASE WHEN o.status IN {$validOrderStatuses} THEN o.final_amount ELSE 0 END), 0) AS revenue,
+                   SUM(CASE WHEN o.status IN {$validOrderStatuses} THEN 1 ELSE 0 END) AS order_cnt
             FROM orders o
-            WHERE o.status IN ('paid', 'shipped', 'completed') {$dateClause}
-            GROUP BY DATE(o.created_at)
-            ORDER BY order_date DESC
-            LIMIT 7";
+            WHERE o.created_at >= :ym_start AND o.created_at < :ym_end
+            GROUP BY DATE(o.created_at)";
     $stmt = $pdo->prepare($sql);
-    $stmt->execute($dateParams);
-    $trendRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $stmt->execute($paramsYm);
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $key = (string)($row['order_date'] ?? '');
+        if ($key !== '' && isset($dailyStats[$key])) {
+            $dailyStats[$key]['revenue'] = (float)($row['revenue'] ?? 0);
+            $dailyStats[$key]['orders'] = (int)($row['order_cnt'] ?? 0);
+        }
+    }
 } catch (Throwable $e) {
-    $trendRows = [];
+    // keep zeros
 }
 
-$trendChrono = $trendRows;
-if ($range !== 'all') {
-    usort($trendChrono, static function (array $a, array $b): int {
-        return strcmp((string)($a['order_date'] ?? ''), (string)($b['order_date'] ?? ''));
-    });
+$paramsSel = [':sel' => $selectedDate];
+
+try {
+    $sql = "SELECT
+                COALESCE(SUM(CASE WHEN o.status <> 'cancelled' THEN o.final_amount ELSE 0 END), 0) AS revenue,
+                SUM(CASE WHEN o.status <> 'cancelled' THEN 1 ELSE 0 END) AS order_cnt,
+                SUM(CASE WHEN o.status IN ('pending','pending_payment','paid') THEN 1 ELSE 0 END) AS pending_cnt,
+                SUM(CASE WHEN o.status = 'shipped' THEN 1 ELSE 0 END) AS shipped_cnt,
+                SUM(CASE WHEN o.status = 'completed' THEN 1 ELSE 0 END) AS completed_cnt
+            FROM orders o
+            WHERE DATE(o.created_at) = :sel";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($paramsSel);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (is_array($row)) {
+        $dayDetail['revenue'] = (float)($row['revenue'] ?? 0);
+        $dayDetail['orders'] = (int)($row['order_cnt'] ?? 0);
+        $dayDetail['pending'] = (int)($row['pending_cnt'] ?? 0);
+        $dayDetail['shipped'] = (int)($row['shipped_cnt'] ?? 0);
+        $dayDetail['completed'] = (int)($row['completed_cnt'] ?? 0);
+    }
+} catch (Throwable $e) {
+    // keep defaults
 }
 
-staffPageStart($pdo, '銷售報表', 'sales_report');
+try {
+    $sql = "SELECT COALESCE(SUM(oi.quantity), 0)
+            FROM order_items oi
+            INNER JOIN orders o ON o.id = oi.order_id
+            WHERE DATE(o.created_at) = :sel
+              AND o.status <> 'cancelled'";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($paramsSel);
+    $dayDetail['units'] = (int)$stmt->fetchColumn();
+} catch (Throwable $e) {
+    $dayDetail['units'] = 0;
+}
+
+$firstOfMonth = new DateTimeImmutable(sprintf('%04d-%02d-01', $calendarYear, $calendarMonth), new DateTimeZone('Asia/Taipei'));
+$leadingEmpty = (int)$firstOfMonth->format('w');
+$cellsForDays = $daysInMonth;
+$totalCells = $leadingEmpty + $cellsForDays;
+$padEnd = ($totalCells % 7 === 0) ? 0 : (7 - ($totalCells % 7));
+
+$weekdayLabels = ['日', '一', '二', '三', '四', '五', '六'];
+$todayYmd = $today;
+
+staffPageStart($pdo, '店員銷售', 'sales_report');
 ?>
-<div class="staff-sales-report-layout">
-    <header class="staff-sales-report-hero">
-        <p class="staff-sales-report-hero-kicker">銷售與營運</p>
-        <p class="staff-sales-report-hero-desc">
-            依時間範圍檢視<strong>已付款／已出貨／已完成</strong>之有效訂單彙總；數字由訂單與明細即時計算，細節請至「訂單處理」。
-        </p>
-    </header>
+<script>
+if ('scrollRestoration' in history) {
+    history.scrollRestoration = 'manual';
+}
+</script>
+<section class="staff-panel" id="sales-report-page">
+    <div id="sales-summary" class="staff-sales-report-section staff-sales-report-section--first">
+        <div class="staff-panel-head">
+            <h2>本月總結</h2>
+        </div>
+        <div class="staff-stats-grid staff-stats-grid--compact staff-stats-grid--sales-kpis" aria-label="本月總結">
+            <article class="staff-stat-card">
+                <div class="staff-stat-label">本月營收</div>
+                <div class="staff-stat-value"><?php echo htmlspecialchars(staffCurrency($summary['sales'])); ?></div>
+                <p class="staff-sales-kpi-note">本月有效訂單金額加總</p>
+            </article>
+            <article class="staff-stat-card">
+                <div class="staff-stat-label">本月訂單數</div>
+                <div class="staff-stat-value"><?php echo number_format($summary['orders_count']); ?></div>
+                <p class="staff-sales-kpi-note">已付款 / 已出貨 / 已完成</p>
+            </article>
+            <article class="staff-stat-card">
+                <div class="staff-stat-label">本月平均客單價</div>
+                <div class="staff-stat-value"><?php echo htmlspecialchars(staffCurrency($summary['avg_order'])); ?></div>
+                <p class="staff-sales-kpi-note">本月營收 ÷ 本月訂單數</p>
+            </article>
+        </div>
+    </div>
 
-    <section class="staff-panel staff-sales-report-range">
+    <div id="sales-calendar" class="staff-sales-report-section">
         <div class="staff-panel-head staff-panel-head--tight-top">
-            <h2>時間範圍</h2>
+            <h2>本月銷售日曆</h2>
         </div>
-        <div class="staff-range-tabs" role="tablist" aria-label="銷售報告時間範圍">
-            <a href="sales_report.php?range=today" class="staff-range-tab <?php echo $range === 'today' ? 'active' : ''; ?>" <?php echo $range === 'today' ? 'aria-current="page"' : ''; ?>>今日</a>
-            <a href="sales_report.php?range=month" class="staff-range-tab <?php echo $range === 'month' ? 'active' : ''; ?>" <?php echo $range === 'month' ? 'aria-current="page"' : ''; ?>>本月</a>
-            <a href="sales_report.php?range=all" class="staff-range-tab <?php echo $range === 'all' ? 'active' : ''; ?>" <?php echo $range === 'all' ? 'aria-current="page"' : ''; ?>>全部</a>
+        <div class="staff-sales-month-toolbar" role="navigation" aria-label="月份切換">
+            <?php if ($prevYm !== null): ?>
+                <a class="staff-sales-month-nav-btn staff-btn" href="<?php echo htmlspecialchars(staff_sales_build_month_only_url($prevYm, STAFF_SALES_HASH_CALENDAR)); ?>">上一月</a>
+            <?php else: ?>
+                <span class="staff-sales-month-nav-btn staff-sales-month-nav-btn--disabled" aria-disabled="true">上一月</span>
+            <?php endif; ?>
+            <span class="staff-sales-month-label"><?php echo (int)$calendarYear; ?> 年 <?php echo (int)$calendarMonth; ?> 月</span>
+            <?php if ($nextYm !== null): ?>
+                <a class="staff-sales-month-nav-btn staff-btn" href="<?php echo htmlspecialchars(staff_sales_build_month_only_url($nextYm, STAFF_SALES_HASH_CALENDAR)); ?>">下一月</a>
+            <?php else: ?>
+                <span class="staff-sales-month-nav-btn staff-sales-month-nav-btn--disabled" aria-disabled="true">下一月</span>
+            <?php endif; ?>
         </div>
-        <p class="staff-section-lede staff-section-lede--tight staff-sales-report-range-hint">以下區塊皆套用同一區間。</p>
-    </section>
+        <div class="staff-sales-cal-wrap">
+            <div class="staff-sales-cal-weekdays" aria-hidden="true">
+                <?php foreach ($weekdayLabels as $wd): ?>
+                    <div class="staff-sales-cal-wd"><?php echo htmlspecialchars($wd); ?></div>
+                <?php endforeach; ?>
+            </div>
+            <div class="staff-sales-cal-grid">
+                <?php for ($i = 0; $i < $leadingEmpty; $i++): ?>
+                    <div class="staff-sales-cal-cell staff-sales-cal-cell--empty"></div>
+                <?php endfor; ?>
+                <?php for ($dom = 1; $dom <= $cellsForDays; $dom++):
+                    $key = sprintf('%04d-%02d-%02d', $calendarYear, $calendarMonth, $dom);
+                    $stat = $dailyStats[$key] ?? ['revenue' => 0.0, 'orders' => 0];
+                    $isToday = ($key === $todayYmd);
+                    $isActive = ($key === $selectedDate);
+                    $dayClasses = 'staff-sales-cal-day';
+                    if ($isActive) {
+                        $dayClasses .= ' staff-sales-cal-day--active';
+                    } elseif ($isToday) {
+                        $dayClasses .= ' staff-sales-cal-day--today';
+                    }
+                    $href = staff_sales_build_url($calendarYm, $key, STAFF_SALES_HASH_DAILY);
+                    ?>
+                    <div class="staff-sales-cal-cell">
+                        <a id="staff-sales-day-<?php echo htmlspecialchars($key); ?>" class="<?php echo htmlspecialchars($dayClasses); ?>" href="<?php echo htmlspecialchars($href); ?>">
+                            <span class="staff-sales-cal-day-num"><?php echo $dom; ?></span>
+                            <span class="staff-sales-cal-day-rev"><?php echo htmlspecialchars(staffCurrency($stat['revenue'])); ?></span>
+                            <span class="staff-sales-cal-day-orders"><?php echo (int)$stat['orders']; ?> 筆</span>
+                        </a>
+                    </div>
+                <?php endfor; ?>
+                <?php for ($i = 0; $i < $padEnd; $i++): ?>
+                    <div class="staff-sales-cal-cell staff-sales-cal-cell--empty"></div>
+                <?php endfor; ?>
+            </div>
+        </div>
+    </div>
 
-    <section class="staff-stats-grid staff-stats-grid--compact staff-sales-report-summary">
-        <article class="staff-stat-card">
-            <div class="staff-stat-label">銷售總額</div>
-            <div class="staff-stat-value"><?php echo htmlspecialchars(staffCurrency($summary['sales'])); ?></div>
-            <div class="staff-stat-note staff-stat-note--compact">依有效訂單統計<br>狀態：已付款 / 已出貨 / 已完成</div>
-        </article>
-        <article class="staff-stat-card">
-            <div class="staff-stat-label">有效訂單數</div>
-            <div class="staff-stat-value"><?php echo number_format($summary['orders_count']); ?></div>
-            <div class="staff-stat-note staff-stat-note--compact">依有效訂單統計<br>狀態：已付款 / 已出貨 / 已完成</div>
-        </article>
-        <article class="staff-stat-card">
-            <div class="staff-stat-label">平均客單價</div>
-            <div class="staff-stat-value"><?php echo htmlspecialchars(staffCurrency($summary['avg_order'])); ?></div>
-            <div class="staff-stat-note staff-stat-note--compact">依有效訂單統計<br>狀態：已付款 / 已出貨 / 已完成</div>
-        </article>
-        <article class="staff-stat-card">
-            <div class="staff-stat-label">銷售件數</div>
-            <div class="staff-stat-value"><?php echo number_format($summary['units_sold']); ?></div>
-            <div class="staff-stat-note staff-stat-note--compact">依有效訂單統計<br>狀態：已付款 / 已出貨 / 已完成</div>
-        </article>
-    </section>
-
-    <section class="staff-panel staff-sales-report-section">
+    <div id="daily-detail" class="staff-sales-report-section">
         <div class="staff-panel-head staff-panel-head--tight-top">
-            <h2>熱門商品</h2>
+            <h2>單日銷售詳情</h2>
         </div>
-        <div class="staff-table-wrap">
-            <table class="staff-table">
-                <thead>
-                    <tr>
-                        <th>商品名稱</th>
-                        <th>分類</th>
-                        <th>銷售數量</th>
-                        <th>銷售金額</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (empty($topProducts)): ?>
-                        <tr>
-                            <td colspan="4">目前所選期間尚無足夠銷售資料可供分析</td>
-                        </tr>
-                    <?php else: ?>
-                        <?php foreach ($topProducts as $item): ?>
-                            <tr>
-                                <td><?php echo htmlspecialchars((string)$item['name']); ?></td>
-                                <td><?php echo htmlspecialchars((string)($item['category_name'] ?? '未分類')); ?></td>
-                                <td><?php echo number_format((int)$item['sold_qty']); ?></td>
-                                <td><?php echo htmlspecialchars(staffCurrency((float)$item['sold_amount'])); ?></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                </tbody>
-            </table>
+        <p class="staff-sales-section-lede staff-sales-section-lede--date"><?php echo htmlspecialchars($displayDateYmd); ?></p>
+        <div class="staff-sales-day-wrap staff-sales-day-wrap--daily-summary" aria-label="單日銷售詳情">
+            <div class="daily-summary-card">
+                <div class="daily-summary-title">單日銷售重點</div>
+                <div class="daily-summary-revenue"><?php echo htmlspecialchars(staffCurrency($dayDetail['revenue'])); ?></div>
+                <div class="daily-summary-meta">共 <?php echo number_format($dayDetail['orders']); ?> 筆訂單、銷售 <?php echo number_format($dayDetail['units']); ?> 件商品</div>
+                <div class="daily-summary-status" role="group" aria-label="訂單狀態">
+                    <span>待處理 <?php echo number_format($dayDetail['pending']); ?></span>
+                    <span class="daily-summary-status__sep" aria-hidden="true">｜</span>
+                    <span>已出貨 <?php echo number_format($dayDetail['shipped']); ?></span>
+                    <span class="daily-summary-status__sep" aria-hidden="true">｜</span>
+                    <span>已完成 <?php echo number_format($dayDetail['completed']); ?></span>
+                </div>
+            </div>
         </div>
-    </section>
-
-    <section class="staff-panel staff-sales-report-section">
-        <div class="staff-panel-head staff-panel-head--tight-top">
-            <h2>分類銷售表現</h2>
-        </div>
-        <div class="staff-table-wrap">
-            <table class="staff-table">
-                <thead>
-                    <tr>
-                        <th>分類</th>
-                        <th>銷售件數</th>
-                        <th>銷售金額</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (empty($categorySales)): ?>
-                        <tr><td colspan="3">目前沒有分類資料。</td></tr>
-                    <?php else: ?>
-                        <?php foreach ($categorySales as $cat): ?>
-                            <tr>
-                                <td><?php echo htmlspecialchars((string)$cat['category_name']); ?></td>
-                                <td><?php echo number_format((int)($cat['sold_qty'] ?? 0)); ?></td>
-                                <td><?php echo htmlspecialchars(staffCurrency((float)($cat['sold_amount'] ?? 0))); ?></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                </tbody>
-            </table>
-        </div>
-    </section>
-
-    <section class="staff-panel staff-sales-report-section">
-        <div class="staff-panel-head staff-panel-head--tight-top">
-            <h2>最近訂單摘要</h2>
-        </div>
-        <p class="staff-section-lede staff-section-lede--tight staff-sales-report-section-hint">此區間內最近有效訂單，最多 10 筆。</p>
-        <div class="staff-table-wrap">
-            <table class="staff-table">
-                <thead>
-                    <tr>
-                        <th>訂單編號</th>
-                        <th>會員</th>
-                        <th>金額</th>
-                        <th>狀態</th>
-                        <th>日期</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (empty($recentOrders)): ?>
-                        <tr><td colspan="5">目前沒有符合條件的訂單資料</td></tr>
-                    <?php else: ?>
-                        <?php foreach ($recentOrders as $o): ?>
-                            <tr>
-                                <td><a href="orders.php?q=<?php echo (int)$o['id']; ?>">#<?php echo (int)$o['id']; ?></a></td>
-                                <td><?php echo htmlspecialchars((string)($o['user_name'] ?? '訪客')); ?></td>
-                                <td><?php echo htmlspecialchars(staffCurrency((float)$o['final_amount'])); ?></td>
-                                <td><span class="staff-badge <?php echo staffStatusBadgeClass((string)$o['status']); ?>"><?php echo htmlspecialchars(staffStatusLabel((string)$o['status'])); ?></span></td>
-                                <td><?php echo htmlspecialchars(date('Y-m-d', strtotime((string)$o['created_at']))); ?></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                </tbody>
-            </table>
-        </div>
-    </section>
-
-    <section class="staff-panel staff-sales-report-section">
-        <div class="staff-panel-head staff-panel-head--tight-top">
-            <h2>近七日銷售趨勢</h2>
-        </div>
-        <p class="staff-section-lede staff-section-lede--tight staff-sales-report-section-hint">依訂單建立日彙總，最多 7 個有成交的日期。</p>
-        <div class="staff-table-wrap">
-            <table class="staff-table">
-                <thead>
-                    <tr>
-                        <th>日期</th>
-                        <th>訂單筆數</th>
-                        <th>銷售金額</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (empty($trendChrono)): ?>
-                        <tr>
-                            <td colspan="3">此區間尚無符合條件之訂單，無法繪製趨勢。</td>
-                        </tr>
-                    <?php else: ?>
-                        <?php foreach ($trendChrono as $tr): ?>
-                            <tr>
-                                <td><?php echo htmlspecialchars((string)($tr['order_date'] ?? '')); ?></td>
-                                <td><?php echo number_format((int)($tr['order_count'] ?? 0)); ?></td>
-                                <td><?php echo htmlspecialchars(staffCurrency((float)($tr['sales_amount'] ?? 0))); ?></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                </tbody>
-            </table>
-        </div>
-    </section>
-</div>
-<style>
-/* 銷售報表版面（僅此頁，延續 staff 黑白灰風格） */
-.staff-page .staff-sales-report-layout {
-    max-width: 1080px;
-    margin: 0 auto;
-}
-.staff-page .staff-sales-report-hero {
-    margin: 0 0 12px;
-    padding: 0 2px 10px;
-    border-bottom: 1px solid #e5e7eb;
-}
-.staff-page .staff-sales-report-hero-kicker {
-    margin: 0 0 4px;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: #6b7280;
-}
-.staff-page .staff-sales-report-hero-desc {
-    margin: 0;
-    font-size: 14px;
-    line-height: 1.45;
-    color: #4b5563;
-    max-width: 40rem;
-}
-.staff-page .staff-sales-report-range {
-    padding: 12px 14px 10px;
-    margin-bottom: 10px;
-}
-.staff-page .staff-sales-report-range .staff-panel-head {
-    margin-bottom: 6px;
-}
-.staff-page .staff-sales-report-range-hint {
-    margin: 8px 0 0;
-    font-size: 13px;
-    color: #6b7280;
-}
-.staff-page .staff-sales-report-summary {
-    margin-bottom: 10px;
-}
-.staff-page .staff-sales-report-summary .staff-stat-note--compact {
-    margin-top: 6px;
-    margin-bottom: 0;
-    line-height: 1.35;
-    font-size: 12px;
-    color: #6b7280;
-}
-.staff-page .staff-sales-report-section {
-    padding: 12px 14px 12px;
-    margin-bottom: 10px;
-}
-.staff-page .staff-sales-report-section .staff-panel-head {
-    margin-bottom: 6px;
-}
-.staff-page .staff-sales-report-section-hint {
-    margin: 0 0 8px;
-    font-size: 13px;
-    color: #6b7280;
-}
-.staff-page .staff-sales-report-range .staff-range-tab {
-    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
-}
-.staff-page .staff-sales-report-range .staff-range-tab.active {
-    box-shadow: 0 0 0 2px rgba(47, 47, 47, 0.35);
-    font-weight: 800;
-}
-</style>
+    </div>
+</section>
+<script>
+(function () {
+    var selectedDayId = <?php echo json_encode('staff-sales-day-' . $selectedDate, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    var hasExplicitDate = <?php echo $dateParamMissingOrEmpty ? 'false' : 'true'; ?>;
+    function scrollToHash() {
+        var h = window.location.hash;
+        if (!h || h.length < 2) {
+            return;
+        }
+        var id = h.slice(1);
+        if (id === 'daily-detail' && hasExplicitDate && selectedDayId) {
+            var dayEl = document.getElementById(selectedDayId);
+            if (dayEl) {
+                dayEl.scrollIntoView({ block: 'center', behavior: 'auto' });
+                return;
+            }
+        }
+        var el = document.getElementById(id);
+        if (!el) {
+            return;
+        }
+        el.scrollIntoView({ block: 'start', behavior: 'auto' });
+    }
+    function scrollToHashDeferred() {
+        scrollToHash();
+        window.requestAnimationFrame(function () {
+            scrollToHash();
+        });
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', scrollToHashDeferred);
+    } else {
+        scrollToHashDeferred();
+    }
+    window.addEventListener('load', function onSalesReportLoad() {
+        window.removeEventListener('load', onSalesReportLoad);
+        scrollToHash();
+    });
+})();
+</script>
 <?php staffPageEnd(); ?>
-

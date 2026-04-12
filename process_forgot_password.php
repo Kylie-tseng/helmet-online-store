@@ -42,14 +42,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $mail->isSMTP();
             $mail->Host       = 'smtp.gmail.com';
             $mail->SMTPAuth   = true;
-            $mail->Username   = 'helmetvrsefju@gmail.com'; // 你的 Gmail
+            $mail->Username   = getSiteContactEmail();
             $mail->Password   = 'avpwtgymnlgekpyv';      // 你的應用程式密碼
             $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
             $mail->Port       = 587;
             $mail->CharSet    = 'utf-8';
 
             // 收寄件人
-            $mail->setFrom('helmetvrsefju@gmail.com', 'HelmetVRse 客服中心');
+            $mail->setFrom(getSiteContactEmail(), 'HelmetVRse 客服中心');
             $mail->addAddress($email); 
 
             // 重設連結：統一由 APP_URL 組出

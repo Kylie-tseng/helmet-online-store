@@ -18,10 +18,22 @@ if (empty($username) || empty($password)) {
 }
 
 try {
-    // 查詢使用者（使用 username）
-    $stmt = $pdo->prepare("SELECT id, name, username, email, password, role FROM users WHERE username = ? LIMIT 1");
+    $hasIsActiveCol = false;
+    try {
+        $hasIsActiveCol = (bool) $pdo->query("SHOW COLUMNS FROM `users` LIKE 'is_active'")->fetch(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        $hasIsActiveCol = false;
+    }
+
+    $sel = 'SELECT id, name, username, email, password, role';
+    if ($hasIsActiveCol) {
+        $sel .= ', is_active';
+    }
+    $sel .= ' FROM users WHERE username = ? LIMIT 1';
+
+    $stmt = $pdo->prepare($sel);
     $stmt->execute([$username]);
-    $user = $stmt->fetch();
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
     // 檢查帳號是否存在
     if (!$user) {
@@ -32,6 +44,12 @@ try {
     // 驗證密碼
     if (!password_verify($password, $user['password'])) {
         header('Location: login.php?error=wrong_password');
+        exit;
+    }
+
+    // 一般會員帳號停用時禁止登入（管理者／店員不受 is_active 限制）
+    if (($user['role'] ?? '') === 'member' && $hasIsActiveCol && (int) ($user['is_active'] ?? 1) !== 1) {
+        header('Location: login.php?error=account_disabled');
         exit;
     }
 

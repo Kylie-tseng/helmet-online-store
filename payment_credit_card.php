@@ -73,6 +73,7 @@ if ($is_payment_post) {
                 $order_coupon_id = !empty($coupon_status_post['coupon']['id']) ? (int)$coupon_status_post['coupon']['id'] : null;
 
                 try {
+                    error_log('payment_credit_card: step1 begin_transaction');
                     $pdo->beginTransaction();
 
                     $stmt = $pdo->prepare("INSERT INTO orders (user_id, coupon_id, total_amount, discount_amount, final_amount, status, payment_method, shipping_method, shipping_address, pickup_store)
@@ -89,14 +90,15 @@ if ($is_payment_post) {
                     ]);
 
                     $order_id = (int)$pdo->lastInsertId();
+                    error_log('payment_credit_card: step2 insert_orders id=' . $order_id);
                     if ($order_id <= 0) {
                         $pdo->rollBack();
                         $payment_error = '建立訂單失敗，請稍後再試。';
                     } else {
                         foreach ($cart_items_post as $item) {
                             $line_subtotal = (float)$item['price'] * (int)$item['quantity'];
-                            $cs = (string)($item['size'] ?? '');
-                            $order_item_size = ($cs === '' || $cs === getCartSizeNoneValue() || $cs === 'N') ? null : $item['size'];
+                            $order_item_size = normalizeOrderItemSizeForDb($item['size'] ?? '');
+                            error_log('order item size: ' . var_export($item['size'] ?? null, true) . ' => ' . var_export($order_item_size, true));
                             $stmt = $pdo->prepare("INSERT INTO order_items (order_id, product_id, size, quantity, unit_price, subtotal)
                                                  VALUES (:order_id, :product_id, :size, :quantity, :unit_price, :subtotal)");
                             $stmt->execute([
@@ -108,6 +110,7 @@ if ($is_payment_post) {
                                 ':subtotal' => $line_subtotal,
                             ]);
                         }
+                        error_log('payment_credit_card: step3 order_items written count=' . count($cart_items_post));
 
                         $stmt = $pdo->prepare('SELECT COUNT(*) FROM order_items WHERE order_id = ?');
                         $stmt->execute([$order_id]);
@@ -116,10 +119,10 @@ if ($is_payment_post) {
                             $pdo->rollBack();
                             $payment_error = '訂單明細寫入異常，訂單未成立。';
                         } else {
-                            markUserCouponUsedAfterOrderStatusChange($pdo, $order_id, 'paid');
                             $stmt = $pdo->prepare('DELETE FROM cart WHERE user_id = :uid');
                             $stmt->execute([':uid' => $user_id]);
                             $pdo->commit();
+                            error_log('payment_credit_card: step4 commit ok');
 
                             unset($_SESSION['checkout_data'], $_SESSION['pending_order_id']);
                             if (function_exists('clearAppliedCoupon')) {
@@ -140,19 +143,26 @@ if ($is_payment_post) {
                             $stmt->execute([':order_id' => $order_id]);
                             $order_items = $stmt->fetchAll();
 
-                            include __DIR__ . '/send_order.php';
+                            error_log('payment_credit_card: step5 before send_order');
+                            try {
+                                include __DIR__ . '/send_order.php';
+                            } catch (Throwable $mailEx) {
+                                error_log('payment_credit_card: send_order mail error — ' . $mailEx->getMessage());
+                            }
+                            error_log('payment_credit_card: step6 after send_order, redirect');
 
                             session_write_close();
                             header('Location: order_success.php?order_id=' . (int)$order_id, true, 303);
                             exit;
                         }
                     }
-                } catch (PDOException $e) {
+                } catch (Throwable $e) {
                     if ($pdo->inTransaction()) {
                         $pdo->rollBack();
                     }
-                    error_log('payment_credit_card PDO: ' . $e->getMessage());
-                    $payment_error = '付款處理時發生錯誤，請稍後再試。若問題持續，請聯絡客服。';
+                    error_log('payment_credit_card Throwable: ' . $e->getMessage() . ' @' . $e->getFile() . ':' . $e->getLine());
+                    $detail = htmlspecialchars(substr($e->getMessage(), 0, 400), ENT_QUOTES, 'UTF-8');
+                    $payment_error = '付款處理時發生錯誤，請稍後再試。若問題持續，請聯絡客服。<br><small style="color:#64748b;">（' . $detail . '）</small>';
                 }
             }
         }

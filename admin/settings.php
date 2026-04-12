@@ -29,35 +29,41 @@ try {
 $flashMessage = '';
 $flashType = 'success';
 
-$defaultSettings = [
-    'free_shipping_threshold' => '3000',
-    'default_discount_type' => 'percent',
-    'default_discount_value' => '10',
+/** 此頁可編輯的設定鍵（其餘若 DB 已有列則保留，不因表單缺欄位被覆寫） */
+$formKeys = ['site_name', 'free_shipping_threshold'];
+
+$defaults = [
     'site_name' => 'HelmetVRse',
-    'site_contact_email' => '',
+    'free_shipping_threshold' => '3000',
 ];
 
-// 讀取設定
-$settings = $defaultSettings;
+$settings = $defaults;
 try {
-    $keys = array_keys($defaultSettings);
-    $in = implode(',', array_fill(0, count($keys), '?'));
+    $in = implode(',', array_fill(0, count($formKeys), '?'));
     $stmt = $pdo->prepare("SELECT setting_key, setting_value FROM settings WHERE setting_key IN ({$in})");
-    $stmt->execute(array_values($keys));
+    $stmt->execute(array_values($formKeys));
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         $k = (string)($row['setting_key'] ?? '');
         $v = (string)($row['setting_value'] ?? '');
-        if ($k !== '') $settings[$k] = $v;
+        if ($k !== '') {
+            $settings[$k] = $v;
+        }
     }
 } catch (Throwable $e) {
 }
 
-// POST：存設定
+// POST：只更新站台名稱、免運門檻
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'save_settings') {
     try {
-        $updates = [];
-        foreach ($defaultSettings as $key => $_) {
-            $updates[$key] = (string)($_POST[$key] ?? $settings[$key] ?? '');
+        $siteName = trim((string)($_POST['site_name'] ?? ''));
+        if ($siteName === '') {
+            $siteName = $defaults['site_name'];
+        }
+
+        $rawTh = $_POST['free_shipping_threshold'] ?? $settings['free_shipping_threshold'] ?? $defaults['free_shipping_threshold'];
+        $threshold = (int)(is_numeric($rawTh) ? $rawTh : (int)$defaults['free_shipping_threshold']);
+        if ($threshold < 0) {
+            $threshold = 0;
         }
 
         $stmt = $pdo->prepare("INSERT INTO settings (setting_key, setting_value, created_at, updated_at)
@@ -65,32 +71,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                ON DUPLICATE KEY UPDATE
                                    setting_value = :v2,
                                    updated_at = NOW()");
-        foreach ($updates as $k => $v) {
-            $stmt->execute([':k' => $k, ':v' => $v, ':v2' => $v]);
-        }
+        $stmt->execute([':k' => 'site_name', ':v' => $siteName, ':v2' => $siteName]);
+        $stmt->execute([':k' => 'free_shipping_threshold', ':v' => (string)$threshold, ':v2' => (string)$threshold]);
 
-        $flashMessage = '系統設定已更新。';
+        $fixedEmail = getSiteContactEmail();
+        $stmt->execute([':k' => 'site_contact_email', ':v' => $fixedEmail, ':v2' => $fixedEmail]);
+
+        $settings['site_name'] = $siteName;
+        $settings['free_shipping_threshold'] = (string)$threshold;
+
+        $flashMessage = '其他設定已儲存。';
     } catch (Throwable $e) {
         $flashMessage = '儲存失敗，請稍後再試。';
         $flashType = 'error';
     }
-
-    // 重新讀取
-    try {
-        $keys = array_keys($defaultSettings);
-        $in = implode(',', array_fill(0, count($keys), '?'));
-        $stmt = $pdo->prepare("SELECT setting_key, setting_value FROM settings WHERE setting_key IN ({$in})");
-        $stmt->execute(array_values($keys));
-        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            $k = (string)($row['setting_key'] ?? '');
-            $v = (string)($row['setting_value'] ?? '');
-            if ($k !== '') $settings[$k] = $v;
-        }
-    } catch (Throwable $e) {
-    }
 }
 
-staffPageStart($pdo, '系統設定', 'settings');
+staffPageStart($pdo, '其他設定', 'settings');
 ?>
 <section class="staff-panel">
     <?php if ($flashMessage !== ''): ?>
@@ -100,43 +97,23 @@ staffPageStart($pdo, '系統設定', 'settings');
     <?php endif; ?>
 
     <div class="staff-panel-head">
-        <h2>基本設定</h2>
-        <p class="staff-panel-subtitle">提供可用且不破壞現有流程的簡單設定介面</p>
+        <h2>其他設定</h2>
+        <p class="staff-panel-subtitle">提供不影響現有流程的基本設定</p>
     </div>
 
     <form method="POST" class="staff-form-grid" style="margin-top: 12px;">
         <input type="hidden" name="action" value="save_settings">
 
         <label class="staff-field">
-            <span>免運門檻（free_shipping_threshold）</span>
+            <span>站台名稱</span>
+            <input type="text" name="site_name" class="staff-input" maxlength="120"
+                   value="<?php echo htmlspecialchars((string)($settings['site_name'] ?? $defaults['site_name'])); ?>">
+        </label>
+
+        <label class="staff-field">
+            <span>免運門檻（元）</span>
             <input type="number" min="0" step="1" name="free_shipping_threshold" class="staff-input"
-                   value="<?php echo htmlspecialchars((string)($settings['free_shipping_threshold'] ?? '3000')); ?>">
-        </label>
-
-        <label class="staff-field">
-            <span>預設折扣類型</span>
-            <select name="default_discount_type" class="staff-select">
-                <option value="percent" <?php echo ($settings['default_discount_type'] ?? '') === 'percent' ? 'selected' : ''; ?>>percent</option>
-                <option value="fixed" <?php echo ($settings['default_discount_type'] ?? '') === 'fixed' ? 'selected' : ''; ?>>fixed</option>
-            </select>
-        </label>
-
-        <label class="staff-field">
-            <span>預設折扣數值</span>
-            <input type="number" min="0" step="0.01" name="default_discount_value" class="staff-input"
-                   value="<?php echo htmlspecialchars((string)($settings['default_discount_value'] ?? '10')); ?>">
-        </label>
-
-        <label class="staff-field">
-            <span>站台名稱（site_name）</span>
-            <input type="text" name="site_name" class="staff-input"
-                   value="<?php echo htmlspecialchars((string)($settings['site_name'] ?? 'HelmetVRse')); ?>">
-        </label>
-
-        <label class="staff-field staff-field-wide">
-            <span>聯絡 Email（site_contact_email）</span>
-            <input type="email" name="site_contact_email" class="staff-input"
-                   value="<?php echo htmlspecialchars((string)($settings['site_contact_email'] ?? '')); ?>">
+                   value="<?php echo htmlspecialchars((string)($settings['free_shipping_threshold'] ?? $defaults['free_shipping_threshold'])); ?>">
         </label>
 
         <div class="staff-form-actions staff-field-wide" style="grid-column:1 / -1; display:flex; justify-content:flex-end; gap:10px; flex-wrap:wrap;">
@@ -146,4 +123,3 @@ staffPageStart($pdo, '系統設定', 'settings');
 </section>
 
 <?php staffPageEnd(); ?>
-

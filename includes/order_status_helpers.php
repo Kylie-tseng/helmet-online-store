@@ -225,3 +225,203 @@ function member_orders_empty_message(int $userOrderTotal, string $orderStatusFil
     return '目前尚未有任何訂單。';
 }
 
+/**
+ * 計入營收、消費統計的「有效訂單」狀態（不含 cancelled／待處理未付款等）。
+ *
+ * @return list<string>
+ */
+function app_orders_valid_revenue_statuses(): array
+{
+    // done：舊資料／部分流程與 completed 同義，計入營收與銷量統計
+    return ['paid', 'shipped', 'completed', 'done'];
+}
+
+/**
+ * 讀取 orders.status 實際 ENUM（店員／管理者訂單頁共用）。
+ *
+ * @return list<string>
+ */
+function app_orders_discover_status_enum(PDO $pdo): array
+{
+    $fallback = ['pending', 'pending_payment', 'paid', 'shipped', 'completed', 'cancelled', 'return_requested'];
+    $out = $fallback;
+    try {
+        $row = $pdo->query("SHOW COLUMNS FROM `orders` LIKE 'status'")->fetch(PDO::FETCH_ASSOC);
+        $type = (string) ($row['Type'] ?? '');
+        if (preg_match('/^enum\((.+)\)$/i', $type, $m)) {
+            $vals = [];
+            if (preg_match_all("/'((?:[^'\\\\]|\\\\.)*)'/", $m[1], $mm)) {
+                foreach ($mm[1] as $raw) {
+                    $vals[] = str_replace(["\\'", '\\\\'], ["'", '\\'], $raw);
+                }
+            }
+            if ($vals !== []) {
+                $out = $vals;
+            }
+        }
+    } catch (Throwable $e) {
+    }
+    return $out;
+}
+
+/**
+ * 訂單狀態概覽（全表 COUNT，不受清單 q／status 篩選影響）。
+ *
+ * @param list<string> $allowedStatuses
+ * @return array{pending:int,paid:int,shipped:int,completed:int,cancelled:int}
+ */
+function app_orders_compute_overview_buckets(PDO $pdo, array $allowedStatuses): array
+{
+    $buckets = [
+        'pending' => 0,
+        'paid' => 0,
+        'shipped' => 0,
+        'completed' => 0,
+        'cancelled' => 0,
+    ];
+    try {
+        $pendingVals = array_values(array_intersect(
+            ['pending', 'pending_payment', 'processing', 'progress'],
+            $allowedStatuses
+        ));
+        if ($pendingVals !== []) {
+            $ph = [];
+            $params = [];
+            foreach ($pendingVals as $i => $v) {
+                $k = ':ovp' . $i;
+                $ph[] = $k;
+                $params[$k] = $v;
+            }
+            $sql = 'SELECT COUNT(*) FROM orders WHERE (status IN (' . implode(', ', $ph) . ') OR TRIM(COALESCE(status, \'\')) = \'\')';
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $buckets['pending'] = (int) $stmt->fetchColumn();
+        }
+        if (in_array('paid', $allowedStatuses, true)) {
+            $stmt = $pdo->query("SELECT COUNT(*) FROM orders WHERE status = 'paid'");
+            $buckets['paid'] = (int) $stmt->fetchColumn();
+        }
+        if (in_array('shipped', $allowedStatuses, true)) {
+            $stmt = $pdo->query("SELECT COUNT(*) FROM orders WHERE status = 'shipped'");
+            $buckets['shipped'] = (int) $stmt->fetchColumn();
+        }
+        $doneVals = array_values(array_intersect(['completed', 'done'], $allowedStatuses));
+        if ($doneVals !== []) {
+            $ph = [];
+            $params = [];
+            foreach ($doneVals as $i => $v) {
+                $k = ':ovd' . $i;
+                $ph[] = $k;
+                $params[$k] = $v;
+            }
+            $sql = 'SELECT COUNT(*) FROM orders WHERE status IN (' . implode(', ', $ph) . ')';
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $buckets['completed'] = (int) $stmt->fetchColumn();
+        }
+        if (in_array('cancelled', $allowedStatuses, true)) {
+            $stmt = $pdo->query("SELECT COUNT(*) FROM orders WHERE status = 'cancelled'");
+            $buckets['cancelled'] = (int) $stmt->fetchColumn();
+        }
+    } catch (Throwable $e) {
+    }
+    return $buckets;
+}
+
+/**
+ * 店員／管理者訂單介面共用：orders.status 中文標籤（與清單篩選分組一致）。
+ */
+function app_backoffice_order_status_label(string $raw): string
+{
+    $s = strtolower(trim($raw));
+    if ($s === '' || in_array($s, ['pending', 'pending_payment', 'processing', 'progress'], true)) {
+        return '待處理';
+    }
+    if ($s === 'return_requested') {
+        return '退貨申請中';
+    }
+    if ($s === 'paid') {
+        return '已付款';
+    }
+    if ($s === 'shipped') {
+        return '已出貨';
+    }
+    if ($s === 'completed' || $s === 'done') {
+        return '已完成';
+    }
+    if ($s === 'cancelled') {
+        return '已取消';
+    }
+    $t = trim($raw);
+    return $t !== '' ? $t : '未知狀態';
+}
+
+/**
+ * 訂單清單 status 篩選（pending／paid／shipped／completed／cancelled）→ SQL 片段與參數。
+ *
+ * @param list<string> $allowedStatuses
+ * @return array{0:string,1:array<string,mixed>}
+ */
+function app_orders_backoffice_list_status_clause(string $statusKey, array $allowedStatuses, string $tableAlias, string $paramPrefix): array
+{
+    $statusKey = strtolower(trim($statusKey));
+    if ($statusKey === '') {
+        return ['', []];
+    }
+    $prefix = $tableAlias !== '' ? ($tableAlias . '.') : '';
+    $params = [];
+    if ($statusKey === 'pending') {
+        $pendingVals = array_values(array_intersect(
+            ['pending', 'pending_payment', 'processing', 'progress'],
+            $allowedStatuses
+        ));
+        if ($pendingVals === []) {
+            return ['', []];
+        }
+        $ph = [];
+        foreach ($pendingVals as $i => $v) {
+            $k = ':' . $paramPrefix . 'p' . $i;
+            $ph[] = $k;
+            $params[$k] = $v;
+        }
+        $sql = ' AND (' . $prefix . 'status IN (' . implode(', ', $ph) . ') OR TRIM(COALESCE(' . $prefix . "status, '')) = '')";
+        return [$sql, $params];
+    }
+    if ($statusKey === 'completed') {
+        $doneVals = array_values(array_intersect(['completed', 'done'], $allowedStatuses));
+        if ($doneVals === []) {
+            return ['', []];
+        }
+        $ph = [];
+        foreach ($doneVals as $i => $v) {
+            $k = ':' . $paramPrefix . 'd' . $i;
+            $ph[] = $k;
+            $params[$k] = $v;
+        }
+        return [' AND ' . $prefix . 'status IN (' . implode(', ', $ph) . ')', $params];
+    }
+    if (in_array($statusKey, $allowedStatuses, true)) {
+        $k = ':' . $paramPrefix . 'one';
+        $params[$k] = $statusKey;
+        return [' AND ' . $prefix . 'status = ' . $k, $params];
+    }
+    return ['', []];
+}
+
+/** 訂單狀態下拉：目前列 status 與選項值是否應顯示為選中（含 pending 群組、done≈completed）。 */
+function app_orders_status_option_is_selected(string $currentRaw, string $optionValue): bool
+{
+    $c = strtolower(trim($currentRaw));
+    $o = strtolower(trim($optionValue));
+    if ($c === $o) {
+        return true;
+    }
+    if (in_array($c, ['', 'pending_payment', 'processing', 'progress', 'return_requested'], true) && $o === 'pending') {
+        return true;
+    }
+    if (in_array($c, ['completed', 'done'], true) && in_array($o, ['completed', 'done'], true)) {
+        return true;
+    }
+    return false;
+}
+

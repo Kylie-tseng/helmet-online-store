@@ -14,6 +14,7 @@ $isLowStockMode = ($filter === 'low_stock');
 $role = (string)($_SESSION['role'] ?? 'staff');
 $productFormHrefBase = $role === 'admin' ? '../staff/product_form.php' : 'product_form.php';
 $products = [];
+$sizesByProduct = [];
 $categories = [];
 $hasCategoryDescriptionColumn = false;
 
@@ -95,16 +96,27 @@ try {
 }
 
 try {
-    $sql = "SELECT p.id, p.name, p.price, p.status, p.style, c.name AS category_name,
-                   " . primaryImageSubquery('p', 'pi') . " AS primary_image,
-                   (
-                       SELECT COALESCE(SUM(ps.stock), 0)
-                       FROM product_sizes ps
-                       WHERE ps.product_id = p.id
-                   ) AS total_stock
+    // 總庫存 ts：一般清單卡片仍顯示加總；低庫存篩選改為「任一尺寸 stock < 5」（EXISTS），不用 SUM 判斷
+    $sql = 'SELECT p.id,
+                   p.name,
+                   p.price,
+                   p.status,
+                   p.style,
+                   c.name AS category_name,
+                   ' . primaryImageSubquery('p', 'pi') . ' AS primary_image,
+                   COALESCE(ts.total_stock, 0) AS total_stock,
+                   (SELECT MIN(psm.stock)
+                    FROM product_sizes psm
+                    WHERE psm.product_id = p.id) AS min_stock
             FROM products p
             LEFT JOIN categories c ON c.id = p.category_id
-            WHERE 1=1";
+            LEFT JOIN (
+                SELECT ps_agg.product_id,
+                       COALESCE(SUM(ps_agg.stock), 0) AS total_stock
+                FROM product_sizes ps_agg
+                GROUP BY ps_agg.product_id
+            ) ts ON ts.product_id = p.id
+            WHERE 1=1';
     $params = [];
     if ($search !== '') {
         $sql .= " AND (
@@ -115,32 +127,66 @@ try {
                  )";
         $params[':search'] = '%' . $search . '%';
     }
-    if ($isLowStockMode) {
-        $sql .= " AND (
-                    SELECT COALESCE(SUM(ps.stock), 0)
-                    FROM product_sizes ps
-                    WHERE ps.product_id = p.id
-                 ) <= 5";
-    }
     if ($categoryFilter > 0) {
         $sql .= ' AND p.category_id = :category_id';
         $params[':category_id'] = $categoryFilter;
     }
-    $sql .= " ORDER BY
-                CASE
-                    WHEN c.name = '全罩式安全帽' THEN 1
-                    WHEN c.name = '半罩式安全帽' THEN 2
-                    WHEN c.name = '3/4罩安全帽' THEN 3
-                    WHEN c.name = '周邊與配件' THEN 4
-                    ELSE 99
-                END ASC,
-                p.id ASC
-              LIMIT 120";
+    if ($isLowStockMode) {
+        $sql .= ' AND EXISTS (
+            SELECT 1
+            FROM product_sizes ps2
+            WHERE ps2.product_id = p.id
+              AND ps2.stock < 5
+        )';
+    }
+    if ($isLowStockMode) {
+        $sql .= ' ORDER BY min_stock ASC, p.id ASC LIMIT 1000';
+    } else {
+        $sql .= " ORDER BY
+                    CASE
+                        WHEN c.name = '全罩式安全帽' THEN 1
+                        WHEN c.name = '半罩式安全帽' THEN 2
+                        WHEN c.name = '3/4罩安全帽' THEN 3
+                        WHEN c.name = '周邊與配件' THEN 4
+                        ELSE 99
+                    END ASC,
+                    p.id ASC
+                  LIMIT 120";
+    }
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (Throwable $e) {
     $products = [];
+}
+
+if ($isLowStockMode && $products !== []) {
+    $ids = array_values(array_unique(array_filter(array_map('intval', array_column($products, 'id')), static function (int $v): bool {
+        return $v > 0;
+    })));
+    if ($ids !== []) {
+        try {
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $sqlSizes = 'SELECT product_id, size, stock
+                FROM product_sizes
+                WHERE product_id IN (' . $placeholders . ')
+                ORDER BY FIELD(size, \'XS\', \'S\', \'M\', \'L\', \'XL\', \'XXL\'), size';
+            $stmtSz = $pdo->prepare($sqlSizes);
+            $stmtSz->execute($ids);
+            while ($row = $stmtSz->fetch(PDO::FETCH_ASSOC)) {
+                $pid = (int)($row['product_id'] ?? 0);
+                if ($pid < 1) {
+                    continue;
+                }
+                if (!isset($sizesByProduct[$pid])) {
+                    $sizesByProduct[$pid] = [];
+                }
+                $sizesByProduct[$pid][] = $row;
+            }
+        } catch (Throwable $e) {
+            $sizesByProduct = [];
+        }
+    }
 }
 
 staffPageStart($pdo, '商品資料管理', $isLowStockMode ? 'low_stock' : 'products');
@@ -149,7 +195,6 @@ staffPageStart($pdo, '商品資料管理', $isLowStockMode ? 'low_stock' : 'prod
     <div class="staff-panel-head staff-panel-head--split" style="align-items:center;">
         <div>
             <h2>商品清單</h2>
-            <p class="staff-section-lede staff-section-lede--tight" style="margin-top:6px;">搜尋、篩選與維護商品資料、上下架、圖片與庫存。</p>
         </div>
         <div style="flex-shrink:0;">
             <a href="products.php" class="staff-btn staff-btn-soft">返回商品入口</a>
@@ -191,7 +236,9 @@ staffPageStart($pdo, '商品資料管理', $isLowStockMode ? 'low_stock' : 'prod
                 <?php
                 $img = '../' . ltrim(resolve_product_card_image_src((string)($product['primary_image'] ?? '')), '/');
                 $isActive = ((string)($product['status'] ?? '') === 'active');
-                $isLowStock = ((int)($product['total_stock'] ?? 0) <= 5);
+                $minStockVal = $product['min_stock'] ?? null;
+                $minStockInt = ($minStockVal === null || $minStockVal === '') ? null : (int)$minStockVal;
+                $isLowStock = ($minStockInt !== null && $minStockInt < 5);
                 ?>
                 <article class="staff-product-card">
                     <div class="staff-product-media">
@@ -209,6 +256,24 @@ staffPageStart($pdo, '商品資料管理', $isLowStockMode ? 'low_stock' : 'prod
                             <?php endif; ?>
                         </div>
                         <div class="staff-product-price"><?php echo htmlspecialchars(staffCurrency((float)($product['price'] ?? 0))); ?></div>
+                        <?php if ($isLowStockMode): ?>
+                            <?php
+                            $pid = (int)($product['id'] ?? 0);
+                            $rows = $sizesByProduct[$pid] ?? [];
+                            $stockParts = [];
+                            foreach ($rows as $szRow) {
+                                $size = htmlspecialchars((string)($szRow['size'] ?? ''), ENT_QUOTES, 'UTF-8');
+                                $stock = (int)($szRow['stock'] ?? 0);
+                                if ($stock < 5) {
+                                    $stockParts[] = '<span class="low-stock">' . $size . ':' . (string)$stock . '</span>';
+                                } else {
+                                    $stockParts[] = $size . ':' . (string)$stock;
+                                }
+                            }
+                            $stockText = $stockParts === [] ? '—' : implode('｜', $stockParts);
+                            ?>
+                            <div class="stock-line">庫存：<?php echo $stockText; ?></div>
+                        <?php else: ?>
                         <div class="staff-product-info-row">
                             <span class="staff-product-stock">庫存：<?php echo number_format((int)($product['total_stock'] ?? 0)); ?></span>
                             <div class="staff-product-badges">
@@ -231,7 +296,6 @@ staffPageStart($pdo, '商品資料管理', $isLowStockMode ? 'low_stock' : 'prod
                             >
                                 <?php if ($search !== ''): ?><input type="hidden" name="search" value="<?php echo htmlspecialchars($search); ?>"><?php endif; ?>
                                 <?php if ($categoryFilter > 0): ?><input type="hidden" name="category_id" value="<?php echo (int)$categoryFilter; ?>"><?php endif; ?>
-                                <?php if ($isLowStockMode): ?><input type="hidden" name="filter" value="low_stock"><?php endif; ?>
                                 <input type="hidden" name="action" value="delete_product">
                                 <input type="hidden" name="product_id" value="<?php echo (int)$product['id']; ?>">
                                 <button type="submit" class="staff-action-btn staff-action-btn-danger">刪除商品</button>
@@ -239,12 +303,12 @@ staffPageStart($pdo, '商品資料管理', $isLowStockMode ? 'low_stock' : 'prod
                             <form method="POST" class="staff-inline-form" action="<?php echo htmlspecialchars($catalogRedirectUrl); ?>">
                                 <?php if ($search !== ''): ?><input type="hidden" name="search" value="<?php echo htmlspecialchars($search); ?>"><?php endif; ?>
                                 <?php if ($categoryFilter > 0): ?><input type="hidden" name="category_id" value="<?php echo (int)$categoryFilter; ?>"><?php endif; ?>
-                                <?php if ($isLowStockMode): ?><input type="hidden" name="filter" value="low_stock"><?php endif; ?>
                                 <input type="hidden" name="action" value="toggle_status">
                                 <input type="hidden" name="product_id" value="<?php echo (int)$product['id']; ?>">
                                 <button type="submit" class="staff-action-btn staff-action-btn-muted"><?php echo $isActive ? '下架' : '上架'; ?></button>
                             </form>
                         </div>
+                        <?php endif; ?>
                     </div>
                 </article>
             <?php endforeach; ?>

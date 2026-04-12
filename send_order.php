@@ -3,6 +3,7 @@
  * 訂單通知信發送腳本 (自動識別來源變數)
  */
 
+require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/includes/cart_functions.php';
 
 // 1. 變數兼容性處理 (重要：解決不同頁面引入時的變數命名差異)
@@ -46,14 +47,14 @@ if (!empty($customer_email) && !empty($mail_items)) {
         $mail->isSMTP();
         $mail->Host       = 'smtp.gmail.com';
         $mail->SMTPAuth   = true;
-        $mail->Username   = 'helmetvrsefju@gmail.com';
+        $mail->Username   = getSiteContactEmail();
         $mail->Password   = 'avpwtgymnlgekpyv';
         $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port       = 587;
         $mail->CharSet    = 'utf-8';
 
         // --- 收寄件人 ---
-        $mail->setFrom('helmetvrsefju@gmail.com', 'HelmetVRse 客服中心');
+        $mail->setFrom(getSiteContactEmail(), 'HelmetVRse 客服中心');
         $mail->addAddress($customer_email); 
 
         // --- 郵件內容 ---

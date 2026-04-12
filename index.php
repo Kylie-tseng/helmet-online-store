@@ -146,7 +146,7 @@ if ($is_logged_in) {
     $favorite_ids = getUserFavoriteProductIds($pdo, (int)$_SESSION['user_id']);
 }
 
-$promo_offers = [
+$static_promo_offers = [
     [
         'title' => '新會員優惠',
         'text' => '新會員註冊後即可使用優惠券',
@@ -188,6 +188,8 @@ $promo_offers = [
         'detail_link' => 'coupon_free_shipping.php'
     ],
 ];
+
+$promo_offers = mergePromoOffersWithActiveDbCoupons($pdo, $static_promo_offers);
 
 $promo_main_offer = null;
 $promo_side_offers = [];

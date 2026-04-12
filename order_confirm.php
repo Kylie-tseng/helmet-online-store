@@ -75,8 +75,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_order'])) {
 
         foreach ($cart_items as $item) {
             $subtotal = $item['price'] * $item['quantity'];
-            $cs = (string)($item['size'] ?? '');
-            $order_item_size = ($cs === '' || $cs === getCartSizeNoneValue() || $cs === 'N') ? null : $item['size'];
+            $order_item_size = normalizeOrderItemSizeForDb($item['size'] ?? '');
+            error_log('order item size: ' . var_export($item['size'] ?? null, true) . ' => ' . var_export($order_item_size, true));
             $stmt = $pdo->prepare("INSERT INTO order_items (order_id, product_id, size, quantity, unit_price, subtotal) 
                                  VALUES (:order_id, :product_id, :size, :quantity, :unit_price, :subtotal)");
             $stmt->execute([

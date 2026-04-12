@@ -311,6 +311,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $returnsTableExists) {
             $sqlUpd = 'UPDATE return_requests SET ' . implode(', ', $sets) . ' WHERE id = :id';
             $upd = $pdo->prepare($sqlUpd);
             $upd->execute($execParams);
+
+            if (staff_returns_status_bucket($newStatus) === 'completed') {
+                $refundedOk = !$hasRefundStatusColumn || strtolower($newRefundStatus) === 'refunded';
+                if ($refundedOk) {
+                    $oidStmt = $pdo->prepare('SELECT order_id FROM return_requests WHERE id = :id LIMIT 1');
+                    $oidStmt->execute([':id' => $returnId]);
+                    $releaseOid = (int) $oidStmt->fetchColumn();
+                    if ($releaseOid > 0) {
+                        releaseCouponUsageAfterReturnRefunded($pdo, $releaseOid);
+                    }
+                }
+            }
+
             staffReturnsRedirectWithFlash('退貨處理已儲存成功。');
         } catch (Throwable $e) {
             staffReturnsRedirectWithFlash('儲存失敗，請稍後再試。');
@@ -419,7 +432,7 @@ if ($returnsTableExists) {
 
 staffPageStart($pdo, '退貨申請處理', 'returns');
 ?>
-<section class="staff-panel">
+<section class="staff-panel staff-panel--returns">
     <?php if (!$returnsTableExists): ?>
         <div class="staff-empty-hint">
             尚未偵測到退貨申請主資料表 <code>return_requests</code>。
@@ -475,24 +488,24 @@ staffPageStart($pdo, '退貨申請處理', 'returns');
             <div class="staff-notice">目前 <code>return_requests</code> 缺少 <code>refund_status</code> 欄位，退款狀態篩選與列表欄位將無法套用；請執行資料庫更新腳本以啟用退款狀態管理。</div>
         <?php endif; ?>
 
-        <div class="staff-table-wrap">
-            <table class="staff-table">
+        <div class="staff-table-wrap returns-table-wrap">
+            <table class="staff-table returns-table returns-table--grid">
                 <thead>
-                    <tr>
-                        <th>申請編號</th>
-                        <th>訂單編號</th>
-                        <th>會員</th>
-                        <th>退貨原因</th>
-                        <th>退貨狀態</th>
-                        <th>退款狀態</th>
-                        <th>申請日期</th>
-                        <th>更新時間</th>
-                        <th>操作</th>
+                    <tr class="returns-table-head">
+                        <th class="col-id">申請編號</th>
+                        <th class="col-order">訂單編號</th>
+                        <th class="col-user">會員</th>
+                        <th class="col-reason">退貨原因</th>
+                        <th class="col-status">退貨狀態</th>
+                        <th class="col-status">退款狀態</th>
+                        <th class="col-date">申請日期</th>
+                        <th class="col-date">更新時間</th>
+                        <th class="col-action returns-th-actions">操作</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($returns)): ?>
-                        <tr>
+                        <tr class="returns-meta-row">
                             <td colspan="9">
                                 <?php echo $q !== '' || $status !== '' || $refundStatus !== '' ? '查無符合條件的退貨申請' : '目前尚無退貨申請'; ?>
                             </td>
@@ -503,13 +516,13 @@ staffPageStart($pdo, '退貨申請處理', 'returns');
                         $detailShipMap = ['pickup' => '超商取貨', 'home' => '宅配到府'];
                         ?>
                         <?php foreach ($returns as $item): ?>
-                            <tr>
-                                <td><?php echo htmlspecialchars((string)$item['id']); ?></td>
-                                <td><?php echo htmlspecialchars((string)(int)($item['order_id'] ?? 0)); ?></td>
-                                <td><?php echo htmlspecialchars((string)($item['user_name'] ?? '訪客')); ?></td>
-                                <td><?php echo htmlspecialchars((string)($item['reason'] ?? '')); ?></td>
-                                <td><span class="staff-badge <?php echo appStatusBadgeClass((string)($item['status'] ?? '')); ?>"><?php echo htmlspecialchars(staff_returns_status_display((string)($item['status'] ?? ''))); ?></span></td>
-                                <td>
+                            <tr class="returns-row">
+                                <td class="col-id"><?php echo htmlspecialchars((string)$item['id']); ?></td>
+                                <td class="col-order"><?php echo htmlspecialchars((string)(int)($item['order_id'] ?? 0)); ?></td>
+                                <td class="col-user"><?php echo htmlspecialchars((string)($item['user_name'] ?? '訪客')); ?></td>
+                                <td class="col-reason returns-td-reason" title="<?php echo htmlspecialchars((string)($item['reason'] ?? '')); ?>"><?php echo htmlspecialchars((string)($item['reason'] ?? '')); ?></td>
+                                <td class="col-status"><span class="staff-badge <?php echo appStatusBadgeClass((string)($item['status'] ?? '')); ?>"><?php echo htmlspecialchars(staff_returns_status_display((string)($item['status'] ?? ''))); ?></span></td>
+                                <td class="col-status">
                                     <?php if ($hasRefundStatusColumn): ?>
                                         <span class="staff-badge <?php echo appStatusBadgeClass((string)($item['refund_status'] ?? 'pending_refund')); ?>">
                                             <?php echo htmlspecialchars(staff_returns_refund_display((string)($item['refund_status'] ?? 'pending_refund'))); ?>
@@ -518,12 +531,12 @@ staffPageStart($pdo, '退貨申請處理', 'returns');
                                         —
                                     <?php endif; ?>
                                 </td>
-                                <td><?php echo htmlspecialchars(date('Y-m-d H:i', strtotime((string)($item['created_at'] ?? '')))); ?></td>
-                                <td><?php
+                                <td class="col-date"><?php echo htmlspecialchars(date('Y-m-d H:i', strtotime((string)($item['created_at'] ?? '')))); ?></td>
+                                <td class="col-date"><?php
                                     $uAt = trim((string)($item['updated_at'] ?? ''));
                                     echo $uAt !== '' ? htmlspecialchars(date('Y-m-d H:i', strtotime($uAt))) : '—';
                                 ?></td>
-                                <td>
+                                <td class="col-action returns-td-actions">
                                     <?php
                                     $itemBucket = staff_returns_status_bucket((string)($item['status'] ?? ''));
                                     $itemIsLocked = ($itemBucket === 'completed');
@@ -532,66 +545,60 @@ staffPageStart($pdo, '退貨申請處理', 'returns');
                                     $refundInteract = $hasRefundStatusColumn && ($itemBucket === 'approved') && !$itemIsLocked;
                                     $noteVal = (string)($item['return_processing_note'] ?? '');
                                     $detailRid = (int)($item['id'] ?? 0);
+                                    $returnsActionsWrapClass = 'returns-actions' . ($itemBucket === 'rejected' ? ' returns-actions--muted' : '');
                                     ?>
-                                    <button type="button" class="staff-action-btn staff-action-btn-muted js-staff-return-toggle" data-target="staff-return-details-<?php echo $detailRid; ?>">查看詳情</button>
-                                    <?php if (!$itemIsLocked): ?>
-                                    <div class="staff-return-actions"<?php echo $itemBucket === 'rejected' ? ' style="opacity:0.72"' : ''; ?>>
-                                        <form method="POST" class="staff-inline-form staff-inline-stack">
+                                    <div class="<?php echo htmlspecialchars($returnsActionsWrapClass); ?>">
+                                        <?php if (!$itemIsLocked): ?>
+                                        <form method="POST" class="returns-actions-form">
                                             <input type="hidden" name="preserve_q" value="<?php echo htmlspecialchars($q); ?>">
                                             <input type="hidden" name="preserve_status" value="<?php echo htmlspecialchars($status); ?>">
                                             <input type="hidden" name="preserve_refund_status" value="<?php echo htmlspecialchars($refundStatus); ?>">
                                             <input type="hidden" name="action" value="save_return_handling">
                                             <input type="hidden" name="return_id" value="<?php echo (int)$item['id']; ?>">
-                                            <label class="staff-field" style="min-width:0;">
-                                                <span>退貨狀態</span>
-                                                <?php if (count($optStatuses) <= 1): ?>
-                                                    <input type="hidden" name="new_status" value="<?php echo htmlspecialchars((string)($item['status'] ?? '')); ?>">
-                                                    <select class="staff-select staff-select-mini" disabled>
-                                                        <?php foreach ($optStatuses as $st): ?>
-                                                            <option value="<?php echo htmlspecialchars($st); ?>" <?php echo ((string)($item['status'] ?? '') === $st) ? 'selected' : ''; ?>>
-                                                                <?php echo htmlspecialchars(staff_returns_status_display($st)); ?>
-                                                            </option>
-                                                        <?php endforeach; ?>
+                                            <?php if (count($optStatuses) <= 1): ?>
+                                                <input type="hidden" name="new_status" value="<?php echo htmlspecialchars((string)($item['status'] ?? '')); ?>">
+                                                <select class="staff-select staff-select-mini returns-actions__ctl returns-actions__select" disabled aria-label="退貨狀態">
+                                                    <?php foreach ($optStatuses as $st): ?>
+                                                        <option value="<?php echo htmlspecialchars($st); ?>" <?php echo ((string)($item['status'] ?? '') === $st) ? 'selected' : ''; ?>>
+                                                            <?php echo htmlspecialchars(staff_returns_status_display($st)); ?>
+                                                        </option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                            <?php else: ?>
+                                                <select name="new_status" class="staff-select staff-select-mini returns-actions__ctl returns-actions__select" aria-label="退貨狀態">
+                                                    <?php foreach ($optStatuses as $st): ?>
+                                                        <option value="<?php echo htmlspecialchars($st); ?>" <?php echo ((string)($item['status'] ?? '') === $st) ? 'selected' : ''; ?>>
+                                                            <?php echo htmlspecialchars(staff_returns_status_display($st)); ?>
+                                                        </option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                            <?php endif; ?>
+                                            <?php if ($hasRefundStatusColumn): ?>
+                                                <?php if ($refundInteract): ?>
+                                                    <select name="new_refund_status" class="staff-select staff-select-mini returns-actions__ctl returns-actions__select" aria-label="退款狀態">
+                                                        <option value="pending_refund" <?php echo $curRf === 'pending_refund' ? 'selected' : ''; ?>>未退款</option>
+                                                        <option value="refunded" <?php echo $curRf === 'refunded' ? 'selected' : ''; ?>>已退款</option>
                                                     </select>
                                                 <?php else: ?>
-                                                    <select name="new_status" class="staff-select staff-select-mini">
-                                                        <?php foreach ($optStatuses as $st): ?>
-                                                            <option value="<?php echo htmlspecialchars($st); ?>" <?php echo ((string)($item['status'] ?? '') === $st) ? 'selected' : ''; ?>>
-                                                                <?php echo htmlspecialchars(staff_returns_status_display($st)); ?>
-                                                            </option>
-                                                        <?php endforeach; ?>
+                                                    <input type="hidden" name="new_refund_status" value="<?php echo htmlspecialchars($curRf === 'refunded' ? 'refunded' : 'pending_refund'); ?>">
+                                                    <select class="staff-select staff-select-mini returns-actions__ctl returns-actions__select" disabled aria-label="退款狀態">
+                                                        <option value="pending_refund" <?php echo $curRf === 'pending_refund' ? 'selected' : ''; ?>>未退款</option>
+                                                        <option value="refunded" <?php echo $curRf === 'refunded' ? 'selected' : ''; ?>>已退款</option>
                                                     </select>
                                                 <?php endif; ?>
-                                            </label>
-                                            <label class="staff-field" style="min-width:0;">
-                                                <span>退款狀態</span>
-                                                <?php if ($hasRefundStatusColumn): ?>
-                                                    <?php if ($refundInteract): ?>
-                                                        <select name="new_refund_status" class="staff-select staff-select-mini">
-                                                            <option value="pending_refund" <?php echo $curRf === 'pending_refund' ? 'selected' : ''; ?>>未退款</option>
-                                                            <option value="refunded" <?php echo $curRf === 'refunded' ? 'selected' : ''; ?>>已退款</option>
-                                                        </select>
-                                                    <?php else: ?>
-                                                        <input type="hidden" name="new_refund_status" value="<?php echo htmlspecialchars($curRf === 'refunded' ? 'refunded' : 'pending_refund'); ?>">
-                                                        <select class="staff-select staff-select-mini" disabled>
-                                                            <option value="pending_refund" <?php echo $curRf === 'pending_refund' ? 'selected' : ''; ?>>未退款</option>
-                                                            <option value="refunded" <?php echo $curRf === 'refunded' ? 'selected' : ''; ?>>已退款</option>
-                                                        </select>
-                                                    <?php endif; ?>
-                                                <?php else: ?>
-                                                    <span class="staff-section-lede staff-section-lede--tight">—</span>
-                                                <?php endif; ?>
-                                            </label>
-                                            <label class="staff-field staff-field-wide" style="min-width:0;">
-                                                <span>處理備註</span>
-                                                <input type="text" name="processing_note" class="staff-input staff-input-mini" placeholder="可留空"
-                                                    value="<?php echo htmlspecialchars($noteVal); ?>"
-                                                    <?php echo $returnNoteColumn === null ? 'disabled title="資料表尚無處理備註欄位"' : ''; ?>>
-                                            </label>
-                                            <button type="submit" class="staff-action-btn staff-action-btn-primary">儲存</button>
+                                            <?php else: ?>
+                                                <span class="returns-actions-static returns-actions__ctl">—</span>
+                                            <?php endif; ?>
+                                            <input type="text" name="processing_note" class="staff-input staff-input-mini returns-actions__ctl returns-actions__input" placeholder="處理備註"
+                                                value="<?php echo htmlspecialchars($noteVal); ?>"
+                                                <?php echo $returnNoteColumn === null ? 'disabled title="資料表尚無處理備註欄位"' : ''; ?>>
+                                            <button type="submit" class="staff-action-btn staff-action-btn-primary staff-action-btn--compact returns-actions__ctl returns-actions__btn returns-actions__btn--save">儲存</button>
+                                            <button type="button" class="staff-action-btn staff-action-btn-muted staff-action-btn--compact returns-actions__ctl returns-actions__btn returns-actions__btn--view view-btn js-staff-return-toggle" data-target="staff-return-details-<?php echo $detailRid; ?>">查看詳情</button>
                                         </form>
+                                        <?php else: ?>
+                                        <button type="button" class="staff-action-btn staff-action-btn-muted staff-action-btn--compact returns-actions__ctl returns-actions__btn returns-actions__btn--view view-btn js-staff-return-toggle" data-target="staff-return-details-<?php echo $detailRid; ?>">查看詳情</button>
+                                        <?php endif; ?>
                                     </div>
-                                    <?php endif; ?>
                                 </td>
                             </tr>
                             <tr id="staff-return-details-<?php echo $detailRid; ?>" class="staff-order-detail-row" style="display:none;">
@@ -705,7 +712,7 @@ document.addEventListener('click', function (e) {
     const row = targetId ? document.getElementById(targetId) : null;
     if (!row) return;
     const isHidden = row.style.display === 'none' || row.style.display === '';
-    row.style.display = isHidden ? 'table-row' : 'none';
+    row.style.display = isHidden ? 'block' : 'none';
     btn.textContent = isHidden ? '收起詳情' : '查看詳情';
 });
 </script>

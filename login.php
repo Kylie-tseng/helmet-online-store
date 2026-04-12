@@ -72,6 +72,8 @@ if ($notice_message === '') {
                         echo '帳號不存在';
                     } elseif ($error === 'wrong_password') {
                         echo '密碼錯誤';
+                    } elseif ($error === 'account_disabled') {
+                        echo '此帳號已停用，無法登入。如有疑問請聯絡客服。';
                     } else {
                         echo htmlspecialchars($error);
                     }

@@ -13,6 +13,22 @@ function getCartSizeNoneValue() {
 }
 
 /**
+ * 寫入 order_items.size 用（絕不為 NULL；欄位多為 NOT NULL）。
+ * S／M／L／XL：大寫正規化；空字串、舊資料 N、統一尺寸 F、無效值 → 一律 'F'（與 getCartSizeNoneValue() 一致）。
+ */
+function normalizeOrderItemSizeForDb($size): string
+{
+    $s = strtoupper(trim((string)($size ?? '')));
+    $f = getCartSizeNoneValue();
+    if ($s === '' || $s === 'N' || $s === strtoupper($f)) {
+        return $f;
+    }
+    $allowed = ['S', 'M', 'L', 'XL'];
+
+    return in_array($s, $allowed, true) ? $s : $f;
+}
+
+/**
  * 購物車／訂單／列表顯示用尺寸文字。
  * 配件代號 F、舊資料 N、NULL／空字串：顯示「統一尺寸」（不顯示字母 F）。
  * 安全帽維持 S／M／L／XL 原樣。
@@ -149,13 +165,6 @@ function normalizeCouponCode($coupon_code) {
 }
 
 /**
- * 系統允許的優惠券代碼（僅保留四張）
- */
-function getAllowedCouponCodes() {
-    return ['NEW100', 'HELMET10', 'SAVE300', 'RIDER20'];
-}
-
-/**
  * 清除已套用優惠券 session
  */
 function clearAppliedCoupon() {
@@ -178,9 +187,6 @@ function setAppliedCoupon($coupon) {
 function getCouponByCode($pdo, $coupon_code) {
     $normalized_code = normalizeCouponCode($coupon_code);
     if ($normalized_code === '') {
-        return null;
-    }
-    if (!in_array($normalized_code, getAllowedCouponCodes(), true)) {
         return null;
     }
 
@@ -215,13 +221,153 @@ function getCouponById($pdo, $coupon_id) {
         if (!$coupon) {
             return null;
         }
-        if (!in_array($coupon['coupon_code'], getAllowedCouponCodes(), true)) {
-            return null;
-        }
         return $coupon;
     } catch (PDOException $e) {
         return null;
     }
+}
+
+/**
+ * 依代碼讀取 coupons 一筆（不檢查啟用／效期；供前台與靜態活動合併時判斷是否已由後台接管）
+ */
+function getCouponDbRowByCodeAny(PDO $pdo, string $coupon_code): ?array {
+    $normalized_code = normalizeCouponCode($coupon_code);
+    if ($normalized_code === '') {
+        return null;
+    }
+    try {
+        $stmt = $pdo->prepare("SELECT id, coupon_code, discount_type, discount_value, minimum_amount, start_date, expire_date, is_active
+                               FROM coupons
+                               WHERE coupon_code = :coupon_code
+                               LIMIT 1");
+        $stmt->execute([':coupon_code' => $normalized_code]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    } catch (PDOException $e) {
+        return null;
+    }
+}
+
+/**
+ * 前台／優惠列表：啟用中且目前在活動期間內的優惠券
+ *
+ * @return list<array<string, mixed>>
+ */
+function fetchStorefrontActiveCoupons(PDO $pdo): array {
+    try {
+        // 僅依 id 排序：避免舊庫 coupons 無 created_at 時整段查詢失敗、回傳空陣列導致前台完全看不到 DB 券
+        $stmt = $pdo->query("SELECT id, coupon_code, discount_type, discount_value, minimum_amount, start_date, expire_date, is_active
+                             FROM coupons
+                             WHERE is_active = 1
+                               AND start_date <= CURDATE()
+                               AND expire_date >= CURDATE()
+                             ORDER BY id DESC");
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        return is_array($rows) ? $rows : [];
+    } catch (Throwable $e) {
+        return [];
+    }
+}
+
+/**
+ * 首頁限時優惠區：將資料庫有效券置於前，並保留靜態檔（免 coupon 碼）與「資料庫尚無該代碼」的舊版活動
+ *
+ * @param list<array<string, mixed>> $static_offers
+ * @return list<array<string, mixed>>
+ */
+function mergePromoOffersWithActiveDbCoupons(PDO $pdo, array $static_offers): array {
+    $dbRows = fetchStorefrontActiveCoupons($pdo);
+    $seen = [];
+    $out = [];
+
+    foreach ($dbRows as $c) {
+        $code = normalizeCouponCode((string)($c['coupon_code'] ?? ''));
+        if ($code === '') {
+            continue;
+        }
+        $seen[$code] = true;
+        $meta = getCouponActivityMeta($code);
+        $offerLine = describeCouponOfferLine($c);
+        $out[] = [
+            'title' => (string)($meta['name'] ?? $code),
+            'text' => $offerLine !== '' ? $offerLine : (string)($meta['content'] ?? '優惠進行中'),
+            'coupon' => $code,
+            'highlight' => $offerLine !== '' ? $offerLine : (string)($meta['content'] ?? ''),
+            'link' => 'coupons.php',
+            'detail_link' => 'coupons.php',
+        ];
+    }
+
+    foreach ($static_offers as $o) {
+        if (!is_array($o)) {
+            continue;
+        }
+        $rawCode = (string)($o['coupon'] ?? '');
+        $code = normalizeCouponCode($rawCode);
+        if ($code === '') {
+            $out[] = $o;
+            continue;
+        }
+        if (isset($seen[$code])) {
+            continue;
+        }
+        $out[] = $o;
+    }
+
+    return $out;
+}
+
+/**
+ * 優惠券專區列表：資料庫有效券置頂，靜態範本僅在「該代碼未由 coupons 表接管」時顯示
+ *
+ * @param list<array<string, mixed>> $static_activities
+ * @return list<array<string, mixed>>
+ */
+function mergeCouponDirectoryActivitiesWithDb(PDO $pdo, array $static_activities): array {
+    $dbRows = fetchStorefrontActiveCoupons($pdo);
+    $seenActive = [];
+    $out = [];
+
+    foreach ($dbRows as $c) {
+        $code = normalizeCouponCode((string)($c['coupon_code'] ?? ''));
+        if ($code === '') {
+            continue;
+        }
+        $seenActive[$code] = true;
+        $meta = getCouponActivityMeta($code);
+        $start = (string)($c['start_date'] ?? '');
+        $end = (string)($c['expire_date'] ?? '');
+        $out[] = [
+            'tag' => '官方優惠',
+            'title' => (string)($meta['name'] ?? $code),
+            'benefit' => describeCouponOfferLine($c),
+            'code' => $code,
+            'validity' => ($start !== '' && $end !== '') ? ($start . ' ～ ' . $end) : '',
+            'detail_url' => 'coupons.php',
+            'claim_url' => 'coupons.php',
+            'claim_post_code' => $code,
+        ];
+    }
+
+    foreach ($static_activities as $act) {
+        if (!is_array($act)) {
+            continue;
+        }
+        $code = normalizeCouponCode((string)($act['code'] ?? ''));
+        if ($code === '') {
+            $out[] = $act;
+            continue;
+        }
+        if (isset($seenActive[$code])) {
+            continue;
+        }
+        if (getCouponDbRowByCodeAny($pdo, $code) !== null) {
+            continue;
+        }
+        $out[] = $act;
+    }
+
+    return $out;
 }
 
 /**
@@ -261,6 +407,32 @@ function validateCoupon($coupon, $subtotal) {
     }
 
     return ['valid' => true, 'message' => '優惠券可使用'];
+}
+
+/**
+ * 僅檢查啟用與效期（領取活動用，不檢查購物車低消）
+ */
+function validateCouponActiveAndInDateWindow(?array $coupon): array {
+    if (!$coupon) {
+        return ['valid' => false, 'message' => '優惠券不存在'];
+    }
+    if ((int)$coupon['is_active'] !== 1) {
+        return ['valid' => false, 'message' => '此優惠券目前已停用'];
+    }
+    $now = date('Y-m-d');
+    if ($now < $coupon['start_date']) {
+        return ['valid' => false, 'message' => '此優惠券尚未開始'];
+    }
+    if ($now > $coupon['expire_date']) {
+        return ['valid' => false, 'message' => '此優惠券已過期'];
+    }
+    if (!in_array($coupon['discount_type'], ['percent', 'fixed'], true)) {
+        return ['valid' => false, 'message' => '優惠券折扣類型錯誤'];
+    }
+    if ((float)$coupon['discount_value'] <= 0) {
+        return ['valid' => false, 'message' => '優惠券折扣數值錯誤'];
+    }
+    return ['valid' => true, 'message' => ''];
 }
 
 /**
@@ -621,8 +793,12 @@ function claimUserCoupon($pdo, $user_id, $coupon_code) {
     }
 
     $coupon = getCouponByCode($pdo, $coupon_code);
-    if (!$coupon || !in_array($coupon_code, getAllowedCouponCodes(), true)) {
+    if (!$coupon) {
         return ['success' => false, 'message' => '此優惠券不可領取'];
+    }
+    $vc = validateCouponActiveAndInDateWindow($coupon);
+    if (!$vc['valid']) {
+        return ['success' => false, 'message' => $vc['message']];
     }
 
     try {
@@ -643,14 +819,53 @@ function claimUserCoupon($pdo, $user_id, $coupon_code) {
 }
 
 /**
- * 訂單狀態：視為「優惠券已在實際流程中耗用」（與 pending／待付款區隔）
+ * 訂單狀態：視為「優惠券已因訂單成功完成而耗用」（僅 completed／done，不含 paid）
  */
 function orderStatusesThatConsumeUserCoupon(): array {
-    return ['paid', 'shipped', 'completed', 'done'];
+    return ['completed', 'done'];
 }
 
 /**
- * 會員是否已在「完成態」訂單中使用過此 coupon_id（以 orders 為準）
+ * return_requests 是否存在（快取）
+ */
+function couponHelperReturnRequestsTableExists(PDO $pdo): bool {
+    static $cached = null;
+    if ($cached !== null) {
+        return $cached;
+    }
+    try {
+        $chk = $pdo->query("SHOW TABLES LIKE 'return_requests'");
+        $cached = (bool) $chk->fetchColumn();
+    } catch (Throwable $e) {
+        $cached = false;
+    }
+    return $cached;
+}
+
+/**
+ * return_requests 是否有 refund_status 欄位（快取）
+ */
+function couponHelperReturnRequestsHasRefundStatus(PDO $pdo): bool {
+    static $cached = null;
+    if ($cached !== null) {
+        return $cached;
+    }
+    if (!couponHelperReturnRequestsTableExists($pdo)) {
+        $cached = false;
+        return false;
+    }
+    try {
+        $cols = $pdo->query("SHOW COLUMNS FROM return_requests LIKE 'refund_status'");
+        $cached = (bool) $cols->fetch(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        $cached = false;
+    }
+    return $cached;
+}
+
+/**
+ * 會員是否已在「完成且仍有效的完成訂單」中使用過此 coupon_id（以 orders 為準）；
+ * 若該筆訂單之退貨已結案且已退款，則不視為耗用（可再次使用）。
  */
 function userHasConsumedCouponInCompletedOrder($pdo, $user_id, $coupon_id) {
     $user_id = (int)$user_id;
@@ -669,10 +884,32 @@ function userHasConsumedCouponInCompletedOrder($pdo, $user_id, $coupon_id) {
             $params[$k] = $st;
         }
         $in = implode(', ', $placeholders);
-        $stmt = $pdo->prepare("SELECT 1 FROM orders
-                               WHERE user_id = :uid AND coupon_id = :cid
-                                 AND LOWER(TRIM(status)) IN ($in)
-                               LIMIT 1");
+
+        if (!couponHelperReturnRequestsTableExists($pdo)) {
+            $stmt = $pdo->prepare("SELECT 1 FROM orders
+                                   WHERE user_id = :uid AND coupon_id = :cid
+                                     AND LOWER(TRIM(status)) IN ($in)
+                                   LIMIT 1");
+            $stmt->execute($params);
+            return (bool) $stmt->fetchColumn();
+        }
+
+        $hasRefundCol = couponHelperReturnRequestsHasRefundStatus($pdo);
+        $refundOk = $hasRefundCol
+            ? "LOWER(TRIM(COALESCE(r.refund_status, ''))) = 'refunded'"
+            : '1=1';
+
+        $sql = "SELECT 1 FROM orders o
+                WHERE o.user_id = :uid AND o.coupon_id = :cid
+                  AND LOWER(TRIM(o.status)) IN ($in)
+                  AND NOT EXISTS (
+                      SELECT 1 FROM return_requests r
+                      WHERE r.order_id = o.id
+                        AND LOWER(TRIM(r.status)) IN ('completed', 'done', 'closed')
+                        AND ($refundOk)
+                  )
+                LIMIT 1";
+        $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         return (bool) $stmt->fetchColumn();
     } catch (PDOException $e) {
@@ -701,16 +938,41 @@ function getUserCouponConsumedDatesMap($pdo, $user_id) {
             $params[$k] = $st;
         }
         $in = implode(', ', $placeholders);
-        $stmt = $pdo->prepare("SELECT coupon_id,
-                                      MAX(COALESCE(updated_at, created_at)) AS used_at
-                               FROM orders
-                               WHERE user_id = :uid
-                                 AND coupon_id IS NOT NULL
-                                 AND coupon_id > 0
-                                 AND LOWER(TRIM(status)) IN ($in)
-                               GROUP BY coupon_id");
-        $stmt->execute($params);
-        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if (!couponHelperReturnRequestsTableExists($pdo)) {
+            $stmt = $pdo->prepare("SELECT coupon_id,
+                                          MAX(COALESCE(updated_at, created_at)) AS used_at
+                                   FROM orders
+                                   WHERE user_id = :uid
+                                     AND coupon_id IS NOT NULL
+                                     AND coupon_id > 0
+                                     AND LOWER(TRIM(status)) IN ($in)
+                                   GROUP BY coupon_id");
+            $stmt->execute($params);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } else {
+            $hasRefundCol = couponHelperReturnRequestsHasRefundStatus($pdo);
+            $refundOk = $hasRefundCol
+                ? "LOWER(TRIM(COALESCE(r.refund_status, ''))) = 'refunded'"
+                : '1=1';
+            $sql = "SELECT o.coupon_id,
+                           MAX(COALESCE(o.updated_at, o.created_at)) AS used_at
+                    FROM orders o
+                    WHERE o.user_id = :uid
+                      AND o.coupon_id IS NOT NULL
+                      AND o.coupon_id > 0
+                      AND LOWER(TRIM(o.status)) IN ($in)
+                      AND NOT EXISTS (
+                          SELECT 1 FROM return_requests r
+                          WHERE r.order_id = o.id
+                            AND LOWER(TRIM(r.status)) IN ('completed', 'done', 'closed')
+                            AND ($refundOk)
+                      )
+                    GROUP BY o.coupon_id";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
     } catch (PDOException $e) {
         return [];
     }
@@ -760,7 +1022,9 @@ function markUserCouponUsedAfterOrderStatusChange($pdo, $order_id, $new_status) 
 }
 
 /**
- * 檢查會員是否可使用指定優惠券（已領取，且尚未在「完成態」訂單中耗用）
+ * 檢查會員是否可於結帳套用指定優惠券：
+ * - 券須存在；若曾領取至 user_coupons 亦可；
+ * - 未領取者仍可輸入後台發行之有效代碼（與「成功完成訂單僅能用一次」之 orders 邏輯一致）
  */
 function validateUserCouponOwnership($pdo, $user_id, $coupon_code) {
     $coupon_code = normalizeCouponCode($coupon_code);
@@ -773,33 +1037,15 @@ function validateUserCouponOwnership($pdo, $user_id, $coupon_code) {
         return ['valid' => false, 'message' => '此優惠券不存在'];
     }
 
-    try {
-        $stmt = $pdo->prepare("SELECT id
-                               FROM user_coupons
-                               WHERE user_id = :user_id
-                                 AND coupon_id = :coupon_id
-                               LIMIT 1");
-        $stmt->execute([
-            ':user_id' => (int)$user_id,
-            ':coupon_id' => (int)$coupon['id']
-        ]);
-        $user_coupon = $stmt->fetch();
-
-        if (!$user_coupon) {
-            return ['valid' => false, 'message' => '此優惠券尚未領取'];
-        }
-        if (userHasConsumedCouponInCompletedOrder($pdo, (int)$user_id, (int)$coupon['id'])) {
-            return ['valid' => false, 'message' => '此優惠券已使用'];
-        }
-
-        return ['valid' => true, 'message' => '可使用'];
-    } catch (PDOException $e) {
-        return ['valid' => false, 'message' => '驗證會員優惠券時發生錯誤'];
+    if (userHasConsumedCouponInCompletedOrder($pdo, (int)$user_id, (int)$coupon['id'])) {
+        return ['valid' => false, 'message' => '此優惠券已於完成訂單中使用過'];
     }
+
+    return ['valid' => true, 'message' => '可使用'];
 }
 
 /**
- * 將會員優惠券標記為已使用（應於訂單進入 paid/shipped/completed/done 時呼叫，與 orders 一致）
+ * 將會員優惠券標記為已使用（應於訂單進入 completed／done 時呼叫，與 orders 耗用邏輯一致）
  */
 function markUserCouponUsed($pdo, $user_id, $coupon_code) {
     $coupon_code = normalizeCouponCode($coupon_code);
@@ -826,6 +1072,55 @@ function markUserCouponUsed($pdo, $user_id, $coupon_code) {
     } catch (PDOException $e) {
         return false;
     }
+}
+
+/**
+ * 訂單取消或退貨退款完成後：將該訂單綁定之 user_coupons 恢復為未使用（若無列則略過）
+ */
+function markUserCouponUnusedForOrder(PDO $pdo, int $order_id): void {
+    $order_id = (int)$order_id;
+    if ($order_id <= 0) {
+        return;
+    }
+    try {
+        $stmt = $pdo->prepare('SELECT user_id, coupon_id FROM orders WHERE id = :id LIMIT 1');
+        $stmt->execute([':id' => $order_id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            return;
+        }
+        $uid = (int)($row['user_id'] ?? 0);
+        $cid = (int)($row['coupon_id'] ?? 0);
+        if ($uid <= 0 || $cid <= 0) {
+            return;
+        }
+        $upd = $pdo->prepare("UPDATE user_coupons
+                              SET status = 'unused'
+                              WHERE user_id = :uid
+                                AND coupon_id = :cid
+                                AND status = 'used'");
+        $upd->execute([':uid' => $uid, ':cid' => $cid]);
+    } catch (PDOException $e) {
+        // ignore
+    }
+}
+
+/**
+ * 訂單狀態改為已取消時：釋放 user_coupons 標記（orders 是否仍算耗用改由 userHasConsumedCouponInCompletedOrder 判斷）
+ */
+function markUserCouponReleasedAfterOrderStatusChange(PDO $pdo, int $order_id, string $new_status): void {
+    $new_status = strtolower(trim($new_status));
+    if ($order_id <= 0 || $new_status !== 'cancelled') {
+        return;
+    }
+    markUserCouponUnusedForOrder($pdo, $order_id);
+}
+
+/**
+ * 退貨結案且已退款後：釋放該訂單優惠券於 user_coupons 之「已使用」標記
+ */
+function releaseCouponUsageAfterReturnRefunded(PDO $pdo, int $order_id): void {
+    markUserCouponUnusedForOrder($pdo, $order_id);
 }
 
 /**

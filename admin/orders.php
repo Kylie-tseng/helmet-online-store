@@ -13,27 +13,27 @@ if (($_SESSION['role'] ?? '') !== 'admin') {
 
 $q = trim($_GET['q'] ?? '');
 $status = trim($_GET['status'] ?? '');
-$flashMessage = (string)($_SESSION['admin_orders_flash'] ?? '');
+$flashMessage = (string) ($_SESSION['admin_orders_flash'] ?? '');
 unset($_SESSION['admin_orders_flash']);
 
-$allowedStatuses = ['pending', 'shipped', 'completed', 'return_requested', 'cancelled'];
-$lockedStatuses = ['completed', 'cancelled'];
-if ($status !== '' && !in_array($status, $allowedStatuses, true)) {
+$allowedStatuses = app_orders_discover_status_enum($pdo);
+/** 清單篩選鍵（與店員訂單頁一致，非 ENUM 一對一） */
+$adminOrderListFilterKeys = ['pending', 'paid', 'shipped', 'completed', 'cancelled'];
+$lockedStatuses = ['completed', 'cancelled', 'done'];
+if ($status !== '' && !in_array($status, $adminOrderListFilterKeys, true)) {
     $status = '';
 }
 
-$statusLabels = [
-    'pending' => '待處理',
-    'shipped' => '已出貨',
-    'completed' => '已完成',
-    'cancelled' => '已取消',
-];
+$statusLabels = [];
+foreach ($allowedStatuses as $st) {
+    $statusLabels[(string) $st] = app_backoffice_order_status_label((string) $st);
+}
 
 $hasStaffNoteColumn = false;
 try {
-    $stmt = $pdo->query("SHOW COLUMNS FROM orders");
+    $stmt = $pdo->query('SHOW COLUMNS FROM orders');
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $col) {
-        if ((string)$col['Field'] === 'staff_note') {
+        if ((string) $col['Field'] === 'staff_note') {
             $hasStaffNoteColumn = true;
             break;
         }
@@ -47,13 +47,14 @@ if (!function_exists('adminOrdersRedirectWithFlash')) {
     {
         $_SESSION['admin_orders_flash'] = $message;
         $query = [];
-        $q = trim((string)($_GET['q'] ?? ''));
-        $status = trim((string)($_GET['status'] ?? ''));
+        $src = array_merge($_GET, $_POST);
+        $q = trim((string) ($src['preserve_q'] ?? $src['q'] ?? ''));
+        $st = trim((string) ($src['preserve_status'] ?? $src['status'] ?? ''));
         if ($q !== '') {
             $query['q'] = $q;
         }
-        if ($status !== '') {
-            $query['status'] = $status;
+        if ($st !== '') {
+            $query['status'] = $st;
         }
         $target = 'orders.php';
         if (!empty($query)) {
@@ -88,6 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $pdo->prepare("UPDATE orders SET status = :status, updated_at = NOW() WHERE id = :id");
             $stmt->execute([':status' => $newStatus, ':id' => $orderId]);
             markUserCouponUsedAfterOrderStatusChange($pdo, $orderId, $newStatus);
+            markUserCouponReleasedAfterOrderStatusChange($pdo, $orderId, $newStatus);
             adminOrdersRedirectWithFlash('訂單狀態已更新。');
         } catch (Throwable $e) {
             adminOrdersRedirectWithFlash('更新失敗，請稍後再試。');
@@ -124,8 +126,9 @@ try {
             WHERE 1=1";
     $params = [];
     if ($status !== '') {
-        $sql .= " AND o.status = :status";
-        $params[':status'] = $status;
+        [$stSql, $stParams] = app_orders_backoffice_list_status_clause($status, $allowedStatuses, 'o', 'adm');
+        $sql .= $stSql;
+        $params = array_merge($params, $stParams);
     }
     if ($q !== '') {
         $sql .= " AND (
@@ -144,58 +147,23 @@ try {
     $orders = [];
 }
 
-$stats = [
-    'pending' => 0,
-    'shipped' => 0,
-    'completed' => 0,
-    'cancelled' => 0,
+$overviewBuckets = app_orders_compute_overview_buckets($pdo, $allowedStatuses);
+$overviewCards = [
+    ['key' => 'pending', 'label' => '待處理'],
+    ['key' => 'paid', 'label' => '已付款'],
+    ['key' => 'shipped', 'label' => '已出貨'],
+    ['key' => 'completed', 'label' => '已完成'],
+    ['key' => 'cancelled', 'label' => '已取消'],
 ];
-try {
-    $where = [];
-    $params = [];
-    if ($status !== '') {
-        $where[] = "o.status = :status";
-        $params[':status'] = $status;
-    }
-    if ($q !== '') {
-        $where[] = "(CAST(o.id AS CHAR) LIKE :q OR u.name LIKE :q OR u.username LIKE :q)";
-        $params[':q'] = '%' . $q . '%';
-    }
-    $whereSql = $where ? (' WHERE ' . implode(' AND ', $where)) : '';
-    $sql = "SELECT o.status, COUNT(*) AS cnt
-            FROM orders o
-            LEFT JOIN users u ON u.id = o.user_id
-            {$whereSql}
-            GROUP BY o.status";
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute($params);
-    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
-        $s = (string)($r['status'] ?? '');
-        if (isset($stats[$s])) {
-            $stats[$s] = (int)($r['cnt'] ?? 0);
-        }
-    }
-} catch (Throwable $e) {
-}
 
 $recentOrders = [];
 try {
-    $where = [];
-    $params = [];
-    if ($q !== '') {
-        $where[] = "(CAST(o.id AS CHAR) LIKE :q OR u.name LIKE :q OR u.username LIKE :q)";
-        $params[':q'] = '%' . $q . '%';
-    }
-    $whereSql = $where ? (' WHERE ' . implode(' AND ', $where)) : '';
     $sql = "SELECT o.id, o.final_amount, o.status, o.created_at, u.name AS user_name
             FROM orders o
             LEFT JOIN users u ON u.id = o.user_id
-            {$whereSql}
             ORDER BY o.created_at DESC
             LIMIT 5";
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute($params);
-    $recentOrders = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $recentOrders = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
 } catch (Throwable $e) {
     $recentOrders = [];
 }
@@ -217,9 +185,9 @@ staffPageStart($pdo, '訂單與營運', 'orders');
         >
         <select name="status" class="staff-select">
             <option value="">全部</option>
-            <?php foreach ($allowedStatuses as $item): ?>
-                <option value="<?php echo htmlspecialchars($item); ?>" <?php echo $status === $item ? 'selected' : ''; ?>>
-                    <?php echo htmlspecialchars($statusLabels[$item] ?? $item); ?>
+            <?php foreach ($adminOrderListFilterKeys as $fk): ?>
+                <option value="<?php echo htmlspecialchars($fk); ?>" <?php echo $status === $fk ? 'selected' : ''; ?>>
+                    <?php echo htmlspecialchars(app_backoffice_order_status_label($fk)); ?>
                 </option>
             <?php endforeach; ?>
         </select>
@@ -227,22 +195,13 @@ staffPageStart($pdo, '訂單與營運', 'orders');
     </form>
 
     <div class="staff-stats-grid" style="margin-top: 12px;">
-        <article class="staff-stat-card">
-            <div class="staff-stat-label">待處理訂單</div>
-            <div class="staff-stat-value"><?php echo number_format((int)$stats['pending']); ?></div>
-        </article>
-        <article class="staff-stat-card">
-            <div class="staff-stat-label">已出貨</div>
-            <div class="staff-stat-value"><?php echo number_format((int)$stats['shipped']); ?></div>
-        </article>
-        <article class="staff-stat-card">
-            <div class="staff-stat-label">已完成</div>
-            <div class="staff-stat-value"><?php echo number_format((int)$stats['completed']); ?></div>
-        </article>
-        <article class="staff-stat-card">
-            <div class="staff-stat-label">已取消</div>
-            <div class="staff-stat-value"><?php echo number_format((int)$stats['cancelled']); ?></div>
-        </article>
+        <?php foreach ($overviewCards as $card): ?>
+            <?php $ck = (string) $card['key']; ?>
+            <article class="staff-stat-card">
+                <div class="staff-stat-label"><?php echo htmlspecialchars((string) $card['label']); ?></div>
+                <div class="staff-stat-value"><?php echo number_format((int) ($overviewBuckets[$ck] ?? 0)); ?></div>
+            </article>
+        <?php endforeach; ?>
     </div>
 
     <div class="staff-panel-head" style="margin-top: 16px; margin-bottom: 10px;">
@@ -268,7 +227,7 @@ staffPageStart($pdo, '訂單與營運', 'orders');
                             <td>#<?php echo (int)$o['id']; ?></td>
                             <td><?php echo htmlspecialchars((string)($o['user_name'] ?? '訪客')); ?></td>
                             <td><?php echo htmlspecialchars(staffCurrency((float)($o['final_amount'] ?? 0))); ?></td>
-                            <td><span class="staff-badge <?php echo staffStatusBadgeClass((string)($o['status'] ?? '')); ?>"><?php echo htmlspecialchars($statusLabels[(string)($o['status'] ?? '')] ?? (string)($o['status'] ?? '')); ?></span></td>
+                            <td><span class="staff-badge <?php echo staffStatusBadgeClass((string)($o['status'] ?? '')); ?>"><?php echo htmlspecialchars(app_backoffice_order_status_label((string)($o['status'] ?? ''))); ?></span></td>
                             <td><?php echo htmlspecialchars(date('Y-m-d', strtotime((string)($o['created_at'] ?? '')))); ?></td>
                         </tr>
                     <?php endforeach; ?>
@@ -314,12 +273,14 @@ staffPageStart($pdo, '訂單與營運', 'orders');
                             <td><?php echo htmlspecialchars(staffCurrency((float)($order['final_amount'] ?? 0))); ?></td>
                             <td>
                                 <span class="staff-badge <?php echo staffStatusBadgeClass($orderStatus); ?>">
-                                    <?php echo htmlspecialchars($statusLabels[$orderStatus] ?? $orderStatus); ?>
+                                    <?php echo htmlspecialchars(app_backoffice_order_status_label($orderStatus)); ?>
                                 </span>
                             </td>
                             <td>
                                 <form method="POST" class="staff-inline-form staff-inline-stack">
                                     <input type="hidden" name="action" value="update_note">
+                                    <input type="hidden" name="preserve_q" value="<?php echo htmlspecialchars($q); ?>">
+                                    <input type="hidden" name="preserve_status" value="<?php echo htmlspecialchars($status); ?>">
                                     <input type="hidden" name="order_id" value="<?php echo (int)$order['id']; ?>">
                                     <input
                                         type="text"
@@ -336,11 +297,13 @@ staffPageStart($pdo, '訂單與營運', 'orders');
                                 <div class="staff-order-actions">
                                     <form method="POST" class="staff-inline-form">
                                         <input type="hidden" name="action" value="update_status">
+                                        <input type="hidden" name="preserve_q" value="<?php echo htmlspecialchars($q); ?>">
+                                        <input type="hidden" name="preserve_status" value="<?php echo htmlspecialchars($status); ?>">
                                         <input type="hidden" name="order_id" value="<?php echo (int)$order['id']; ?>">
                                         <select name="new_status" class="staff-select staff-select-mini" <?php echo $isLocked ? 'disabled' : ''; ?>>
                                             <?php foreach ($allowedStatuses as $item): ?>
-                                                <option value="<?php echo htmlspecialchars($item); ?>" <?php echo ($orderStatus === $item) ? 'selected' : ''; ?>>
-                                                    <?php echo htmlspecialchars($statusLabels[$item] ?? $item); ?>
+                                                <option value="<?php echo htmlspecialchars($item); ?>" <?php echo app_orders_status_option_is_selected($orderStatus, (string) $item) ? 'selected' : ''; ?>>
+                                                    <?php echo htmlspecialchars($statusLabels[$item] ?? app_backoffice_order_status_label((string) $item)); ?>
                                                 </option>
                                             <?php endforeach; ?>
                                         </select>

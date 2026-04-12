@@ -9926,6 +9926,56 @@ body.staff-page .staff-navbar-logout {
     margin-right: 6px;
 }
 
+/* 訂單列表／退貨列表：列尾操作區（與 staff/orders.php 內嵌樣式一致，供多頁共用） */
+.staff-page .staff-order-actions-row {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 14px;
+    max-width: 100%;
+}
+
+.staff-page .staff-order-actions-row .staff-inline-form {
+    display: inline-flex;
+    flex: 0 1 auto;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+}
+
+.staff-page .staff-order-actions-row .staff-select.staff-select-mini {
+    min-width: 0;
+}
+
+.staff-page .staff-order-actions-row .staff-select--order-row {
+    max-width: 118px;
+    min-width: 0;
+}
+
+.staff-page .staff-order-actions-row .staff-input--order-note-row {
+    width: 120px;
+    min-width: 72px;
+    max-width: 140px;
+}
+
+.staff-page .staff-order-actions-row .staff-action-btn--compact {
+    padding: 4px 8px;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+@media (max-width: 1100px) {
+    .staff-page .staff-order-actions-row .staff-input--order-note-row {
+        width: 88px;
+    }
+
+    .staff-page .staff-order-actions-row .staff-select--order-row {
+        max-width: 100px;
+    }
+}
+
 .staff-page .staff-inline-stack {
     align-items: stretch;
     flex-wrap: wrap;
@@ -9937,6 +9987,274 @@ body.staff-page .staff-navbar-logout {
     flex-direction: column;
     gap: 8px;
     align-items: flex-start;
+}
+
+/* 退貨申請處理：整塊收斂寬度，清單維持在容器內 */
+.staff-page .staff-panel.staff-panel--returns {
+    max-width: 1240px;
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.staff-page .staff-panel--returns .returns-table .staff-badge {
+    padding: 3px 8px;
+    font-size: 11px;
+}
+
+/* 退貨頁篩選列：略縮寬度，整排留在面板內、按鈕不被切 */
+.staff-page .staff-panel--returns form.staff-toolbar {
+    gap: 8px 10px;
+}
+
+.staff-page .staff-panel--returns form.staff-toolbar > .staff-input {
+    flex: 1 1 200px;
+    min-width: 0;
+    max-width: min(100%, 340px);
+}
+
+.staff-page .staff-panel--returns form.staff-toolbar > .staff-select {
+    flex: 0 0 auto;
+    width: 148px;
+    max-width: 148px;
+    min-width: 0;
+}
+
+.staff-page .staff-panel--returns form.staff-toolbar > .staff-btn {
+    flex: 0 0 auto;
+    flex-shrink: 0;
+}
+
+/* 店員退貨申請清單：等比例縮欄寬；表格外層必要時橫向捲動 */
+.staff-page .returns-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+}
+
+.staff-page .returns-table.returns-table--grid {
+    /* 664 + 操作 422 + gap 40 = 1126：對齊 .container(1200)+padding 與 staff-panel 內距，避免右側被切 */
+    --returns-grid-cols: 50px 60px 68px 76px 75px 75px 130px 130px 422px;
+    --returns-grid-gap: 5px;
+    display: block;
+    width: 100%;
+    min-width: 1126px;
+    max-width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.staff-page .returns-table.returns-table--grid thead,
+.staff-page .returns-table.returns-table--grid tbody {
+    display: block;
+    width: 100%;
+}
+
+.staff-page .returns-table.returns-table--grid thead tr.returns-table-head,
+.staff-page .returns-table.returns-table--grid tbody tr.returns-row {
+    display: grid;
+    grid-template-columns: var(--returns-grid-cols);
+    gap: var(--returns-grid-gap);
+    align-items: center;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.staff-page .returns-table.returns-table--grid thead th,
+.staff-page .returns-table.returns-table--grid tbody tr.returns-row td {
+    padding: 8px 6px;
+    margin: 0;
+    border: none;
+    border-bottom: 1px solid #eceff3;
+    font-size: 14px;
+    text-align: left;
+    vertical-align: middle;
+    min-width: 0;
+}
+
+.staff-page .returns-table.returns-table--grid thead th {
+    font-size: 14px;
+    font-weight: 600;
+    color: #6b7280;
+}
+
+.staff-page .returns-table.returns-table--grid .returns-th-actions {
+    text-align: left;
+}
+
+.staff-page .returns-table.returns-table--grid .col-id,
+.staff-page .returns-table.returns-table--grid .col-order,
+.staff-page .returns-table.returns-table--grid .col-user,
+.staff-page .returns-table.returns-table--grid .col-reason,
+.staff-page .returns-table.returns-table--grid .col-status,
+.staff-page .returns-table.returns-table--grid .col-date,
+.staff-page .returns-table.returns-table--grid .col-action {
+    min-width: 0;
+}
+
+.staff-page .returns-table.returns-table--grid th.col-date,
+.staff-page .returns-table.returns-table--grid td.col-date {
+    white-space: nowrap;
+    font-size: 14px;
+    line-height: 1.25;
+    width: 130px;
+    max-width: 130px;
+    box-sizing: border-box;
+}
+
+.staff-page .returns-table.returns-table--grid thead th.col-date {
+    font-size: 14px;
+}
+
+.staff-page .returns-table.returns-table--grid th.col-status,
+.staff-page .returns-table.returns-table--grid td.col-status {
+    white-space: nowrap;
+}
+
+.staff-page .returns-table.returns-table--grid tbody tr.returns-row td.returns-td-reason {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.staff-page .returns-table.returns-table--grid thead th.col-action,
+.staff-page .returns-table.returns-table--grid tbody tr.returns-row td.col-action {
+    text-align: left;
+    width: 422px;
+    min-width: 422px;
+    max-width: 422px;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.staff-page .returns-table.returns-table--grid tbody tr.returns-meta-row,
+.staff-page .returns-table.returns-table--grid tbody tr.staff-order-detail-row {
+    display: block;
+    width: 100%;
+}
+
+.staff-page .returns-table.returns-table--grid tbody tr.returns-meta-row td,
+.staff-page .returns-table.returns-table--grid tbody tr.staff-order-detail-row td {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    border-bottom: 1px solid #eceff3;
+}
+
+.staff-page .returns-table.returns-table--grid tbody tr.returns-meta-row td {
+    padding: 12px 0;
+    font-size: 14px;
+}
+
+.staff-page .returns-table.returns-table--grid tbody tr.staff-order-detail-row td {
+    padding: 0;
+    border: none;
+}
+
+.staff-page .returns-td-actions {
+    text-align: left;
+    vertical-align: middle;
+    min-width: 0;
+    padding: 0;
+    margin: 0;
+}
+
+/* 操作欄水平 padding 略收，配合 422px 欄寬容納 80+80+90+56+84 與 gap:6 */
+.staff-page .returns-table.returns-table--grid tbody tr.returns-row td.returns-td-actions {
+    padding: 6px 3px;
+}
+
+.staff-page .returns-actions--muted {
+    opacity: 0.72;
+}
+
+/* 操作欄：單一 flex 列，表單 display:contents 讓五個控制項成為同列 flex 子項 */
+.staff-page .returns-td-actions .returns-actions {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 6px;
+    flex-wrap: nowrap;
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.staff-page .returns-td-actions .returns-actions-form {
+    display: contents;
+}
+
+.staff-page .returns-td-actions .returns-actions .returns-actions__select {
+    flex: 0 0 auto;
+    flex-shrink: 0;
+    width: 80px;
+    min-width: 80px;
+    max-width: 80px;
+    height: 34px;
+    min-height: 34px;
+    box-sizing: border-box;
+    font-size: 12px;
+    padding: 0 3px;
+}
+
+.staff-page .returns-td-actions .returns-actions .returns-actions__input {
+    flex: 0 0 auto;
+    flex-shrink: 0;
+    width: 90px;
+    min-width: 90px;
+    max-width: 90px;
+    height: 34px;
+    min-height: 34px;
+    box-sizing: border-box;
+    font-size: 12px;
+    padding: 0 4px;
+}
+
+.staff-page .returns-td-actions .returns-actions .returns-actions__btn--save {
+    flex: 0 0 auto;
+    flex-shrink: 0;
+    width: 56px;
+    min-width: 56px;
+    max-width: 56px;
+    height: 34px;
+    min-height: 34px;
+    padding: 0 2px;
+    font-size: 12px;
+    white-space: nowrap;
+    box-sizing: border-box;
+}
+
+.staff-page .returns-td-actions .returns-actions .returns-actions__btn--view {
+    flex: 0 0 auto;
+    flex-shrink: 0;
+    width: 84px;
+    min-width: 84px;
+    max-width: 84px;
+    height: 34px;
+    min-height: 34px;
+    padding: 0 2px;
+    font-size: 12px;
+    white-space: nowrap;
+    box-sizing: border-box;
+}
+
+.staff-page .returns-td-actions .returns-actions .returns-actions-static.returns-actions__ctl {
+    flex: 0 0 auto;
+    flex-shrink: 0;
+    min-width: 24px;
+}
+
+.staff-page .returns-actions-static {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 32px;
+    padding: 0 4px;
+    font-size: 12px;
+    color: #6b7280;
 }
 
 .staff-page .staff-order-actions {
@@ -10081,6 +10399,19 @@ body.staff-page .staff-navbar-logout {
     font-size: 17px;
     font-weight: 700;
     color: #111827;
+}
+
+.staff-page .stock-line {
+    font-size: 13px;
+    color: #374151;
+    margin-top: 6px;
+    white-space: nowrap;
+    line-height: 1.4;
+}
+
+.staff-page .stock-line .low-stock {
+    color: #dc2626;
+    font-weight: 600;
 }
 
 .staff-page .staff-product-info-row {
@@ -10265,6 +10596,279 @@ body.staff-page .staff-navbar-logout {
 .staff-page .staff-badge.progress { background: #eef2f7; color: #1f2937; }
 .staff-page .staff-badge.done { background: #edf5ef; color: #14532d; }
 .staff-page .staff-badge.danger { background: #f9eded; color: #7f1d1d; }
+
+/* 店員後台：銷售報表（KPI 列與訂單處理頁同一套 staff-panel / staff-stat-card） */
+.staff-page .staff-stats-grid--sales-kpis {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 10px;
+}
+
+.staff-page .staff-stats-grid--sales-kpis .staff-stat-card {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.staff-page .staff-stats-grid--sales-kpis .staff-sales-kpi-note {
+    margin: 4px 0 0;
+    font-size: 12px;
+    line-height: 1.35;
+    color: #6b7280;
+}
+
+@media (max-width: 768px) {
+    .staff-page .staff-stats-grid--sales-kpis {
+        flex-wrap: wrap;
+    }
+
+    .staff-page .staff-stats-grid--sales-kpis .staff-stat-card {
+        flex: 1 1 calc(50% - 5px);
+        min-width: 140px;
+    }
+}
+
+/* 店員 sales_report：本月銷售日曆 + 單日詳情 */
+.staff-page #sales-calendar,
+.staff-page #daily-detail {
+    scroll-margin-top: 96px;
+}
+
+.staff-page .staff-sales-report-section {
+    margin-top: 22px;
+}
+
+.staff-page .staff-sales-report-section--first {
+    margin-top: 0;
+}
+
+.staff-page .staff-sales-report-section > .staff-panel-head {
+    margin-bottom: 8px;
+}
+
+.staff-page .staff-sales-month-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 12px 16px;
+    margin-bottom: 8px;
+}
+
+.staff-page .staff-sales-month-nav-btn.staff-btn {
+    padding: 7px 14px;
+    font-size: 13px;
+}
+
+.staff-page .staff-sales-month-nav-btn--disabled {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 7px 14px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #9ca3af;
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+    background: #f3f4f6;
+    cursor: not-allowed;
+    user-select: none;
+}
+
+.staff-page .staff-sales-month-label {
+    font-size: 16px;
+    font-weight: 800;
+    color: #111827;
+    min-width: 8.5rem;
+    text-align: center;
+}
+
+.staff-page .staff-sales-section-lede {
+    margin: 0 0 12px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #6b7280;
+}
+
+.staff-page .staff-sales-section-lede--date {
+    margin-top: -4px;
+    margin-bottom: 10px;
+    font-weight: 600;
+    color: #374151;
+}
+
+.staff-page .staff-sales-cal-wrap,
+.staff-page .staff-sales-day-wrap {
+    margin-top: 0;
+    padding: 16px 14px 18px;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    background: #fff;
+    box-sizing: border-box;
+}
+
+.staff-page .staff-sales-day-wrap--daily-summary {
+    padding: 0;
+    border: none;
+    background: transparent;
+}
+
+/* 店員 sales_report：單日銷售重點（一張結論卡） */
+.staff-page .daily-summary-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    padding: 22px 26px;
+    box-sizing: border-box;
+}
+
+.staff-page .daily-summary-title {
+    font-size: 14px;
+    color: #6b7280;
+    margin-bottom: 12px;
+    font-weight: 600;
+}
+
+.staff-page .daily-summary-revenue {
+    font-size: 28px;
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: 14px;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+}
+
+.staff-page .daily-summary-meta {
+    font-size: 14px;
+    color: #374151;
+    margin-bottom: 10px;
+    line-height: 1.5;
+}
+
+.staff-page .daily-summary-status {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 16px;
+    font-size: 13px;
+    color: #6b7280;
+    line-height: 1.45;
+}
+
+.staff-page .daily-summary-status__sep {
+    color: #d1d5db;
+    user-select: none;
+}
+
+@media (max-width: 520px) {
+    .staff-page .daily-summary-card {
+        padding: 18px 16px;
+    }
+
+    .staff-page .daily-summary-revenue {
+        font-size: 24px;
+    }
+}
+
+.staff-page .staff-sales-cal-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.staff-page .staff-sales-cal-wd {
+    text-align: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: #6b7280;
+    padding: 4px 0;
+}
+
+.staff-page .staff-sales-cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.staff-page .staff-sales-cal-cell {
+    min-height: 72px;
+    min-width: 0;
+}
+
+.staff-page .staff-sales-cal-cell--empty {
+    min-height: 72px;
+    min-width: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.staff-page .staff-sales-cal-day {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    height: 100%;
+    min-height: 72px;
+    padding: 8px 6px;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #fafafa;
+    text-decoration: none;
+    color: #111827;
+    box-sizing: border-box;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.staff-page .staff-sales-cal-day:hover {
+    border-color: #d1d5db;
+    background: #fff;
+}
+
+.staff-page .staff-sales-cal-day--today {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+}
+
+.staff-page .staff-sales-cal-day--active {
+    border-color: #2f2f2f;
+    box-shadow: 0 0 0 1px rgba(47, 47, 47, 0.25);
+    background: #fff;
+}
+
+.staff-page .staff-sales-cal-day-num {
+    font-size: 15px;
+    font-weight: 800;
+    line-height: 1.2;
+    margin-bottom: 4px;
+}
+
+.staff-page .staff-sales-cal-day-rev {
+    font-size: 11px;
+    font-weight: 600;
+    color: #374151;
+    line-height: 1.25;
+    word-break: break-all;
+}
+
+.staff-page .staff-sales-cal-day-orders {
+    margin-top: 2px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #6b7280;
+}
+
+@media (max-width: 520px) {
+    .staff-page .staff-sales-cal-day {
+        min-height: 64px;
+        padding: 6px 4px;
+    }
+
+    .staff-page .staff-sales-cal-day-rev,
+    .staff-page .staff-sales-cal-day-orders {
+        font-size: 10px;
+    }
+}
 
 .staff-page .order-detail-panel {
     margin: 8px 0;
@@ -20529,4 +21133,81 @@ body.app-modal-open {
 
 .app-modal-btn--ghost:hover {
   background: #f9fafb;
+}
+
+/* ===== 購物車 加購區 UI 優化（卡片變小 + 去灰底） ===== */
+
+.cart-addon-section {
+  background: transparent !important;
+}
+
+.cart-addon-section .addon-card {
+  width: 220px !important;
+  min-width: 220px !important;
+  max-width: 220px !important;
+
+  background: #ffffff !important;
+  border: 1px solid #eee !important;
+
+  padding: 12px !important;
+  border-radius: 12px !important;
+
+  transition: all 0.2s ease;
+}
+
+.cart-addon-section .addon-card .addon-image {
+  background: transparent !important;
+}
+
+.cart-addon-section .addon-list {
+  gap: 16px !important;
+}
+
+.cart-addon-section .addon-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+}
+
+/* 加購商品圖：縮小寬度、移除圖片區灰底（覆寫 .addon-image-wrap / .cart-page-layout） */
+.cart-page-layout .cart-addon-section .addon-image-link {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: transparent !important;
+}
+
+.cart-page-layout .cart-addon-section .addon-image-wrap {
+  background: transparent !important;
+  width: auto !important;
+  max-width: 108px !important;
+  height: auto !important;
+  min-height: 0 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cart-page-layout .cart-addon-section .addon-image {
+  width: auto !important;
+  max-width: 100% !important;
+  height: auto !important;
+  max-height: 76px !important;
+  object-fit: contain !important;
+  background: transparent !important;
+}
+
+.cart-addon-section .addon-track {
+  gap: 16px !important;
+}
+
+@media (max-width: 768px) {
+  .cart-page-layout .cart-addon-section .addon-image-wrap {
+    max-width: 96px !important;
+    height: auto !important;
+  }
+
+  .cart-page-layout .cart-addon-section .addon-image {
+    max-height: 70px !important;
+  }
 }

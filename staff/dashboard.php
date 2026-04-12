@@ -1,10 +1,21 @@
 <?php
+date_default_timezone_set('Asia/Taipei');
 
 require_once '../config.php';
 
 require_once __DIR__ . '/includes/staff_layout.php';
 
+require_once __DIR__ . '/../includes/order_status_helpers.php';
+
 staffRequireAuth();
+
+// 與 PHP「今天」一致：本連線以台灣時區解讀 orders.created_at 之 DATE()
+try {
+    $pdo->exec("SET time_zone = '+08:00'");
+} catch (Throwable $e) {
+}
+
+$today = date('Y-m-d');
 
 $summary = [
     'pending_orders' => 0,
@@ -15,80 +26,50 @@ $summary = [
     'inactive_products' => 0,
 ];
 
-// 待處理訂單數
+// 待處理訂單（與訂單處理頁「待處理」概覽同口徑：全表即時 COUNT）
 try {
-    $stmt = $pdo->query("SELECT status, COUNT(*) AS cnt FROM orders GROUP BY status");
-    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-        $s = (string)$row['status'];
-        $c = (int)$row['cnt'];
-        if (in_array($s, ['pending', 'pending_payment'], true)) {
-            $summary['pending_orders'] += $c;
-        }
-    }
+    $enumStatuses = app_orders_discover_status_enum($pdo);
+    $ob = app_orders_compute_overview_buckets($pdo, $enumStatuses);
+    $summary['pending_orders'] = (int) ($ob['pending'] ?? 0);
 } catch (Throwable $e) {
 }
 
-// 待處理退貨數
+// 待處理退貨（依申請 status；與 returns.php 待處理語意一致，不用 refund_status 代替）
 try {
     $stmt = $pdo->query("SHOW TABLES LIKE 'return_requests'");
     $hasReturnRequests = (bool)$stmt->fetchColumn();
     if ($hasReturnRequests) {
-        $hasRefundStatusColumn = false;
-        try {
-            $cols = $pdo->query("SHOW COLUMNS FROM return_requests");
-            foreach ($cols->fetchAll(PDO::FETCH_ASSOC) as $c) {
-                if ((string)($c['Field'] ?? '') === 'refund_status') {
-                    $hasRefundStatusColumn = true;
-                    break;
-                }
-            }
-        } catch (Throwable $e) {
-            $hasRefundStatusColumn = false;
-        }
-
-        if ($hasRefundStatusColumn) {
-            $stmt = $pdo->query("SELECT COUNT(*) FROM return_requests WHERE refund_status = 'pending_refund'");
-            $summary['pending_returns'] = (int)$stmt->fetchColumn();
-        } else {
-            $stmt = $pdo->query("SELECT COUNT(*) FROM return_requests WHERE status IN ('pending','pending_payment')");
-            $summary['pending_returns'] = (int)$stmt->fetchColumn();
-        }
+        $stmt = $pdo->query("SELECT COUNT(*) FROM return_requests WHERE status IN ('pending','pending_payment')");
+        $summary['pending_returns'] = (int)$stmt->fetchColumn();
     }
 } catch (Throwable $e) {
 }
 
-// 今日營收、今日訂單數（與營收口徑一致：已付款／已出貨／已完成）
+// 今日訂單＝今日建立且非 cancelled；今日營收＝同上日期內 paid／shipped／completed 之 final_amount 加總
 try {
-    $stmt = $pdo->query(
-        "SELECT COALESCE(SUM(final_amount), 0) AS sales,
-                COUNT(*) AS cnt
+    $stmt = $pdo->prepare(
+        "SELECT COALESCE(SUM(CASE WHEN status IN ('paid','shipped','completed') THEN final_amount ELSE 0 END), 0) AS sales,
+                COUNT(CASE WHEN status <> 'cancelled' THEN 1 END) AS cnt
          FROM orders
-         WHERE status IN ('paid','shipped','completed')
-           AND DATE(created_at) = CURDATE()"
+         WHERE DATE(created_at) = :today"
     );
+    $stmt->execute([':today' => $today]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
     $summary['today_sales'] = (float)($row['sales'] ?? 0);
     $summary['today_orders'] = (int)($row['cnt'] ?? 0);
 } catch (Throwable $e) {
 }
 
-// 低庫存商品數（總庫存 ≤ 5）
+// 低庫存商品「種數」：任一尺寸 stock < 5 之商品只算一次（與 product_catalog 低庫存篩選一致）
 try {
-    $stmt = $pdo->query(
-        "SELECT COUNT(*) FROM (
-            SELECT p.id, COALESCE(SUM(ps.stock), 0) AS total_stock
-            FROM products p
-            LEFT JOIN product_sizes ps ON ps.product_id = p.id
-            GROUP BY p.id
-        ) t WHERE t.total_stock <= 5"
-    );
+    $stmt = $pdo->query('SELECT COUNT(DISTINCT product_id) FROM product_sizes WHERE stock < 5');
     $summary['low_stock_products'] = (int)$stmt->fetchColumn();
 } catch (Throwable $e) {
 }
 
-// 未上架商品數（status = inactive）
+// 未上架／非上架中（status 非 active）
 try {
-    $stmt = $pdo->query("SELECT COUNT(*) FROM products WHERE status = 'inactive'");
+    $stmt = $pdo->query("SELECT COUNT(*) FROM products WHERE status <> 'active'");
     $summary['inactive_products'] = (int)$stmt->fetchColumn();
 } catch (Throwable $e) {
 }
@@ -152,7 +133,7 @@ staffPageStart($pdo, '店員工作入口', 'dashboard');
 
         <article class="staff-entry-card staff-entry-card--stack">
             <h2>低庫存提醒</h2>
-            <p class="staff-entry-desc">總庫存 ≤ 5 的商品需留意補貨。</p>
+            <p class="staff-entry-desc">任一品項尺寸庫存 &lt; 5 需留意補貨（與低庫存清單相同口徑）。</p>
             <p class="staff-entry-meta-line">低庫存商品：<?php echo number_format($summary['low_stock_products']); ?> 種</p>
             <a href="product_catalog.php?filter=low_stock" class="staff-btn">查看低庫存</a>
         </article>

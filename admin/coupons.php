@@ -37,8 +37,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             try {
                 $stmt = $pdo->prepare("DELETE FROM coupons WHERE id = :id");
                 $stmt->execute([':id' => $coupon_id]);
-                $message = '優惠券已刪除';
-                $message_type = 'success';
+                staffSetToastSuccess('優惠券已刪除。');
+                header('Location: coupons.php');
+                exit;
             } catch (Throwable $e) {
                 $message = '刪除失敗，請稍後再試';
                 $message_type = 'error';
@@ -54,8 +55,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     ':is_active' => $is_active === 1 ? 0 : 1,
                     ':id' => $coupon_id
                 ]);
-                $message = '優惠券狀態已更新';
-                $message_type = 'success';
+                staffSetToastSuccess('優惠券狀態已更新。');
+                header('Location: coupons.php');
+                exit;
             } catch (Throwable $e) {
                 $message = '更新狀態失敗，請稍後再試';
                 $message_type = 'error';
@@ -116,7 +118,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         ':is_active' => $is_active,
                         ':id' => $coupon_id
                     ]);
-                    $message = '優惠券已更新';
+                    staffSetToastSuccess('優惠券已更新。');
                 } else {
                     $stmt = $pdo->prepare("INSERT INTO coupons
                                            (coupon_code, discount_type, discount_value, minimum_amount, start_date, expire_date, is_active)
@@ -131,9 +133,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         ':expire_date' => $expire_date,
                         ':is_active' => $is_active
                     ]);
-                    $message = '優惠券已新增';
+                    staffSetToastSuccess('優惠券已新增。');
                 }
-                $message_type = 'success';
+                header('Location: coupons.php');
+                exit;
             } catch (Throwable $e) {
                 $message = '儲存失敗，coupon code 可能重複';
                 $message_type = 'error';

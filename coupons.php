@@ -1,10 +1,34 @@
 <?php
 require_once 'config.php';
 require_once 'includes/cart_functions.php';
+
+$isAjaxClaim = $_SERVER['REQUEST_METHOD'] === 'POST'
+    && (($_POST['action'] ?? '') === 'claim_coupon')
+    && !empty($_SERVER['HTTP_X_REQUESTED_WITH'])
+    && strtolower((string)$_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+
+if ($isAjaxClaim) {
+    header('Content-Type: text/html; charset=UTF-8');
+    $claimCode = normalizeCouponCode((string)($_POST['coupon_code'] ?? ''));
+    if ($claimCode === '') {
+        echo '<!DOCTYPE html><html lang="zh-TW"><body><div class="cart-message error">請指定優惠券代碼</div></body></html>';
+        exit;
+    }
+    if (!isset($_SESSION['user_id'])) {
+        echo '<!DOCTYPE html><html lang="zh-TW"><body><div class="cart-message error">請先登入會員再領取優惠券</div></body></html>';
+        exit;
+    }
+    $claim_result = claimUserCoupon($pdo, (int)$_SESSION['user_id'], $claimCode);
+    $mt = $claim_result['success'] ? 'success' : 'error';
+    $msg = htmlspecialchars((string)($claim_result['message'] ?? ''), ENT_QUOTES, 'UTF-8');
+    echo '<!DOCTYPE html><html lang="zh-TW"><body><div class="cart-message ' . htmlspecialchars($mt, ENT_QUOTES, 'UTF-8') . '">' . $msg . '</div></body></html>';
+    exit;
+}
+
 require_once 'includes/navbar.php';
 
 $today = new DateTime('today');
-$coupon_activities = [
+$static_coupon_activities = [
     [
         'tag' => '新會員優惠',
         'title' => '新會員專屬優惠',
@@ -51,6 +75,8 @@ $coupon_activities = [
         'claim_url' => 'coupon_free_shipping.php#claim'
     ]
 ];
+
+$coupon_activities = mergeCouponDirectoryActivitiesWithDb($pdo, $static_coupon_activities);
 
 try {
     $stmt = $pdo->query("SELECT id, name, description FROM categories ORDER BY id");
@@ -187,7 +213,8 @@ try {
                                     <button
                                         type="button"
                                         class="coupon-item-btn coupon-item-btn-primary js-claim-coupon"
-                                        data-post-url="<?php echo htmlspecialchars($activity['detail_url']); ?>"
+                                        data-post-url="<?php echo htmlspecialchars($activity['claim_url'] ?? $activity['detail_url']); ?>"
+                                        <?php if (!empty($activity['claim_post_code'])): ?>data-claim-coupon-code="<?php echo htmlspecialchars((string)$activity['claim_post_code'], ENT_QUOTES, 'UTF-8'); ?>"<?php endif; ?>
                                         style="background:#4e6e8e !important; border:none !important; color:#ffffff !important;"
                                     >立即領取優惠</button>
                                 <?php endif; ?>
@@ -276,7 +303,14 @@ try {
                                 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
                                 'X-Requested-With': 'XMLHttpRequest'
                             },
-                            body: toFormUrlEncoded({ action: 'claim_coupon' })
+                            body: (function () {
+                                var payload = { action: 'claim_coupon' };
+                                var cc = (btn.getAttribute('data-claim-coupon-code') || '').trim();
+                                if (cc) {
+                                    payload.coupon_code = cc;
+                                }
+                                return toFormUrlEncoded(payload);
+                            })()
                         })
                             .then(function (res) { return res.text(); })
                             .then(function (text) {
